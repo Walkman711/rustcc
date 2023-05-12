@@ -49,26 +49,47 @@ impl TryFrom<&str> for Token {
     }
 }
 
-pub fn lex(program: &str) -> Vec<Token> {
-    let mut lexed_tokens = vec![];
+#[derive(Clone, Debug)]
+pub struct Lexer {
+    tokens: Vec<Token>,
+    curr_idx: usize,
+}
 
-    let chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
+impl TryFrom<&str> for Lexer {
+    type Error = RustCcError;
 
-    // TODO: make list of special chars
-    let program_with_whitespace = program
-        .replace(';', " ; ")
-        .replace('-', " - ")
-        .replace('!', " ! ")
-        .replace('~', " ~ ")
-        .replace('(', " ( ")
-        .replace(')', " ) ")
-        .replace('{', " { ")
-        .replace('}', " } ");
+    fn try_from(program: &str) -> Result<Self, Self::Error> {
+        let mut tokens = vec![];
 
-    for token in program_with_whitespace.split_whitespace() {
-        let lexed_token = Token::try_from(token).unwrap();
-        lexed_tokens.push(lexed_token);
+        let chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
+
+        // TODO: make list of special chars
+        let program_with_whitespace = program
+            .replace(';', " ; ")
+            .replace('-', " - ")
+            .replace('!', " ! ")
+            .replace('~', " ~ ")
+            .replace('(', " ( ")
+            .replace(')', " ) ")
+            .replace('{', " { ")
+            .replace('}', " } ");
+
+        for token in program_with_whitespace.split_whitespace() {
+            let lexed_token = Token::try_from(token).unwrap();
+            tokens.push(lexed_token);
+        }
+
+        Ok(Self {
+            tokens,
+            curr_idx: 0,
+        })
     }
+}
 
-    lexed_tokens
+impl Lexer {
+    pub fn get_token(&mut self) -> Option<Token> {
+        let tok = self.tokens.get(self.curr_idx);
+        self.curr_idx += 1;
+        tok.map(|t| t.to_owned())
+    }
 }
