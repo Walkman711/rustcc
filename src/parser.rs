@@ -57,51 +57,51 @@ impl Parser {
     fn parse_fn(&mut self) -> RustCcResult<Function> {
         let tok = self.lexer.get_token();
         let Some(Token::Keyword(Keywords::Int)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.map(|t| t.to_owned())));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok));
         };
 
         let tok = self.lexer.get_token();
         let Some(Token::Identifier(identifier)) = tok else {
-            return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok));
         };
 
         let tok = self.lexer.get_token();
         let Some(Token::OpenParen) = tok else {
-            return Err(RustCcError::ParseError(Token::OpenParen, tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::OpenParen, tok));
         };
 
         let tok = self.lexer.get_token();
         let Some(Token::CloseParen) = tok else {
-            return Err(RustCcError::ParseError(Token::CloseParen, tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::CloseParen, tok));
         };
 
         let tok = self.lexer.get_token();
         let Some(Token::OpenBrace) = tok else {
-            return Err(RustCcError::ParseError(Token::OpenBrace, tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::OpenBrace, tok))
         };
 
         let statement = self.parse_statement()?;
 
-        Ok(Function::Fun(identifier.to_owned(), statement))
+        Ok(Function::Fun(identifier, statement))
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
         let tok = self.lexer.get_token();
         let Some(Token::Keyword(Keywords::Return)) = tok else {
-            return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok));
         };
 
         let exp = self.parse_exp()?;
 
         let tok = self.lexer.get_token();
         let Some(Token::Semicolon) = tok else {
-            return Err(RustCcError::ParseError(Token::Semicolon, tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::Semicolon, tok));
         };
 
         // dbg!(tokens);
         let tok = self.lexer.get_token();
         let Some(Token::CloseBrace) = tok else {
-            return Err(RustCcError::ParseError(Token::CloseBrace, tok.map(|t| t.to_owned())));
+            return Err(RustCcError::ParseError(Token::CloseBrace, tok));
         };
 
         Ok(Statement::Return(exp))
