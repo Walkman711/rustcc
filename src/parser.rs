@@ -88,30 +88,16 @@ impl Parser {
     }
 
     fn parse_fn(&mut self) -> RustCcResult<Function> {
-        let tok = self.lexer.next();
-        let Some(Token::Keyword(Keywords::Int)) = tok else {
-            return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok));
-        };
+        self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
 
-        let tok = self.lexer.next();
+        let tok = self.lexer.next_token();
         let Some(Token::Identifier(identifier)) = tok else {
             return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok));
         };
 
-        let tok = self.lexer.next();
-        let Some(Token::OpenParen) = tok else {
-            return Err(RustCcError::ParseError(Token::OpenParen, tok));
-        };
-
-        let tok = self.lexer.next();
-        let Some(Token::CloseParen) = tok else {
-            return Err(RustCcError::ParseError(Token::CloseParen, tok));
-        };
-
-        let tok = self.lexer.next();
-        let Some(Token::OpenBrace) = tok else {
-            return Err(RustCcError::ParseError(Token::OpenBrace, tok))
-        };
+        self.lexer.expect_next(&Token::OpenParen)?;
+        self.lexer.expect_next(&Token::CloseParen)?;
+        self.lexer.expect_next(&Token::OpenBrace)?;
 
         let statement = self.parse_statement()?;
 
@@ -119,46 +105,22 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
-        let tok = self.lexer.next();
-        let Some(Token::Keyword(Keywords::Return)) = tok else {
-            return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok));
-        };
+        self.lexer.expect_next(&Token::Keyword(Keywords::Return))?;
 
         let exp = self.parse_exp()?;
 
-        let tok = self.lexer.next();
-        let Some(Token::Semicolon) = tok else {
-            return Err(RustCcError::ParseError(Token::Semicolon, tok));
-        };
+        self.lexer.expect_next(&Token::Semicolon)?;
+        self.lexer.expect_next(&Token::CloseBrace)?;
 
         // dbg!(tokens);
-        let tok = self.lexer.next();
-        let Some(Token::CloseBrace) = tok else {
-            return Err(RustCcError::ParseError(Token::CloseBrace, tok));
-        };
 
         Ok(Statement::Return(exp))
     }
 
     fn parse_exp(&mut self) -> RustCcResult<Expression> {
-        // let tok = self.lexer.next().unwrap();
-        // let exp = match tok {
-        //     // Token::Integer(u) => Expression::Const(u),
-        //     // Token::Minus => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
-        //     // Token::ExclamationPoint => {
-        //     //     Expression::UnOp(UnaryOp::LogicalNegation, Box::new(self.parse_exp()?))
-        //     // }
-        //     // Token::Tilde => {
-        //     //     Expression::UnOp(UnaryOp::BitwiseComplement, Box::new(self.parse_exp()?))
-        //     // }
-        //     _ => panic!("come up with better error type for when multiple tokens are valid"),
-        // };
-        // let exp = Expression::Fact(self.parse_factor()?);
-
-        // Ok(exp)
         let first_term = self.parse_term()?;
         let mut trailing_terms = vec![];
-        while let Some(tok) = self.lexer.next() {
+        while let Some(tok) = self.lexer.next_token() {
             let op = match tok {
                 Token::Plus => AddSubtract::Addition,
                 // FIX: no way this works
@@ -178,7 +140,7 @@ impl Parser {
     fn parse_term(&mut self) -> RustCcResult<Term> {
         let first_factor = self.parse_factor()?;
         let mut trailing_factors = vec![];
-        while let Some(tok) = self.lexer.next() {
+        while let Some(tok) = self.lexer.next_token() {
             let op = match tok {
                 Token::Star => MultiplyDivide::Multiply,
                 Token::Slash => MultiplyDivide::Divide,
@@ -195,14 +157,11 @@ impl Parser {
     }
 
     fn parse_factor(&mut self) -> RustCcResult<Factor> {
-        let tok = self.lexer.next().unwrap();
+        let tok = self.lexer.next_token().unwrap();
         let factor = match tok {
             Token::OpenParen => {
                 let f = Factor::ParenExp(Box::new(self.parse_exp()?));
-                let tok = self.lexer.next();
-                let Some(Token::CloseParen) = tok else {
-                    return Err(RustCcError::ParseError(Token::CloseParen, tok));
-                };
+                self.lexer.expect_next(&Token::CloseParen)?;
                 f
             }
             Token::Integer(u) => Factor::Const(u),

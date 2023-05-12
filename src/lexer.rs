@@ -1,6 +1,6 @@
-use crate::utils::RustCcError;
+use crate::utils::{RustCcError, RustCcResult};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Token {
     Keyword(Keywords),
     OpenBrace,
@@ -18,7 +18,7 @@ pub enum Token {
     Slash,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Keywords {
     Int,
     Return,
@@ -94,7 +94,7 @@ impl TryFrom<&str> for Lexer {
 }
 
 impl Lexer {
-    pub fn next(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<Token> {
         let tok = self.tokens.get(self.curr_idx);
         self.curr_idx += 1;
         tok.map(|t| t.to_owned())
@@ -102,5 +102,15 @@ impl Lexer {
 
     pub fn back(&mut self) {
         self.curr_idx -= 1;
+    }
+
+    pub fn expect_next(&mut self, expected: &Token) -> RustCcResult<()> {
+        let tok_opt = self.next_token();
+        if let Some(ref actual) = tok_opt {
+            if actual == expected {
+                return Ok(());
+            }
+        }
+        Err(RustCcError::ParseError(expected.to_owned(), tok_opt))
     }
 }
