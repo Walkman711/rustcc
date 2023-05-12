@@ -9,17 +9,15 @@ pub enum Token {
     CloseParen,
     Semicolon,
     Integer(u64),
-    Negation,
-    LogicalNegation,
-    BitwiseComplement,
+    Minus,
+    ExclamationPoint,
+    Tilde,
     Identifier(String),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum Keywords {
     Int,
-    // TODO: get rid of this
-    Main,
     Return,
 }
 
@@ -35,9 +33,9 @@ impl TryFrom<&str> for Token {
             ";" => Ok(Token::Semicolon),
             "int" => Ok(Token::Keyword(Keywords::Int)),
             "return" => Ok(Token::Keyword(Keywords::Return)),
-            "-" => Ok(Token::Negation),
-            "!" => Ok(Token::LogicalNegation),
-            "~" => Ok(Token::BitwiseComplement),
+            "-" => Ok(Token::Minus),
+            "!" => Ok(Token::ExclamationPoint),
+            "~" => Ok(Token::Tilde),
             _ => {
                 if let Ok(u) = value.parse::<u64>() {
                     Ok(Token::Integer(u))

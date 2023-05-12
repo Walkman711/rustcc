@@ -111,11 +111,11 @@ impl Parser {
         let tok = self.lexer.get_token().unwrap();
         let exp = match tok {
             Token::Integer(u) => Expression::Const(u),
-            Token::Negation => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
-            Token::LogicalNegation => {
+            Token::Minus => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
+            Token::ExclamationPoint => {
                 Expression::UnOp(UnaryOp::LogicalNegation, Box::new(self.parse_exp()?))
             }
-            Token::BitwiseComplement => {
+            Token::Tilde => {
                 Expression::UnOp(UnaryOp::BitwiseComplement, Box::new(self.parse_exp()?))
             }
             _ => panic!("come up with better error type for when multiple tokens are valid"),
