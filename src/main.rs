@@ -95,8 +95,8 @@ fn lex(program: &str) -> Vec<Token> {
 /// <statement> ::= "return" <exp> ";"
 /// <exp> ::= <int>
 
-fn parse(lexed: &[Token]) -> RustCcResult<Program> {
-    let function = parse_fn(&lexed)?;
+fn parse(tokens: &[Token]) -> RustCcResult<Program> {
+    let function = parse_fn(tokens)?;
     Ok(Program::Func(function))
 }
 
@@ -104,27 +104,27 @@ fn parse_fn(tokens: &[Token]) -> RustCcResult<Function> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
     let Some(Token::Keyword(Keywords::Int)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.copied()));
     };
 
     let tok = tok_it.next();
     let Some(Token::Keyword(Keywords::Main)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Main), tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Main), tok.copied()));
     };
 
     let tok = tok_it.next();
     let Some(Token::OpenParen) = tok else {
-        return Err(RustCcError::ParseError(Token::OpenParen, tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::OpenParen, tok.copied()));
     };
 
     let tok = tok_it.next();
     let Some(Token::CloseParen) = tok else {
-        return Err(RustCcError::ParseError(Token::CloseParen, tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::CloseParen, tok.copied()));
     };
 
     let tok = tok_it.next();
     let Some(Token::OpenBracket) = tok else {
-        return Err(RustCcError::ParseError(Token::OpenBracket, tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::OpenBracket, tok.copied()));
     };
 
     let statement = parse_statement(&tokens[5..])?;
@@ -136,7 +136,7 @@ fn parse_statement(tokens: &[Token]) -> RustCcResult<Statement> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
     let Some(Token::Keyword(Keywords::Return)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.map(|t| *t)));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.copied()));
     };
 
     let exp = parse_exp(&tokens[1..]);
