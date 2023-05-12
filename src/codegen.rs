@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 
-use crate::parser::{Expression, Factor, Function, Program, Statement, UnaryOp};
+use crate::parser::{Expression, Factor, Function, Program, Statement, Term, UnaryOp};
 
 pub fn generate_asm(prog: Program, asm_filename: &str) {
     let mut asm_file = File::create(asm_filename).unwrap();
@@ -29,10 +29,23 @@ fn generate_stmt_asm(stmt: Statement, asm_file: &mut File) {
 
 // TODO: better printing of assembly so that it's evenly spaced
 fn generate_expression_asm(exp: Expression, asm_file: &mut File) {
-    match exp {
-        Expression::Binary(_, _, _) => todo!(),
-        Expression::Fact(f) => generate_factor_asm(f, asm_file),
-    };
+    // FIX: handle trailing terms
+    let term = exp.0;
+    generate_term_asm(term, asm_file);
+
+    // match exp {
+
+    // }
+    // match exp {
+    //     Expression::Binary(_, _, _) => todo!(),
+    //     Expression::Fact(f) => generate_factor_asm(f, asm_file),
+    // };
+}
+
+fn generate_term_asm(t: Term, asm_file: &mut File) {
+    // TODO: handle trailing terms
+    let factor = t.0;
+    generate_factor_asm(factor, asm_file);
 }
 
 fn generate_factor_asm(f: Factor, asm_file: &mut File) {

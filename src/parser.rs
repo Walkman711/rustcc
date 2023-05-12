@@ -19,10 +19,13 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug)]
-pub enum Expression {
+pub enum ExpressionOld {
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Fact(Factor),
 }
+
+pub type Expression = (Term, Vec<(AddSubtract, Term)>);
+pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
 
 #[derive(Clone, Copy, Debug)]
 pub enum UnaryOp {
@@ -46,10 +49,24 @@ pub enum Factor {
     ParenExp(Box<Expression>),
 }
 
+// TODO: do something with bin op precedence
+#[derive(Clone, Debug)]
+pub enum AddSubtract {
+    Addition,
+    Subtraction,
+}
+
+#[derive(Clone, Debug)]
+pub enum MultiplyDivide {
+    Multiply,
+    Divide,
+}
+
 /// <program> ::= <function>
 /// <function> ::= "int" <id> "(" ")" "{" <statement> ""
 /// <statement> ::= "return" <exp> ";"
-/// <exp> ::= <exp> <binary_op> <exp> | <factor>
+/// <exp> ::= <term> { ("+" | "-") <term> }
+/// <term> ::= <factor> { ("*" | "/") <factor> }
 /// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
 /// <unop> ::= "!" | "~" | "-"
 
@@ -71,27 +88,27 @@ impl Parser {
     }
 
     fn parse_fn(&mut self) -> RustCcResult<Function> {
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::Keyword(Keywords::Int)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok));
+            return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok));
         };
 
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::Identifier(identifier)) = tok else {
             return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok));
         };
 
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::OpenParen) = tok else {
             return Err(RustCcError::ParseError(Token::OpenParen, tok));
         };
 
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::CloseParen) = tok else {
             return Err(RustCcError::ParseError(Token::CloseParen, tok));
         };
 
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::OpenBrace) = tok else {
             return Err(RustCcError::ParseError(Token::OpenBrace, tok))
         };
@@ -102,20 +119,20 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::Keyword(Keywords::Return)) = tok else {
             return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok));
         };
 
         let exp = self.parse_exp()?;
 
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::Semicolon) = tok else {
             return Err(RustCcError::ParseError(Token::Semicolon, tok));
         };
 
         // dbg!(tokens);
-        let tok = self.lexer.get_token();
+        let tok = self.lexer.next();
         let Some(Token::CloseBrace) = tok else {
             return Err(RustCcError::ParseError(Token::CloseBrace, tok));
         };
@@ -124,7 +141,7 @@ impl Parser {
     }
 
     fn parse_exp(&mut self) -> RustCcResult<Expression> {
-        // let tok = self.lexer.get_token().unwrap();
+        // let tok = self.lexer.next().unwrap();
         // let exp = match tok {
         //     // Token::Integer(u) => Expression::Const(u),
         //     // Token::Minus => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
@@ -136,15 +153,58 @@ impl Parser {
         //     // }
         //     _ => panic!("come up with better error type for when multiple tokens are valid"),
         // };
-        let exp = Expression::Fact(self.parse_factor()?);
+        // let exp = Expression::Fact(self.parse_factor()?);
 
-        Ok(exp)
+        // Ok(exp)
+        let first_term = self.parse_term()?;
+        let mut trailing_terms = vec![];
+        while let Some(tok) = self.lexer.next() {
+            let op = match tok {
+                Token::Plus => AddSubtract::Addition,
+                // FIX: no way this works
+                Token::Minus => AddSubtract::Subtraction,
+                _ => {
+                    // go back by one if next token isn't a trailing term
+                    self.lexer.back();
+                    break;
+                }
+            };
+            let term = self.parse_term()?;
+            trailing_terms.push((op, term));
+        }
+        Ok((first_term, trailing_terms))
+    }
+
+    fn parse_term(&mut self) -> RustCcResult<Term> {
+        let first_factor = self.parse_factor()?;
+        let mut trailing_factors = vec![];
+        while let Some(tok) = self.lexer.next() {
+            let op = match tok {
+                Token::Star => MultiplyDivide::Multiply,
+                Token::Slash => MultiplyDivide::Divide,
+                _ => {
+                    // go back by one if next token isn't a trailing factor
+                    self.lexer.back();
+                    break;
+                }
+            };
+            let factor = self.parse_factor()?;
+            trailing_factors.push((op, factor));
+        }
+        Ok((first_factor, trailing_factors))
     }
 
     fn parse_factor(&mut self) -> RustCcResult<Factor> {
-        let tok = self.lexer.get_token().unwrap();
+        let tok = self.lexer.next().unwrap();
         let factor = match tok {
-            Token::OpenParen => Factor::ParenExp(Box::new(self.parse_exp()?)),
+            Token::OpenParen => {
+                let f = Factor::ParenExp(Box::new(self.parse_exp()?));
+                let tok = self.lexer.next();
+                let Some(Token::CloseParen) = tok else {
+                    return Err(RustCcError::ParseError(Token::CloseParen, tok));
+                };
+                f
+            }
             Token::Integer(u) => Factor::Const(u),
             Token::Minus => Factor::Unary(UnaryOp::Negation, Box::new(self.parse_factor()?)),
             Token::ExclamationPoint => {

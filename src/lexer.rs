@@ -94,9 +94,13 @@ impl TryFrom<&str> for Lexer {
 }
 
 impl Lexer {
-    pub fn get_token(&mut self) -> Option<Token> {
+    pub fn next(&mut self) -> Option<Token> {
         let tok = self.tokens.get(self.curr_idx);
         self.curr_idx += 1;
         tok.map(|t| t.to_owned())
+    }
+
+    pub fn back(&mut self) {
+        self.curr_idx -= 1;
     }
 }
