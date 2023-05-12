@@ -1,5 +1,3 @@
-use strum_macros::EnumString;
-
 #[derive(Clone, Copy, Debug)]
 pub enum Token {
     Keyword(Keywords),
@@ -8,13 +6,15 @@ pub enum Token {
     OpenParen,
     CloseParen,
     Semicolon,
-    Integer(i64),
+    Integer(u64),
+    Negation,
+    LogicalNegation,
+    BitwiseComplement,
 }
 
 #[derive(Debug)]
 pub enum RustCcError {
     LexError(String),
-    // Expected, actual
     ParseError(Token, Option<Token>),
 }
 
@@ -33,9 +33,12 @@ impl TryFrom<&str> for Token {
             "int" => Ok(Token::Keyword(Keywords::Int)),
             "main" => Ok(Token::Keyword(Keywords::Main)),
             "return" => Ok(Token::Keyword(Keywords::Return)),
+            "-" => Ok(Token::Negation),
+            "!" => Ok(Token::LogicalNegation),
+            "~" => Ok(Token::BitwiseComplement),
             _ => {
-                if let Ok(i) = value.parse::<i64>() {
-                    Ok(Token::Integer(i))
+                if let Ok(u) = value.parse::<u64>() {
+                    Ok(Token::Integer(u))
                 } else {
                     Err(RustCcError::LexError(value.to_string()))
                 }
@@ -44,7 +47,7 @@ impl TryFrom<&str> for Token {
     }
 }
 
-#[derive(Clone, Copy, Debug, EnumString)]
+#[derive(Clone, Copy, Debug)]
 pub enum Keywords {
     Int,
     // TODO: get rid of this
@@ -53,11 +56,19 @@ pub enum Keywords {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Expression {
-    Const(i64),
+pub enum UnaryOp {
+    Negation,
+    LogicalNegation,
+    BitwiseComplement,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
+pub enum Expression {
+    UnOp(UnaryOp, Box<Expression>),
+    Const(u64),
+}
+
+#[derive(Clone, Debug)]
 pub enum Statement {
     Return(Expression),
 }
@@ -75,8 +86,14 @@ pub enum Program {
 fn lex(program: &str) -> Vec<Token> {
     let mut lexed_tokens = vec![];
 
+    let chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
+
+    // TODO: make list of special chars
     let program_with_whitespace = program
         .replace(';', " ; ")
+        .replace('-', " - ")
+        .replace('!', " ! ")
+        .replace('~', " ~ ")
         .replace('(', " ( ")
         .replace(')', " ) ")
         .replace('{', " { ")
@@ -93,7 +110,8 @@ fn lex(program: &str) -> Vec<Token> {
 /// <program> ::= <function>
 /// <function> ::= "int" <id> "(" ")" "{" <statement> ""
 /// <statement> ::= "return" <exp> ";"
-/// <exp> ::= <int>
+/// <exp> ::= <int> | <unop> <exp>
+/// <unop> ::= "!" | "~" | "-"
 
 fn parse(tokens: &[Token]) -> RustCcResult<Program> {
     let function = parse_fn(tokens)?;
@@ -146,12 +164,19 @@ fn parse_statement(tokens: &[Token]) -> RustCcResult<Statement> {
 
 fn parse_exp(tokens: &[Token]) -> Expression {
     let mut tok_it = tokens.iter();
-    let tok = tok_it.next();
-    let Some(Token::Integer(i)) = tok else {
-        panic!("");
-    };
-
-    Expression::Const(*i)
+    let tok = tok_it.next().unwrap();
+    match tok {
+        Token::Integer(u) => Expression::Const(*u),
+        Token::Negation => Expression::UnOp(UnaryOp::Negation, Box::new(parse_exp(&tokens[1..]))),
+        Token::LogicalNegation => {
+            Expression::UnOp(UnaryOp::LogicalNegation, Box::new(parse_exp(&tokens[1..])))
+        }
+        Token::BitwiseComplement => Expression::UnOp(
+            UnaryOp::BitwiseComplement,
+            Box::new(parse_exp(&tokens[1..])),
+        ),
+        _ => panic!("come up with better error type for when multiple tokens are valid"),
+    }
 }
 
 fn generate_asm(prog: Program) {
@@ -162,24 +187,46 @@ fn generate_asm(prog: Program) {
                 println!(".align 2");
                 println!();
                 println!("_{identifier}:");
-                match stmt {
-                    Statement::Return(exp) => {
-                        match exp {
-                            Expression::Const(i) => {
-                                println!("  mov w0, {i} ");
-                            }
-                        };
-                        println!("  ret")
-                    }
-                }
+                generate_stmt_asm(stmt);
             }
         },
     }
 }
 
+fn generate_stmt_asm(stmt: Statement) {
+    match stmt {
+        Statement::Return(exp) => {
+            generate_expression_asm(exp);
+        }
+    }
+    println!("  ret");
+}
+
+fn generate_expression_asm(exp: Expression) {
+    match exp {
+        Expression::Const(u) => {
+            println!("  mov w0, {u} ");
+        }
+        Expression::UnOp(op, nested_exp) => {
+            generate_expression_asm(*nested_exp);
+            match op {
+                UnaryOp::Negation => println!(" neg w0, w0"),
+                UnaryOp::LogicalNegation => {
+                    println!("  cmp w0, wzr");
+                    println!("  cset w0, eq");
+                    println!("  uxtb w0, w0")
+                }
+                UnaryOp::BitwiseComplement => println!("  mvn w0, w0"),
+            }
+        }
+    };
+}
+
 fn main() -> RustCcResult<()> {
-    let test_program = "int main() { return 2; }";
-    let lexed_tokens = lex(test_program);
+    let test_program = "int main() { return !2; }";
+    // let args: Vec<String> = std::env::args().collect();
+    // let test_program = std::fs::read_to_string(&args[1]).unwrap();
+    let lexed_tokens = lex(&test_program);
     // dbg!(&lexed_tokens);
 
     let parsed_program = parse(&lexed_tokens)?;
