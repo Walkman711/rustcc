@@ -1,6 +1,6 @@
 use crate::utils::RustCcError;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Token {
     Keyword(Keywords),
     OpenBracket,
@@ -12,6 +12,7 @@ pub enum Token {
     Negation,
     LogicalNegation,
     BitwiseComplement,
+    Identifier(String),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -33,7 +34,6 @@ impl TryFrom<&str> for Token {
             ")" => Ok(Token::CloseParen),
             ";" => Ok(Token::Semicolon),
             "int" => Ok(Token::Keyword(Keywords::Int)),
-            "main" => Ok(Token::Keyword(Keywords::Main)),
             "return" => Ok(Token::Keyword(Keywords::Return)),
             "-" => Ok(Token::Negation),
             "!" => Ok(Token::LogicalNegation),
@@ -42,7 +42,7 @@ impl TryFrom<&str> for Token {
                 if let Ok(u) = value.parse::<u64>() {
                     Ok(Token::Integer(u))
                 } else {
-                    Err(RustCcError::LexError(value.to_string()))
+                    Ok(Token::Identifier(value.to_string()))
                 }
             }
         }

@@ -46,39 +46,39 @@ fn parse_fn(tokens: &[Token]) -> RustCcResult<Function> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
     let Some(Token::Keyword(Keywords::Int)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.copied()));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.map(|t| t.to_owned())));
     };
 
     let tok = tok_it.next();
-    let Some(Token::Keyword(Keywords::Main)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Main), tok.copied()));
+    let Some(Token::Identifier(identifier)) = tok else {
+        return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok.map(|t| t.to_owned())));
     };
 
     let tok = tok_it.next();
     let Some(Token::OpenParen) = tok else {
-        return Err(RustCcError::ParseError(Token::OpenParen, tok.copied()));
+        return Err(RustCcError::ParseError(Token::OpenParen, tok.map(|t| t.to_owned())));
     };
 
     let tok = tok_it.next();
     let Some(Token::CloseParen) = tok else {
-        return Err(RustCcError::ParseError(Token::CloseParen, tok.copied()));
+        return Err(RustCcError::ParseError(Token::CloseParen, tok.map(|t| t.to_owned())));
     };
 
     let tok = tok_it.next();
     let Some(Token::OpenBracket) = tok else {
-        return Err(RustCcError::ParseError(Token::OpenBracket, tok.copied()));
+        return Err(RustCcError::ParseError(Token::OpenBracket, tok.map(|t| t.to_owned())));
     };
 
     let statement = parse_statement(&tokens[5..])?;
 
-    Ok(Function::Fun("main".to_string(), statement))
+    Ok(Function::Fun(identifier.to_owned(), statement))
 }
 
 fn parse_statement(tokens: &[Token]) -> RustCcResult<Statement> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
     let Some(Token::Keyword(Keywords::Return)) = tok else {
-        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.copied()));
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.map(|t| t.to_owned())));
     };
 
     let exp = parse_exp(&tokens[1..]);
