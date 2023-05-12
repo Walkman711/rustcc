@@ -1,59 +1,7 @@
-#[derive(Clone, Copy, Debug)]
-pub enum Token {
-    Keyword(Keywords),
-    OpenBracket,
-    CloseBracket,
-    OpenParen,
-    CloseParen,
-    Semicolon,
-    Integer(u64),
-    Negation,
-    LogicalNegation,
-    BitwiseComplement,
-}
-
-#[derive(Debug)]
-pub enum RustCcError {
-    LexError(String),
-    ParseError(Token, Option<Token>),
-}
-
-pub type RustCcResult<T> = Result<T, RustCcError>;
-
-impl TryFrom<&str> for Token {
-    type Error = RustCcError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "{" => Ok(Token::OpenBracket),
-            "}" => Ok(Token::CloseBracket),
-            "(" => Ok(Token::OpenParen),
-            ")" => Ok(Token::CloseParen),
-            ";" => Ok(Token::Semicolon),
-            "int" => Ok(Token::Keyword(Keywords::Int)),
-            "main" => Ok(Token::Keyword(Keywords::Main)),
-            "return" => Ok(Token::Keyword(Keywords::Return)),
-            "-" => Ok(Token::Negation),
-            "!" => Ok(Token::LogicalNegation),
-            "~" => Ok(Token::BitwiseComplement),
-            _ => {
-                if let Ok(u) = value.parse::<u64>() {
-                    Ok(Token::Integer(u))
-                } else {
-                    Err(RustCcError::LexError(value.to_string()))
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Keywords {
-    Int,
-    // TODO: get rid of this
-    Main,
-    Return,
-}
+use rustcc::{
+    lexer::{Keywords, Token},
+    utils::{RustCcError, RustCcResult},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub enum UnaryOp {
@@ -81,30 +29,6 @@ pub enum Function {
 #[derive(Clone, Debug)]
 pub enum Program {
     Func(Function),
-}
-
-fn lex(program: &str) -> Vec<Token> {
-    let mut lexed_tokens = vec![];
-
-    let chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
-
-    // TODO: make list of special chars
-    let program_with_whitespace = program
-        .replace(';', " ; ")
-        .replace('-', " - ")
-        .replace('!', " ! ")
-        .replace('~', " ~ ")
-        .replace('(', " ( ")
-        .replace(')', " ) ")
-        .replace('{', " { ")
-        .replace('}', " } ");
-
-    for token in program_with_whitespace.split_whitespace() {
-        let lexed_token = Token::try_from(token).unwrap();
-        lexed_tokens.push(lexed_token);
-    }
-
-    lexed_tokens
 }
 
 /// <program> ::= <function>
@@ -226,7 +150,7 @@ fn main() -> RustCcResult<()> {
     let test_program = "int main() { return !2; }";
     // let args: Vec<String> = std::env::args().collect();
     // let test_program = std::fs::read_to_string(&args[1]).unwrap();
-    let lexed_tokens = lex(&test_program);
+    let lexed_tokens = rustcc::lexer::lex(&test_program);
     // dbg!(&lexed_tokens);
 
     let parsed_program = parse(&lexed_tokens)?;
