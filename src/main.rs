@@ -1,7 +1,7 @@
 use strum_macros::EnumString;
 
 #[derive(Clone, Copy, Debug)]
-pub enum Tokens {
+pub enum Token {
     Keyword(Keywords),
     OpenBracket,
     CloseBracket,
@@ -11,24 +11,33 @@ pub enum Tokens {
     Integer(i64),
 }
 
-impl TryFrom<&str> for Tokens {
-    type Error = String;
+#[derive(Debug)]
+pub enum RustCcError {
+    LexError(String),
+    // Expected, actual
+    ParseError(Token, Option<Token>),
+}
+
+pub type RustCcResult<T> = Result<T, RustCcError>;
+
+impl TryFrom<&str> for Token {
+    type Error = RustCcError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "{" => Ok(Tokens::OpenBracket),
-            "}" => Ok(Tokens::CloseBracket),
-            "(" => Ok(Tokens::OpenParen),
-            ")" => Ok(Tokens::CloseParen),
-            ";" => Ok(Tokens::Semicolon),
-            "int" => Ok(Tokens::Keyword(Keywords::Int)),
-            "main" => Ok(Tokens::Keyword(Keywords::Main)),
-            "return" => Ok(Tokens::Keyword(Keywords::Return)),
+            "{" => Ok(Token::OpenBracket),
+            "}" => Ok(Token::CloseBracket),
+            "(" => Ok(Token::OpenParen),
+            ")" => Ok(Token::CloseParen),
+            ";" => Ok(Token::Semicolon),
+            "int" => Ok(Token::Keyword(Keywords::Int)),
+            "main" => Ok(Token::Keyword(Keywords::Main)),
+            "return" => Ok(Token::Keyword(Keywords::Return)),
             _ => {
                 if let Ok(i) = value.parse::<i64>() {
-                    Ok(Tokens::Integer(i))
+                    Ok(Token::Integer(i))
                 } else {
-                    Err(value.to_string())
+                    Err(RustCcError::LexError(value.to_string()))
                 }
             }
         }
@@ -63,7 +72,7 @@ pub enum Program {
     Func(Function),
 }
 
-fn lex(program: &str) -> Vec<Tokens> {
+fn lex(program: &str) -> Vec<Token> {
     let mut lexed_tokens = vec![];
 
     let program_with_whitespace = program
@@ -74,7 +83,7 @@ fn lex(program: &str) -> Vec<Tokens> {
         .replace('}', " } ");
 
     for token in program_with_whitespace.split_whitespace() {
-        let lexed_token = Tokens::try_from(token).unwrap();
+        let lexed_token = Token::try_from(token).unwrap();
         lexed_tokens.push(lexed_token);
     }
 
@@ -86,59 +95,59 @@ fn lex(program: &str) -> Vec<Tokens> {
 /// <statement> ::= "return" <exp> ";"
 /// <exp> ::= <int>
 
-fn parse(lexed: &[Tokens]) -> Program {
-    let function = parse_fn(&lexed);
-    Program::Func(function)
+fn parse(lexed: &[Token]) -> RustCcResult<Program> {
+    let function = parse_fn(&lexed)?;
+    Ok(Program::Func(function))
 }
 
-fn parse_fn(tokens: &[Tokens]) -> Function {
+fn parse_fn(tokens: &[Token]) -> RustCcResult<Function> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
-    let Some(Tokens::Keyword(Keywords::Int)) = tok else {
-        panic!("only support functions starting with int");
+    let Some(Token::Keyword(Keywords::Int)) = tok else {
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Int), tok.map(|t| *t)));
     };
 
     let tok = tok_it.next();
-    let Some(Tokens::Keyword(Keywords::Main)) = tok else {
-        panic!("");
+    let Some(Token::Keyword(Keywords::Main)) = tok else {
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Main), tok.map(|t| *t)));
     };
 
     let tok = tok_it.next();
-    let Some(Tokens::OpenParen) = tok else {
-        panic!("");
+    let Some(Token::OpenParen) = tok else {
+        return Err(RustCcError::ParseError(Token::OpenParen, tok.map(|t| *t)));
     };
 
     let tok = tok_it.next();
-    let Some(Tokens::CloseParen) = tok else {
-        panic!("");
+    let Some(Token::CloseParen) = tok else {
+        return Err(RustCcError::ParseError(Token::CloseParen, tok.map(|t| *t)));
     };
 
     let tok = tok_it.next();
-    let Some(Tokens::OpenBracket) = tok else {
-        panic!("");
+    let Some(Token::OpenBracket) = tok else {
+        return Err(RustCcError::ParseError(Token::OpenBracket, tok.map(|t| *t)));
     };
 
-    let statement = parse_statement(&tokens[5..]);
+    let statement = parse_statement(&tokens[5..])?;
 
-    Function::Fun("main".to_string(), statement)
+    Ok(Function::Fun("main".to_string(), statement))
 }
 
-fn parse_statement(tokens: &[Tokens]) -> Statement {
+fn parse_statement(tokens: &[Token]) -> RustCcResult<Statement> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
-    let Some(Tokens::Keyword(Keywords::Return)) = tok else {
-        panic!("");
+    let Some(Token::Keyword(Keywords::Return)) = tok else {
+        return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.map(|t| *t)));
     };
 
     let exp = parse_exp(&tokens[1..]);
 
-    Statement::Return(exp)
+    Ok(Statement::Return(exp))
 }
 
-fn parse_exp(tokens: &[Tokens]) -> Expression {
+fn parse_exp(tokens: &[Token]) -> Expression {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next();
-    let Some(Tokens::Integer(i)) = tok else {
+    let Some(Token::Integer(i)) = tok else {
         panic!("");
     };
 
@@ -168,11 +177,13 @@ fn generate_asm(prog: Program) {
     }
 }
 
-fn main() {
+fn main() -> RustCcResult<()> {
     let test_program = "int main() { return 2; }";
     let lexed_tokens = lex(test_program);
     // dbg!(&lexed_tokens);
-    let parsed_program = parse(&lexed_tokens);
+
+    let parsed_program = parse(&lexed_tokens)?;
     // dbg!(&parsed_program);
     generate_asm(parsed_program);
+    Ok(())
 }
