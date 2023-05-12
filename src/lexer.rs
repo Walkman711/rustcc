@@ -3,8 +3,8 @@ use crate::utils::RustCcError;
 #[derive(Clone, Debug)]
 pub enum Token {
     Keyword(Keywords),
-    OpenBracket,
-    CloseBracket,
+    OpenBrace,
+    CloseBrace,
     OpenParen,
     CloseParen,
     Semicolon,
@@ -28,8 +28,8 @@ impl TryFrom<&str> for Token {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "{" => Ok(Token::OpenBracket),
-            "}" => Ok(Token::CloseBracket),
+            "{" => Ok(Token::OpenBrace),
+            "}" => Ok(Token::CloseBrace),
             "(" => Ok(Token::OpenParen),
             ")" => Ok(Token::CloseParen),
             ";" => Ok(Token::Semicolon),

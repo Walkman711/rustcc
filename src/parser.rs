@@ -65,8 +65,8 @@ fn parse_fn(tokens: &[Token]) -> RustCcResult<Function> {
     };
 
     let tok = tok_it.next();
-    let Some(Token::OpenBracket) = tok else {
-        return Err(RustCcError::ParseError(Token::OpenBracket, tok.map(|t| t.to_owned())));
+    let Some(Token::OpenBrace) = tok else {
+        return Err(RustCcError::ParseError(Token::OpenBrace, tok.map(|t| t.to_owned())));
     };
 
     let statement = parse_statement(&tokens[5..])?;
@@ -81,24 +81,36 @@ fn parse_statement(tokens: &[Token]) -> RustCcResult<Statement> {
         return Err(RustCcError::ParseError(Token::Keyword(Keywords::Return), tok.map(|t| t.to_owned())));
     };
 
-    let exp = parse_exp(&tokens[1..]);
+    let exp = parse_exp(&tokens[1..])?;
+
+    dbg!(tokens);
+    let Token::CloseBrace = tokens[tokens.len() - 1] else {
+        return Err(RustCcError::ParseError(Token::CloseBrace, tok.map(|t| t.to_owned())));
+    };
 
     Ok(Statement::Return(exp))
 }
 
-fn parse_exp(tokens: &[Token]) -> Expression {
+fn parse_exp(tokens: &[Token]) -> RustCcResult<Expression> {
     let mut tok_it = tokens.iter();
     let tok = tok_it.next().unwrap();
-    match tok {
+    let exp = match tok {
         Token::Integer(u) => Expression::Const(*u),
-        Token::Negation => Expression::UnOp(UnaryOp::Negation, Box::new(parse_exp(&tokens[1..]))),
+        Token::Negation => Expression::UnOp(UnaryOp::Negation, Box::new(parse_exp(&tokens[1..])?)),
         Token::LogicalNegation => {
-            Expression::UnOp(UnaryOp::LogicalNegation, Box::new(parse_exp(&tokens[1..])))
+            Expression::UnOp(UnaryOp::LogicalNegation, Box::new(parse_exp(&tokens[1..])?))
         }
         Token::BitwiseComplement => Expression::UnOp(
             UnaryOp::BitwiseComplement,
-            Box::new(parse_exp(&tokens[1..])),
+            Box::new(parse_exp(&tokens[1..])?),
         ),
         _ => panic!("come up with better error type for when multiple tokens are valid"),
-    }
+    };
+
+    let tok = tok_it.next();
+    let Some(Token::Semicolon) = tok else {
+        return Err(RustCcError::ParseError(Token::Semicolon, tok.map(|t| t.to_owned())));
+    };
+
+    Ok(exp)
 }
