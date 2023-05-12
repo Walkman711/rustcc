@@ -13,6 +13,9 @@ pub enum Token {
     ExclamationPoint,
     Tilde,
     Identifier(String),
+    Plus,
+    Star,
+    Slash,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -36,6 +39,9 @@ impl TryFrom<&str> for Token {
             "-" => Ok(Token::Minus),
             "!" => Ok(Token::ExclamationPoint),
             "~" => Ok(Token::Tilde),
+            "+" => Ok(Token::Plus),
+            "*" => Ok(Token::Star),
+            "/" => Ok(Token::Slash),
             _ => {
                 if let Ok(u) = value.parse::<u64>() {
                     Ok(Token::Integer(u))
@@ -59,12 +65,15 @@ impl TryFrom<&str> for Lexer {
     fn try_from(program: &str) -> Result<Self, Self::Error> {
         let mut tokens = vec![];
 
-        let chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
+        let _chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
 
         // TODO: make list of special chars
         let program_with_whitespace = program
             .replace(';', " ; ")
             .replace('-', " - ")
+            .replace('+', " + ")
+            .replace('*', " * ")
+            .replace('/', " / ")
             .replace('!', " ! ")
             .replace('~', " ~ ")
             .replace('(', " ( ")

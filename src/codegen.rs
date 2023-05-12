@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 
-use crate::parser::{Expression, Function, Program, Statement, UnaryOp};
+use crate::parser::{Expression, Factor, Function, Program, Statement, UnaryOp};
 
 pub fn generate_asm(prog: Program, asm_filename: &str) {
     let mut asm_file = File::create(asm_filename).unwrap();
@@ -30,11 +30,18 @@ fn generate_stmt_asm(stmt: Statement, asm_file: &mut File) {
 // TODO: better printing of assembly so that it's evenly spaced
 fn generate_expression_asm(exp: Expression, asm_file: &mut File) {
     match exp {
-        Expression::Const(u) => {
+        Expression::Binary(_, _, _) => todo!(),
+        Expression::Fact(f) => generate_factor_asm(f, asm_file),
+    };
+}
+
+fn generate_factor_asm(f: Factor, asm_file: &mut File) {
+    match f {
+        Factor::Const(u) => {
             writeln!(asm_file, "\tmov  w0, {u}").unwrap();
         }
-        Expression::UnOp(op, nested_exp) => {
-            generate_expression_asm(*nested_exp, asm_file);
+        Factor::Unary(op, factor) => {
+            generate_factor_asm(*factor, asm_file);
             match op {
                 UnaryOp::Negation => writeln!(asm_file, "\tneg  w0, w0").unwrap(),
                 UnaryOp::LogicalNegation => {
@@ -45,5 +52,6 @@ fn generate_expression_asm(exp: Expression, asm_file: &mut File) {
                 UnaryOp::BitwiseComplement => writeln!(asm_file, "\tmvn  w0, w0").unwrap(),
             }
         }
-    };
+        Factor::ParenExp(_) => todo!(),
+    }
 }

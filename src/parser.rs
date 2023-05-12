@@ -3,22 +3,9 @@ use crate::{
     utils::{RustCcError, RustCcResult},
 };
 
-#[derive(Clone, Copy, Debug)]
-pub enum UnaryOp {
-    Negation,
-    LogicalNegation,
-    BitwiseComplement,
-}
-
 #[derive(Clone, Debug)]
-pub enum Expression {
-    UnOp(UnaryOp, Box<Expression>),
-    Const(u64),
-}
-
-#[derive(Clone, Debug)]
-pub enum Statement {
-    Return(Expression),
+pub enum Program {
+    Func(Function),
 }
 
 #[derive(Clone, Debug)]
@@ -27,14 +14,43 @@ pub enum Function {
 }
 
 #[derive(Clone, Debug)]
-pub enum Program {
-    Func(Function),
+pub enum Statement {
+    Return(Expression),
+}
+
+#[derive(Clone, Debug)]
+pub enum Expression {
+    Binary(BinaryOp, Box<Expression>, Box<Expression>),
+    Fact(Factor),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum UnaryOp {
+    Negation,
+    LogicalNegation,
+    BitwiseComplement,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BinaryOp {
+    Addition,
+    Subtraction,
+    Multiplication,
+    Division,
+}
+
+#[derive(Clone, Debug)]
+pub enum Factor {
+    Const(u64),
+    Unary(UnaryOp, Box<Factor>),
+    ParenExp(Box<Expression>),
 }
 
 /// <program> ::= <function>
 /// <function> ::= "int" <id> "(" ")" "{" <statement> ""
 /// <statement> ::= "return" <exp> ";"
-/// <exp> ::= <int> | <unop> <exp>
+/// <exp> ::= <exp> <binary_op> <exp> | <factor>
+/// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
 /// <unop> ::= "!" | "~" | "-"
 
 pub struct Parser {
@@ -108,19 +124,38 @@ impl Parser {
     }
 
     fn parse_exp(&mut self) -> RustCcResult<Expression> {
-        let tok = self.lexer.get_token().unwrap();
-        let exp = match tok {
-            Token::Integer(u) => Expression::Const(u),
-            Token::Minus => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
-            Token::ExclamationPoint => {
-                Expression::UnOp(UnaryOp::LogicalNegation, Box::new(self.parse_exp()?))
-            }
-            Token::Tilde => {
-                Expression::UnOp(UnaryOp::BitwiseComplement, Box::new(self.parse_exp()?))
-            }
-            _ => panic!("come up with better error type for when multiple tokens are valid"),
-        };
+        // let tok = self.lexer.get_token().unwrap();
+        // let exp = match tok {
+        //     // Token::Integer(u) => Expression::Const(u),
+        //     // Token::Minus => Expression::UnOp(UnaryOp::Negation, Box::new(self.parse_exp()?)),
+        //     // Token::ExclamationPoint => {
+        //     //     Expression::UnOp(UnaryOp::LogicalNegation, Box::new(self.parse_exp()?))
+        //     // }
+        //     // Token::Tilde => {
+        //     //     Expression::UnOp(UnaryOp::BitwiseComplement, Box::new(self.parse_exp()?))
+        //     // }
+        //     _ => panic!("come up with better error type for when multiple tokens are valid"),
+        // };
+        let exp = Expression::Fact(self.parse_factor()?);
 
         Ok(exp)
+    }
+
+    fn parse_factor(&mut self) -> RustCcResult<Factor> {
+        let tok = self.lexer.get_token().unwrap();
+        let factor = match tok {
+            Token::OpenParen => Factor::ParenExp(Box::new(self.parse_exp()?)),
+            Token::Integer(u) => Factor::Const(u),
+            Token::Minus => Factor::Unary(UnaryOp::Negation, Box::new(self.parse_factor()?)),
+            Token::ExclamationPoint => {
+                Factor::Unary(UnaryOp::LogicalNegation, Box::new(self.parse_factor()?))
+            }
+            Token::Tilde => {
+                Factor::Unary(UnaryOp::BitwiseComplement, Box::new(self.parse_factor()?))
+            }
+            _ => panic!("bad factor"),
+        };
+
+        Ok(factor)
     }
 }
