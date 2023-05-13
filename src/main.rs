@@ -15,7 +15,7 @@ fn main() -> RustCcResult<()> {
     let mut parser = Parser::new(&test_program).unwrap();
     let parsed_program = parser.parse().unwrap();
 
-    dbg!(&parsed_program);
+    // dbg!(&parsed_program);
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);
