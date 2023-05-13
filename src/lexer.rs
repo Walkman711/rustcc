@@ -36,35 +36,6 @@ pub enum Keywords {
     Return,
 }
 
-impl TryFrom<&str> for Token {
-    type Error = RustCcError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "{" => Ok(Token::OpenBrace),
-            "}" => Ok(Token::CloseBrace),
-            "(" => Ok(Token::OpenParen),
-            ")" => Ok(Token::CloseParen),
-            ";" => Ok(Token::Semicolon),
-            "int" => Ok(Token::Keyword(Keywords::Int)),
-            "return" => Ok(Token::Keyword(Keywords::Return)),
-            "-" => Ok(Token::Minus),
-            "!" => Ok(Token::ExclamationPoint),
-            "~" => Ok(Token::Tilde),
-            "+" => Ok(Token::Plus),
-            "*" => Ok(Token::Star),
-            "/" => Ok(Token::Slash),
-            _ => {
-                if let Ok(u) = value.parse::<u64>() {
-                    Ok(Token::Integer(u))
-                } else {
-                    Ok(Token::Identifier(value.to_string()))
-                }
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Lexer {
     tokens: Vec<Token>,
@@ -85,9 +56,75 @@ impl TryFrom<&str> for Lexer {
             expanded_program = expanded_program.replace(c, &format!(" {c} "));
         }
 
-        let token_iter = expanded_program.split_whitespace().peekable();
-        for token in token_iter {
-            let lexed_token = Token::try_from(token).unwrap();
+        let mut token_iter = expanded_program.split_whitespace().peekable();
+        while let Some(token) = token_iter.next() {
+            let lexed_token = match token {
+                "int" => (Token::Keyword(Keywords::Int)),
+                "return" => (Token::Keyword(Keywords::Return)),
+                "{" => (Token::OpenBrace),
+                "}" => (Token::CloseBrace),
+                "(" => (Token::OpenParen),
+                ")" => (Token::CloseParen),
+                ";" => (Token::Semicolon),
+                "-" => (Token::Minus),
+                "!" => {
+                    if let Some(&"=") = token_iter.peek() {
+                        let _discard_equals = token_iter.next();
+                        (Token::NotEquals)
+                    } else {
+                        (Token::ExclamationPoint)
+                    }
+                }
+                "~" => (Token::Tilde),
+                "+" => (Token::Plus),
+                "*" => (Token::Star),
+                "/" => (Token::Slash),
+                "&" => {
+                    if let Some("&") = token_iter.next() {
+                        (Token::And)
+                    } else {
+                        unimplemented!("Implement bitwise AND")
+                    }
+                }
+                "|" => {
+                    if let Some("|") = token_iter.next() {
+                        (Token::Or)
+                    } else {
+                        unimplemented!("Implement bitwise OR")
+                    }
+                }
+                "=" => {
+                    if let Some(&"=") = token_iter.peek() {
+                        let _discard_equals = token_iter.next();
+                        (Token::Equals)
+                    } else {
+                        unimplemented!("Implement assignment")
+                    }
+                }
+                "<" => {
+                    if let Some(&"=") = token_iter.peek() {
+                        let _discard_equals = token_iter.next();
+                        (Token::LessThanEquals)
+                    } else {
+                        (Token::LessThan)
+                    }
+                }
+                ">" => {
+                    if let Some(&"=") = token_iter.peek() {
+                        let _discard_equals = token_iter.next();
+                        (Token::GreaterThanEquals)
+                    } else {
+                        (Token::GreaterThan)
+                    }
+                }
+                s => {
+                    if let Ok(u) = s.parse::<u64>() {
+                        Token::Integer(u)
+                    } else {
+                        Token::Identifier(s.to_string())
+                    }
+                }
+            };
             tokens.push(lexed_token);
         }
 
