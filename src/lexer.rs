@@ -59,36 +59,36 @@ impl TryFrom<&str> for Lexer {
         let mut token_iter = expanded_program.split_whitespace().peekable();
         while let Some(token) = token_iter.next() {
             let lexed_token = match token {
-                "int" => (Token::Keyword(Keywords::Int)),
-                "return" => (Token::Keyword(Keywords::Return)),
-                "{" => (Token::OpenBrace),
-                "}" => (Token::CloseBrace),
-                "(" => (Token::OpenParen),
-                ")" => (Token::CloseParen),
-                ";" => (Token::Semicolon),
-                "-" => (Token::Minus),
+                "int" => Token::Keyword(Keywords::Int),
+                "return" => Token::Keyword(Keywords::Return),
+                "{" => Token::OpenBrace,
+                "}" => Token::CloseBrace,
+                "(" => Token::OpenParen,
+                ")" => Token::CloseParen,
+                ";" => Token::Semicolon,
+                "-" => Token::Minus,
                 "!" => {
                     if let Some(&"=") = token_iter.peek() {
                         let _discard_equals = token_iter.next();
-                        (Token::NotEquals)
+                        Token::NotEquals
                     } else {
-                        (Token::ExclamationPoint)
+                        Token::ExclamationPoint
                     }
                 }
-                "~" => (Token::Tilde),
-                "+" => (Token::Plus),
-                "*" => (Token::Star),
-                "/" => (Token::Slash),
+                "~" => Token::Tilde,
+                "+" => Token::Plus,
+                "*" => Token::Star,
+                "/" => Token::Slash,
                 "&" => {
                     if let Some("&") = token_iter.next() {
-                        (Token::And)
+                        Token::And
                     } else {
                         unimplemented!("Implement bitwise AND")
                     }
                 }
                 "|" => {
                     if let Some("|") = token_iter.next() {
-                        (Token::Or)
+                        Token::Or
                     } else {
                         unimplemented!("Implement bitwise OR")
                     }
@@ -96,7 +96,7 @@ impl TryFrom<&str> for Lexer {
                 "=" => {
                     if let Some(&"=") = token_iter.peek() {
                         let _discard_equals = token_iter.next();
-                        (Token::Equals)
+                        Token::Equals
                     } else {
                         unimplemented!("Implement assignment")
                     }
@@ -104,17 +104,17 @@ impl TryFrom<&str> for Lexer {
                 "<" => {
                     if let Some(&"=") = token_iter.peek() {
                         let _discard_equals = token_iter.next();
-                        (Token::LessThanEquals)
+                        Token::LessThanEquals
                     } else {
-                        (Token::LessThan)
+                        Token::LessThan
                     }
                 }
                 ">" => {
                     if let Some(&"=") = token_iter.peek() {
                         let _discard_equals = token_iter.next();
-                        (Token::GreaterThanEquals)
+                        Token::GreaterThanEquals
                     } else {
-                        (Token::GreaterThan)
+                        Token::GreaterThan
                     }
                 }
                 s => {
