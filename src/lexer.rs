@@ -2,6 +2,7 @@ use crate::utils::{RustCcError, RustCcResult};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Token {
+    // Stage 1
     Keyword(Keywords),
     OpenBrace,
     CloseBrace,
@@ -9,13 +10,24 @@ pub enum Token {
     CloseParen,
     Semicolon,
     Integer(u64),
+    Identifier(String),
+    // Stage 2 (Unary ops)
     Minus,
     ExclamationPoint,
     Tilde,
-    Identifier(String),
+    // Stage 3 (Binary ops)
     Plus,
     Star,
     Slash,
+    // Stage 4 (Logical binary ops)
+    And,
+    Or,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanEquals,
+    GreaterThan,
+    GreaterThanEquals,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -65,23 +77,16 @@ impl TryFrom<&str> for Lexer {
     fn try_from(program: &str) -> Result<Self, Self::Error> {
         let mut tokens = vec![];
 
-        let _chars_to_expand = vec![';', '-', '!', '~', '(', ')', '{', '}'];
+        let chars_to_expand = vec![
+            ';', '-', '!', '~', '(', ')', '{', '}', '&', '|', '<', '=', '>',
+        ];
+        let mut expanded_program = program.to_string();
+        for c in chars_to_expand {
+            expanded_program = expanded_program.replace(c, &format!(" {c} "));
+        }
 
-        // TODO: make list of special chars
-        let program_with_whitespace = program
-            .replace(';', " ; ")
-            .replace('-', " - ")
-            .replace('+', " + ")
-            .replace('*', " * ")
-            .replace('/', " / ")
-            .replace('!', " ! ")
-            .replace('~', " ~ ")
-            .replace('(', " ( ")
-            .replace(')', " ) ")
-            .replace('{', " { ")
-            .replace('}', " } ");
-
-        for token in program_with_whitespace.split_whitespace() {
+        let token_iter = expanded_program.split_whitespace().peekable();
+        for token in token_iter {
             let lexed_token = Token::try_from(token).unwrap();
             tokens.push(lexed_token);
         }
