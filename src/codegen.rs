@@ -3,68 +3,96 @@ use std::io::Write;
 
 use crate::parser::{Expression, Factor, Function, Program, Statement, Term, UnaryOp};
 
-pub fn generate_asm(prog: Program, asm_filename: &str) {
-    let mut asm_file = File::create(asm_filename).unwrap();
-    match prog {
-        Program::Func(func) => match func {
-            Function::Fun(identifier, stmt) => {
-                writeln!(&mut asm_file, ".global _{identifier}").unwrap();
-                writeln!(&mut asm_file, ".align 2").unwrap();
-                writeln!(&mut asm_file,).unwrap();
-                writeln!(&mut asm_file, "_{identifier}:").unwrap();
-                generate_stmt_asm(stmt, &mut asm_file);
-            }
-        },
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
+pub enum Arch {
+    x86,
+    ARM,
+}
+
+pub struct AsmGenerator {
+    asm_file: File,
+}
+
+impl AsmGenerator {
+    pub fn new(asm_filename: &str) -> Self {
+        Self {
+            asm_file: File::create(asm_filename).unwrap(),
+        }
+    }
+
+    fn write_fn_header(&mut self, identifier: &str) {
+        writeln!(self.asm_file, ".global _{identifier}").unwrap();
+        writeln!(self.asm_file, ".align 2").unwrap();
+        writeln!(self.asm_file, "\n").unwrap();
+        writeln!(self.asm_file, "_{identifier}:").unwrap();
+    }
+
+    fn write_inst(&mut self, inst: &str) {
+        writeln!(self.asm_file, "\t{inst}").unwrap();
     }
 }
 
-fn generate_stmt_asm(stmt: Statement, asm_file: &mut File) {
-    match stmt {
-        Statement::Return(exp) => {
-            generate_expression_asm(exp, asm_file);
-        }
-    }
-    writeln!(asm_file, "\tret").unwrap();
-}
-
-// TODO: better printing of assembly so that it's evenly spaced
-fn generate_expression_asm(exp: Expression, asm_file: &mut File) {
-    // FIX: handle trailing terms
-    let term = exp.0;
-    generate_term_asm(term, asm_file);
-
-    // match exp {
-
-    // }
-    // match exp {
-    //     Expression::Binary(_, _, _) => todo!(),
-    //     Expression::Fact(f) => generate_factor_asm(f, asm_file),
-    // };
-}
-
-fn generate_term_asm(t: Term, asm_file: &mut File) {
-    // TODO: handle trailing terms
-    let factor = t.0;
-    generate_factor_asm(factor, asm_file);
-}
-
-fn generate_factor_asm(f: Factor, asm_file: &mut File) {
-    match f {
-        Factor::Const(u) => {
-            writeln!(asm_file, "\tmov  w0, {u}").unwrap();
-        }
-        Factor::Unary(op, factor) => {
-            generate_factor_asm(*factor, asm_file);
-            match op {
-                UnaryOp::Negation => writeln!(asm_file, "\tneg  w0, w0").unwrap(),
-                UnaryOp::LogicalNegation => {
-                    writeln!(asm_file, "\tcmp  w0, wzr").unwrap();
-                    writeln!(asm_file, "\tcset w0, eq").unwrap();
-                    writeln!(asm_file, "\tuxtb w0, w0").unwrap();
+impl AsmGenerator {
+    pub fn generate_asm(&mut self, prog: Program) {
+        match prog {
+            Program::Func(func) => match func {
+                Function::Fun(identifier, stmt) => {
+                    self.write_fn_header(&identifier);
+                    self.generate_stmt_asm(stmt);
                 }
-                UnaryOp::BitwiseComplement => writeln!(asm_file, "\tmvn  w0, w0").unwrap(),
+            },
+        }
+    }
+
+    fn generate_stmt_asm(&mut self, stmt: Statement) {
+        match stmt {
+            Statement::Return(exp) => {
+                self.generate_expression_asm(exp);
             }
         }
-        Factor::ParenExp(_) => todo!(),
+        self.write_inst("ret");
+    }
+
+    // TODO: better printing of assembly so that it's evenly spaced
+    fn generate_expression_asm(&mut self, exp: Expression) {
+        // FIX: handle trailing terms
+        let term = exp.0;
+        self.generate_term_asm(term);
+
+        // match exp {
+
+        // }
+        // match exp {
+        //     Expression::Binary(_, _, _) => todo!(),
+        //     Expression::Fact(f) => generate_factor_asm(f, asm_file),
+        // };
+    }
+
+    fn generate_term_asm(&mut self, t: Term) {
+        // FIX: handle trailing terms
+        let factor = t.0;
+        self.generate_factor_asm(factor);
+    }
+
+    fn generate_factor_asm(&mut self, f: Factor) {
+        match f {
+            Factor::Const(u) => {
+                self.write_inst(&format!("mov  w0, {u}"));
+            }
+            Factor::Unary(op, factor) => {
+                self.generate_factor_asm(*factor);
+                match op {
+                    UnaryOp::Negation => self.write_inst("neg  w0, w0"),
+                    UnaryOp::LogicalNegation => {
+                        self.write_inst("cmp  w0, wzr");
+                        self.write_inst("cset w0, eq");
+                        self.write_inst("utxb w0, w0");
+                    }
+                    UnaryOp::BitwiseComplement => self.write_inst("mvn  w0, w0"),
+                }
+            }
+            Factor::ParenExp(_) => todo!(),
+        }
     }
 }

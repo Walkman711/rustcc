@@ -18,12 +18,6 @@ pub enum Statement {
     Return(Expression),
 }
 
-#[derive(Clone, Debug)]
-pub enum ExpressionOld {
-    Binary(BinaryOp, Box<Expression>, Box<Expression>),
-    Fact(Factor),
-}
-
 pub type Expression = (Term, Vec<(AddSubtract, Term)>);
 pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
 
@@ -111,8 +105,6 @@ impl Parser {
 
         self.lexer.expect_next(&Token::Semicolon)?;
         self.lexer.expect_next(&Token::CloseBrace)?;
-
-        // dbg!(tokens);
 
         Ok(Statement::Return(exp))
     }
