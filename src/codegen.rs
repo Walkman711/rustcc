@@ -18,25 +18,27 @@ pub struct AsmGenerator {
     sp: usize,
 }
 
+const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
+
 // TODO: better printing of assembly so that it's evenly spaced
 // FIX: how much to subtract stack pointer by? Oh wait, can just add that at the top
 impl AsmGenerator {
     pub fn new(asm_filename: &str) -> Self {
         Self {
-            asm_file: File::create(asm_filename).unwrap(),
+            asm_file: File::create(asm_filename).expect("Failed to create output .s file."),
             sp: 0,
         }
     }
 
     fn write_fn_header(&mut self, identifier: &str) {
-        writeln!(self.asm_file, ".global _{identifier}").unwrap();
-        writeln!(self.asm_file, ".align 2").unwrap();
-        writeln!(self.asm_file, "\n").unwrap();
-        writeln!(self.asm_file, "_{identifier}:").unwrap();
+        writeln!(self.asm_file, ".global _{identifier}").expect(WRITELN_EXPECT);
+        writeln!(self.asm_file, ".align 2").expect(WRITELN_EXPECT);
+        writeln!(self.asm_file, "\n").expect(WRITELN_EXPECT);
+        writeln!(self.asm_file, "_{identifier}:").expect(WRITELN_EXPECT);
     }
 
     fn write_inst(&mut self, inst: &str) {
-        writeln!(self.asm_file, "\t{inst}").unwrap();
+        writeln!(self.asm_file, "\t{inst}").expect(WRITELN_EXPECT);
     }
 
     fn push_stack(&mut self) {

@@ -1,4 +1,4 @@
-use crate::utils::{RustCcError, RustCcResult};
+use crate::utils::{ParseError, RustCcError, RustCcResult};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Token {
@@ -147,12 +147,18 @@ impl Lexer {
     }
 
     pub fn expect_next(&mut self, expected: &Token) -> RustCcResult<()> {
-        let tok_opt = self.next_token();
-        if let Some(ref actual) = tok_opt {
-            if actual == expected {
-                return Ok(());
+        match self.next_token() {
+            Some(ref actual) => {
+                if actual == expected {
+                    Ok(())
+                } else {
+                    Err(RustCcError::ParseError(ParseError::ExpectedToken(
+                        expected.to_owned(),
+                        actual.to_owned(),
+                    )))
+                }
             }
+            None => Err(RustCcError::ParseError(ParseError::UnexpectedTokenEnd)),
         }
-        Err(RustCcError::ParseError(expected.to_owned(), tok_opt))
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Keywords, Lexer, Token},
-    utils::{RustCcError, RustCcResult},
+    utils::{ParseError, RustCcError, RustCcResult},
 };
 
 #[derive(Clone, Debug)]
@@ -84,9 +84,15 @@ impl Parser {
     fn parse_fn(&mut self) -> RustCcResult<Function> {
         self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
 
-        let tok = self.lexer.next_token();
-        let Some(Token::Identifier(identifier)) = tok else {
-            return Err(RustCcError::ParseError(Token::Identifier("any function name".to_string()), tok));
+        let tok = self
+            .lexer
+            .next_token()
+            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+
+        let Token::Identifier(identifier) = tok else {
+            return Err(RustCcError::ParseError(
+                ParseError::ExpectedToken(
+                    Token::Identifier("any function name".to_string()), tok)));
         };
 
         self.lexer.expect_next(&Token::OpenParen)?;
@@ -149,7 +155,11 @@ impl Parser {
     }
 
     fn parse_factor(&mut self) -> RustCcResult<Factor> {
-        let tok = self.lexer.next_token().unwrap();
+        let tok = self
+            .lexer
+            .next_token()
+            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+
         let factor = match tok {
             Token::OpenParen => {
                 let f = Factor::ParenExp(Box::new(self.parse_exp()?));
