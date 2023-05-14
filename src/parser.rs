@@ -112,7 +112,7 @@ impl Parser {
         while let Some(tok) = self.lexer.next_token() {
             // TODO: Make this into a try-from
             match tok {
-                Token::Or => {}
+                Token::LogicalOr => {}
                 _ => {
                     self.lexer.back();
                     break;
@@ -132,7 +132,7 @@ impl Parser {
 
         while let Some(tok) = self.lexer.next_token() {
             match tok {
-                Token::And => {}
+                Token::LogicalAnd => {}
                 _ => {
                     self.lexer.back();
                     break;
@@ -152,7 +152,7 @@ impl Parser {
 
         while let Some(tok) = self.lexer.next_token() {
             let op = match tok {
-                Token::Equals => EqualityOp::Equals,
+                Token::DoubleEquals => EqualityOp::Equals,
                 Token::NotEquals => EqualityOp::NotEquals,
                 _ => {
                     self.lexer.back();

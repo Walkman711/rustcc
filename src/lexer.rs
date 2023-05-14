@@ -20,14 +20,38 @@ pub enum Token {
     Star,
     Slash,
     // Stage 4 (Logical binary ops)
-    And,
-    Or,
-    Equals,
+    LogicalAnd,
+    LogicalOr,
+    DoubleEquals,
     NotEquals,
     LessThan,
     LessThanEquals,
     GreaterThan,
     GreaterThanEquals,
+    // Stage 5 (Local variables)
+    SingleEquals,
+    // Tons of remaining ops
+    Increment,
+    Decrement,
+    PercentSign,
+    BitwiseLeftShift,
+    BitwiseRightShift,
+    SingleAnd,
+    BitwiseXor,
+    BitwiseOr,
+    QuestionMark,
+    Colon,
+    PlusEquals,
+    MinusEquals,
+    StarEquals,
+    SlashEquals,
+    PercentEquals,
+    BitwiseLeftShiftEquals,
+    BitwiseRightShiftEquals,
+    BitwiseAndEquals,
+    BitwiseXorEquals,
+    BitwiseOrEquals,
+    Comma,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -49,7 +73,7 @@ impl TryFrom<&str> for Lexer {
         let mut tokens = vec![];
 
         let chars_to_expand = vec![
-            ';', '-', '!', '~', '(', ')', '{', '}', '&', '|', '<', '=', '>',
+            ';', '-', '!', '~', '(', ')', '{', '}', '&', '|', '<', '=', '>', '?', ':', '%',
         ];
         let mut expanded_program = program.to_string();
         for c in chars_to_expand {
@@ -67,56 +91,119 @@ impl TryFrom<&str> for Lexer {
                 ")" => Token::CloseParen,
                 ";" => Token::Semicolon,
                 "-" => Token::Minus,
-                "!" => {
-                    if let Some(&"=") = token_iter.peek() {
-                        let _discard_equals = token_iter.next();
+                "!" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
                         Token::NotEquals
-                    } else {
-                        Token::ExclamationPoint
                     }
-                }
+                    _ => Token::ExclamationPoint,
+                },
                 "~" => Token::Tilde,
-                "+" => Token::Plus,
-                "*" => Token::Star,
-                "/" => Token::Slash,
-                "&" => {
-                    if let Some("&") = token_iter.next() {
-                        Token::And
-                    } else {
-                        unimplemented!("Implement bitwise AND")
+                "+" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::PlusEquals
                     }
-                }
-                "|" => {
-                    if let Some("|") = token_iter.next() {
-                        Token::Or
-                    } else {
-                        unimplemented!("Implement bitwise OR")
+                    Some(&"+") => {
+                        let _ = token_iter.next();
+                        Token::Increment
                     }
-                }
-                "=" => {
-                    if let Some(&"=") = token_iter.peek() {
-                        let _discard_equals = token_iter.next();
-                        Token::Equals
-                    } else {
-                        unimplemented!("Implement assignment")
+                    _ => Token::Plus,
+                },
+                "*" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::StarEquals
                     }
-                }
-                "<" => {
-                    if let Some(&"=") = token_iter.peek() {
-                        let _discard_equals = token_iter.next();
+                    _ => Token::Star,
+                },
+                "/" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::SlashEquals
+                    }
+                    _ => Token::Slash,
+                },
+                "&" => match token_iter.peek() {
+                    Some(&"&") => {
+                        let _ = token_iter.next();
+                        Token::LogicalAnd
+                    }
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::BitwiseAndEquals
+                    }
+                    _ => Token::SingleAnd,
+                },
+                "|" => match token_iter.peek() {
+                    Some(&"|") => {
+                        let _ = token_iter.next();
+                        Token::LogicalOr
+                    }
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::BitwiseOrEquals
+                    }
+                    _ => Token::BitwiseOr,
+                },
+                "^" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::BitwiseXorEquals
+                    }
+                    _ => Token::BitwiseXor,
+                },
+                "=" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::DoubleEquals
+                    }
+                    _ => Token::SingleEquals,
+                },
+                "<" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
                         Token::LessThanEquals
-                    } else {
-                        Token::LessThan
                     }
-                }
-                ">" => {
-                    if let Some(&"=") = token_iter.peek() {
-                        let _discard_equals = token_iter.next();
+                    Some(&"<") => {
+                        let _ = token_iter.next();
+                        match token_iter.peek() {
+                            Some(&"=") => {
+                                let _ = token_iter.next();
+                                Token::BitwiseLeftShiftEquals
+                            }
+                            _ => Token::BitwiseLeftShift,
+                        }
+                    }
+                    _ => Token::LessThan,
+                },
+                ">" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
                         Token::GreaterThanEquals
-                    } else {
-                        Token::GreaterThan
                     }
-                }
+                    Some(&">") => {
+                        let _ = token_iter.next();
+                        match token_iter.peek() {
+                            Some(&"=") => {
+                                let _ = token_iter.next();
+                                Token::BitwiseRightShiftEquals
+                            }
+                            _ => Token::BitwiseRightShift,
+                        }
+                    }
+                    _ => Token::GreaterThan,
+                },
+                "%" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::PercentEquals
+                    }
+                    _ => Token::PercentSign,
+                },
+                "?" => Token::QuestionMark,
+                ":" => Token::Colon,
+                "," => Token::Comma,
                 s => {
                     if let Ok(u) = s.parse::<u64>() {
                         Token::Integer(u)
