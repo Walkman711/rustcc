@@ -1,5 +1,6 @@
 use crate::{
-    lexer::{Keywords, Lexer, Token},
+    lexer::Lexer,
+    lexer_enums::{Keywords, Token},
     parser_enums::{AdditiveOp, EqualityOp, MultiplicativeOp, RelationOp, UnaryOp},
     utils::{ParseError, RustCcError, RustCcResult},
 };

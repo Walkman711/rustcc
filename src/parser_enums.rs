@@ -3,7 +3,7 @@
 // Logical And is the next lowest precedence
 
 use crate::{
-    lexer::Token,
+    lexer_enums::Token,
     utils::{ParseError, RustCcError},
 };
 
