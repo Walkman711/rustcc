@@ -26,7 +26,8 @@ fn main() -> anyhow::Result<()> {
         .arg("-o")
         .arg(out_filename)
         .arg(asm_filename)
-        .output()?;
+        .output()
+        .unwrap();
 
     Ok(())
 }

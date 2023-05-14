@@ -4,6 +4,18 @@ use crate::{
     utils::{ParseError, RustCcError, RustCcResult},
 };
 
+/// <program> ::= <function>
+/// <function> ::= "int" <id> "(" ")" "{" <statement> ""
+/// <statement> ::= "return" <exp> ";"
+/// <exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
+/// <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
+/// <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
+/// <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
+/// <additive-exp> ::= <term> { ("+" | "-") <term> }
+/// <term> ::= <factor> { ("*" | "/") <factor> }
+/// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
+/// <unop> ::= "!" | "~" | "-"
+
 #[derive(Clone, Debug)]
 pub enum Program {
     Func(Function),
@@ -19,34 +31,27 @@ pub enum Statement {
     Return(Expression),
 }
 
+pub type Expression = (LogicalAndExpression, Vec<LogicalAndExpression>);
+
+pub type LogicalAndExpression = (EqualityExpression, Vec<EqualityExpression>);
+
+pub type EqualityExpression = (
+    RelationalExpression,
+    Vec<(EqualityOp, RelationalExpression)>,
+);
+
+pub type RelationalExpression = (AdditiveExpression, Vec<(RelationOp, AdditiveExpression)>);
+
+pub type AdditiveExpression = (Term, Vec<(AdditiveOp, Term)>);
+
+pub type Term = (Factor, Vec<(MultiplicativeOp, Factor)>);
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Factor {
     Const(u64),
     Unary(UnaryOp, Box<Factor>),
     ParenExp(Box<Expression>),
 }
-
-pub type Expression = (LogicalAndExpression, Vec<LogicalAndExpression>);
-pub type LogicalAndExpression = (EqualityExpression, Vec<EqualityExpression>);
-pub type EqualityExpression = (
-    RelationalExpression,
-    Vec<(EqualityOp, RelationalExpression)>,
-);
-pub type RelationalExpression = (AdditiveExpression, Vec<(RelationOp, AdditiveExpression)>);
-pub type AdditiveExpression = (Term, Vec<(AdditiveOp, Term)>);
-pub type Term = (Factor, Vec<(MultiplicativeOp, Factor)>);
-
-/// <program> ::= <function>
-/// <function> ::= "int" <id> "(" ")" "{" <statement> ""
-/// <statement> ::= "return" <exp> ";"
-/// <exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
-/// <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
-/// <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
-/// <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
-/// <additive-exp> ::= <term> { ("+" | "-") <term> }
-/// <term> ::= <factor> { ("*" | "/") <factor> }
-/// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
-/// <unop> ::= "!" | "~" | "-"
 
 pub struct Parser {
     lexer: Lexer,
@@ -105,6 +110,7 @@ impl Parser {
         let mut trailing_logical_and_exps = vec![];
 
         while let Some(tok) = self.lexer.next_token() {
+            // TODO: Make this into a try-from
             match tok {
                 Token::Or => {}
                 _ => {
