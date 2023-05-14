@@ -16,6 +16,51 @@ pub enum Arch {
     ARM,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cond {
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanEquals,
+    GreaterThan,
+    GreaterThanEquals,
+    Always,
+}
+
+impl std::fmt::Display for Cond {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Equals => write!(f, "eq"),
+            Self::NotEquals => write!(f, "ne"),
+            Self::LessThan => write!(f, "lt"),
+            Self::LessThanEquals => write!(f, "le"),
+            Self::GreaterThan => write!(f, "gt"),
+            Self::GreaterThanEquals => write!(f, "ge"),
+            Self::Always => write!(f, "al"),
+        }
+    }
+}
+
+impl From<EqualityOp> for Cond {
+    fn from(value: EqualityOp) -> Self {
+        match value {
+            EqualityOp::Equals => Self::Equals,
+            EqualityOp::NotEquals => Self::NotEquals,
+        }
+    }
+}
+
+impl From<RelationOp> for Cond {
+    fn from(value: RelationOp) -> Self {
+        match value {
+            RelationOp::LessThan => Self::LessThan,
+            RelationOp::LessThanEquals => Self::LessThanEquals,
+            RelationOp::GreaterThan => Self::GreaterThan,
+            RelationOp::GreaterThanEquals => Self::GreaterThanEquals,
+        }
+    }
+}
+
 pub struct AsmGenerator {
     asm_file: File,
     sp: usize,
@@ -50,6 +95,10 @@ impl AsmGenerator {
         writeln!(self.asm_file, ".L{lbl}:").expect(WRITELN_EXPECT);
     }
 
+    fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
+        self.write_inst(&format!("b{cond} .L{lbl}"));
+    }
+
     fn push_stack(&mut self) {
         self.sp += 4;
         self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
@@ -60,7 +109,7 @@ impl AsmGenerator {
         self.sp -= 4;
     }
 
-    fn logical_comparison(&mut self, reg_a: &str, reg_b: &str, cond: &str) {
+    fn logical_comparison(&mut self, reg_a: &str, reg_b: &str, cond: Cond) {
         // Compare registers
         self.write_inst(&format!("cmp  {reg_a}, {reg_b}"));
         // set lower byte of reg_a based on if cond is satisfied
@@ -99,16 +148,16 @@ impl AsmGenerator {
         let (first_logical_and_exp, trailing_logical_and_exps) = exp;
         self.generate_logical_and_exp_asm(first_logical_and_exp);
         self.write_inst("cmp  w0, wzr");
-        self.write_inst(&format!("bne .L{}", short_circuit_label));
+        self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
         for logical_and_exp in trailing_logical_and_exps {
             self.generate_logical_and_exp_asm(logical_and_exp);
             self.write_inst("cmp  w0, wzr");
-            self.write_inst(&format!("bne .L{}", short_circuit_label));
+            self.write_branch_inst(Cond::NotEquals, short_circuit_label);
         }
 
         self.write_inst("mov  w0, wzr");
-        self.write_inst(&format!("b    .L{}", exit_label));
+        self.write_branch_inst(Cond::Always, exit_label);
 
         self.write_jmp_label(short_circuit_label);
         self.write_inst("mov  w0, 1");
@@ -125,16 +174,16 @@ impl AsmGenerator {
 
         self.generate_equality_exp_asm(first_equality_exp);
         self.write_inst("cmp  w0, wzr");
-        self.write_inst(&format!("beq  .L{}", short_circuit_label));
+        self.write_branch_inst(Cond::Equals, short_circuit_label);
 
         for equality_exp in trailing_equality_exps {
             self.generate_equality_exp_asm(equality_exp);
             self.write_inst("cmp  w0, wzr");
-            self.write_inst(&format!("beq  .L{}", short_circuit_label));
+            self.write_branch_inst(Cond::Equals, short_circuit_label);
         }
 
         self.write_inst("mov  w0, 1");
-        self.write_inst(&format!("b    .L{}", success_label));
+        self.write_branch_inst(Cond::Always, success_label);
 
         self.write_jmp_label(short_circuit_label);
         self.write_inst("mov  w0, wzr");
@@ -150,9 +199,10 @@ impl AsmGenerator {
             self.push_stack();
             self.generate_relational_exp_asm(relational_exp);
             self.pop_stack_into_w1();
+            let cond: Cond = op.into();
             match op {
-                EqualityOp::Equals => self.logical_comparison("w1", "w0", "eq"),
-                EqualityOp::NotEquals => self.logical_comparison("w1", "w0", "ne"),
+                EqualityOp::Equals => self.logical_comparison("w1", "w0", cond),
+                EqualityOp::NotEquals => self.logical_comparison("w1", "w0", cond),
             }
         }
     }
@@ -165,11 +215,12 @@ impl AsmGenerator {
             self.push_stack();
             self.generate_additive_exp_asm(additive_exp);
             self.pop_stack_into_w1();
+            let cond: Cond = op.into();
             match op {
-                RelationOp::LessThan => self.logical_comparison("w1", "w0", "lt"),
-                RelationOp::LessThanEquals => self.logical_comparison("w1", "w0", "le"),
-                RelationOp::GreaterThan => self.logical_comparison("w1", "w0", "gt"),
-                RelationOp::GreaterThanEquals => self.logical_comparison("w1", "w0", "ge"),
+                RelationOp::LessThan => self.logical_comparison("w1", "w0", cond),
+                RelationOp::LessThanEquals => self.logical_comparison("w1", "w0", cond),
+                RelationOp::GreaterThan => self.logical_comparison("w1", "w0", cond),
+                RelationOp::GreaterThanEquals => self.logical_comparison("w1", "w0", cond),
             }
         }
     }

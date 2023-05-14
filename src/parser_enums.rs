@@ -2,13 +2,13 @@
 
 // Logical And is the next lowest precedence
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EqualityOp {
     Equals,
     NotEquals,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RelationOp {
     LessThan,
     LessThanEquals,
@@ -16,19 +16,19 @@ pub enum RelationOp {
     GreaterThanEquals,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AdditiveOp {
     Addition,
     Subtraction,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MultiplicativeOp {
     Multiply,
     Divide,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnaryOp {
     Negation,
     LogicalNegation,
