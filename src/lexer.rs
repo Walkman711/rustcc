@@ -52,12 +52,48 @@ pub enum Token {
     BitwiseXorEquals,
     BitwiseOrEquals,
     Comma,
+    Period,
+    Arrow,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum Keywords {
+    Auto,
+    Break,
+    Case,
+    Char,
+    Const,
+    Continue,
+    Defualt,
+    Do,
+    Double,
+    Else,
+    Enum,
+    Extern,
+    Float,
+    For,
+    Goto,
+    If,
+    Inline,
     Int,
+    Long,
+    Nullptr,
+    Register,
+    Restrict,
     Return,
+    Short,
+    Signed,
+    Sizeof,
+    Static,
+    Struct,
+    Switch,
+    Typedef,
+    Union,
+    Unsigned,
+    Void,
+    Volatile,
+    While,
 }
 
 #[derive(Clone, Debug)]
@@ -83,14 +119,22 @@ impl TryFrom<&str> for Lexer {
         let mut token_iter = expanded_program.split_whitespace().peekable();
         while let Some(token) = token_iter.next() {
             let lexed_token = match token {
-                "int" => Token::Keyword(Keywords::Int),
-                "return" => Token::Keyword(Keywords::Return),
                 "{" => Token::OpenBrace,
                 "}" => Token::CloseBrace,
                 "(" => Token::OpenParen,
                 ")" => Token::CloseParen,
                 ";" => Token::Semicolon,
-                "-" => Token::Minus,
+                "-" => match token_iter.peek() {
+                    Some(&"=") => {
+                        let _ = token_iter.next();
+                        Token::MinusEquals
+                    }
+                    Some(&">") => {
+                        let _ = token_iter.next();
+                        Token::Arrow
+                    }
+                    _ => Token::Minus,
+                },
                 "!" => match token_iter.peek() {
                     Some(&"=") => {
                         let _ = token_iter.next();
@@ -204,8 +248,11 @@ impl TryFrom<&str> for Lexer {
                 "?" => Token::QuestionMark,
                 ":" => Token::Colon,
                 "," => Token::Comma,
+                "." => Token::Period,
                 s => {
-                    if let Ok(u) = s.parse::<u64>() {
+                    if let Ok(kw) = Keywords::try_from(s) {
+                        Token::Keyword(kw)
+                    } else if let Ok(u) = s.parse::<u64>() {
                         Token::Integer(u)
                     } else {
                         Token::Identifier(s.to_string())
