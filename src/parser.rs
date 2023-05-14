@@ -1,5 +1,6 @@
 use crate::{
     lexer::{Keywords, Lexer, Token},
+    parser_enums::{AdditiveOp, EqualityOp, RelationOp},
     utils::{ParseError, RustCcError, RustCcResult},
 };
 
@@ -13,53 +14,63 @@ pub enum Function {
     Fun(String, Statement),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Return(Expression),
 }
 
-pub type Expression = (Term, Vec<(AddSubtract, Term)>);
-pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnaryOp {
     Negation,
     LogicalNegation,
     BitwiseComplement,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum BinaryOp {
-    Addition,
-    Subtraction,
-    Multiplication,
-    Division,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Factor {
     Const(u64),
     Unary(UnaryOp, Box<Factor>),
     ParenExp(Box<Expression>),
 }
 
-// TODO: do something with bin op precedence
-#[derive(Clone, Debug)]
-pub enum AddSubtract {
-    Addition,
-    Subtraction,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MultiplyDivide {
     Multiply,
     Divide,
 }
 
+// pub type Expression = (Term, Vec<(AdditiveOp, Term)>);
+// pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
+
+pub type Expression = (LogicalAndExpression, Vec<LogicalAndExpression>);
+pub type LogicalAndExpression = (EqualityExpression, Vec<EqualityExpression>);
+pub type EqualityExpression = (
+    RelationalExpression,
+    Vec<(EqualityOp, RelationalExpression)>,
+);
+pub type RelationalExpression = (AdditiveExpression, Vec<(RelationOp, AdditiveExpression)>);
+pub type AdditiveExpression = (Term, Vec<(AdditiveOp, Term)>);
+pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
+
+/// <exp> ::= <term> { ("+" | "-") <term> }
+/// <term> ::= <factor> { ("*" | "/") <factor> }
+/// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
+/// <unop> ::= "!" | "~" | "-"
+
+// <exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
+// <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
+// <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
+// <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
+// <additive-exp> ::= <term> { ("+" | "-") <term> }
+
 /// <program> ::= <function>
 /// <function> ::= "int" <id> "(" ")" "{" <statement> ""
 /// <statement> ::= "return" <exp> ";"
-/// <exp> ::= <term> { ("+" | "-") <term> }
+/// <exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
+/// <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
+/// <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
+/// <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
+/// <additive-exp> ::= <term> { ("+" | "-") <term> }
 /// <term> ::= <factor> { ("*" | "/") <factor> }
 /// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
 /// <unop> ::= "!" | "~" | "-"
@@ -116,15 +127,99 @@ impl Parser {
     }
 
     fn parse_exp(&mut self) -> RustCcResult<Expression> {
-        let first_term = self.parse_term()?;
-        let mut trailing_terms = vec![];
+        let first_logical_and_exp = self.parse_logical_and_exp()?;
+
+        let mut trailing_logical_and_exps = vec![];
+
+        while let Some(tok) = self.lexer.next_token() {
+            match tok {
+                Token::Or => {}
+                _ => {
+                    self.lexer.back();
+                    break;
+                }
+            }
+            let logical_and_exp = self.parse_logical_and_exp()?;
+            trailing_logical_and_exps.push(logical_and_exp);
+        }
+
+        Ok((first_logical_and_exp, trailing_logical_and_exps))
+    }
+
+    fn parse_logical_and_exp(&mut self) -> RustCcResult<LogicalAndExpression> {
+        let first_equality_exp = self.parse_equality_exp()?;
+
+        let mut trailing_equality_exps = vec![];
+
+        while let Some(tok) = self.lexer.next_token() {
+            match tok {
+                Token::And => {}
+                _ => {
+                    self.lexer.back();
+                    break;
+                }
+            }
+            let equality_exp = self.parse_equality_exp()?;
+            trailing_equality_exps.push(equality_exp);
+        }
+
+        Ok((first_equality_exp, trailing_equality_exps))
+    }
+
+    fn parse_equality_exp(&mut self) -> RustCcResult<EqualityExpression> {
+        let first_relational_exp = self.parse_relational_exp()?;
+
+        let mut trailing_relational_exps = vec![];
+
         while let Some(tok) = self.lexer.next_token() {
             let op = match tok {
-                Token::Plus => AddSubtract::Addition,
-                // FIX: no way this works
-                Token::Minus => AddSubtract::Subtraction,
+                Token::Equals => EqualityOp::Equals,
+                Token::NotEquals => EqualityOp::NotEquals,
                 _ => {
-                    // go back by one if next token isn't a trailing term
+                    self.lexer.back();
+                    break;
+                }
+            };
+            let relational_exp = self.parse_relational_exp()?;
+            trailing_relational_exps.push((op, relational_exp));
+        }
+
+        Ok((first_relational_exp, trailing_relational_exps))
+    }
+
+    fn parse_relational_exp(&mut self) -> RustCcResult<RelationalExpression> {
+        let first_additive_exp = self.parse_additive_exp()?;
+
+        let mut trailing_additive_exps = vec![];
+
+        while let Some(tok) = self.lexer.next_token() {
+            let op = match tok {
+                Token::LessThan => RelationOp::LessThan,
+                Token::LessThanEquals => RelationOp::LessThanEquals,
+                Token::GreaterThan => RelationOp::GreaterThan,
+                Token::GreaterThanEquals => RelationOp::GreaterThanEquals,
+                _ => {
+                    self.lexer.back();
+                    break;
+                }
+            };
+            let additive_exp = self.parse_additive_exp()?;
+            trailing_additive_exps.push((op, additive_exp));
+        }
+
+        Ok((first_additive_exp, trailing_additive_exps))
+    }
+
+    fn parse_additive_exp(&mut self) -> RustCcResult<AdditiveExpression> {
+        let first_term = self.parse_term()?;
+
+        let mut trailing_terms = vec![];
+
+        while let Some(tok) = self.lexer.next_token() {
+            let op = match tok {
+                Token::Plus => AdditiveOp::Addition,
+                Token::Minus => AdditiveOp::Subtraction,
+                _ => {
                     self.lexer.back();
                     break;
                 }
@@ -132,6 +227,7 @@ impl Parser {
             let term = self.parse_term()?;
             trailing_terms.push((op, term));
         }
+
         Ok((first_term, trailing_terms))
     }
 

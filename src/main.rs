@@ -15,7 +15,7 @@ fn main() -> anyhow::Result<()> {
     let mut parser = Parser::new(&test_program)?;
     let parsed_program = parser.parse()?;
 
-    // dbg!(&parsed_program);
+    dbg!(&parsed_program);
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);

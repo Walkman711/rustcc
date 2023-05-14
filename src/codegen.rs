@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Write;
 
 use crate::parser::{
-    AddSubtract, Expression, Factor, Function, MultiplyDivide, Program, Statement, Term, UnaryOp,
+    Expression, Factor, Function, MultiplyDivide, Program, Statement, Term, UnaryOp,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,12 +67,13 @@ impl AsmGenerator {
     fn generate_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
             Statement::Return(exp) => {
-                self.generate_expression_asm(exp);
+                //                self.generate_expression_asm(exp);
             }
         }
         self.write_inst("ret");
     }
 
+    /*
     fn generate_expression_asm(&mut self, exp: Expression) {
         let (first_term, trailing_terms) = exp;
         self.generate_term_asm(first_term);
@@ -123,4 +124,5 @@ impl AsmGenerator {
             Factor::ParenExp(exp) => self.generate_expression_asm(*exp),
         }
     }
+    */
 }
