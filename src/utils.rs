@@ -16,6 +16,8 @@ pub enum ParseError {
     ExpectedToken(Token, Token),
     #[error("Ran out of tokens")]
     UnexpectedTokenEnd,
+    #[error("Next token didn't parse into op")]
+    PeekFailed,
 }
 
 pub type RustCcResult<T> = Result<T, RustCcError>;

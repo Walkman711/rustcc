@@ -146,23 +146,29 @@ impl AsmGenerator {
         self.curr_jmp_label += 2;
 
         let (first_logical_and_exp, trailing_logical_and_exps) = exp;
+        let print_jmp_insts = !trailing_logical_and_exps.is_empty();
+
         self.generate_logical_and_exp_asm(first_logical_and_exp);
-        self.write_inst("cmp  w0, wzr");
-        self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
         for logical_and_exp in trailing_logical_and_exps {
-            self.generate_logical_and_exp_asm(logical_and_exp);
             self.write_inst("cmp  w0, wzr");
             self.write_branch_inst(Cond::NotEquals, short_circuit_label);
+
+            self.generate_logical_and_exp_asm(logical_and_exp);
         }
 
-        self.write_inst("mov  w0, wzr");
-        self.write_branch_inst(Cond::Always, exit_label);
+        if print_jmp_insts {
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
-        self.write_jmp_label(short_circuit_label);
-        self.write_inst("mov  w0, 1");
+            self.write_inst("mov  w0, wzr");
+            self.write_branch_inst(Cond::Always, exit_label);
 
-        self.write_jmp_label(exit_label);
+            self.write_jmp_label(short_circuit_label);
+            self.write_inst("mov  w0, 1");
+
+            self.write_jmp_label(exit_label);
+        }
     }
 
     fn generate_logical_and_exp_asm(&mut self, logical_and_exp: LogicalAndExpression) {
@@ -171,24 +177,30 @@ impl AsmGenerator {
         self.curr_jmp_label += 2;
 
         let (first_equality_exp, trailing_equality_exps) = logical_and_exp;
+        let print_jmp_insts = !trailing_equality_exps.is_empty();
 
         self.generate_equality_exp_asm(first_equality_exp);
-        self.write_inst("cmp  w0, wzr");
-        self.write_branch_inst(Cond::Equals, short_circuit_label);
 
         for equality_exp in trailing_equality_exps {
-            self.generate_equality_exp_asm(equality_exp);
             self.write_inst("cmp  w0, wzr");
             self.write_branch_inst(Cond::Equals, short_circuit_label);
+
+            self.generate_equality_exp_asm(equality_exp);
         }
 
-        self.write_inst("mov  w0, 1");
-        self.write_branch_inst(Cond::Always, success_label);
+        if print_jmp_insts {
+            // Get the last term checked
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::Equals, short_circuit_label);
 
-        self.write_jmp_label(short_circuit_label);
-        self.write_inst("mov  w0, wzr");
+            self.write_inst("mov  w0, 1");
+            self.write_branch_inst(Cond::Always, success_label);
 
-        self.write_jmp_label(success_label);
+            self.write_jmp_label(short_circuit_label);
+            self.write_inst("mov  w0, wzr");
+
+            self.write_jmp_label(success_label);
+        }
     }
 
     fn generate_equality_exp_asm(&mut self, equality_exp: EqualityExpression) {

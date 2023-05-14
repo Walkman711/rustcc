@@ -214,15 +214,11 @@ impl Parser {
         let first_factor = self.parse_factor()?;
         let mut trailing_factors = vec![];
         while let Some(tok) = self.lexer.next_token() {
-            let op = match tok {
-                Token::Star => MultiplicativeOp::Multiply,
-                Token::Slash => MultiplicativeOp::Divide,
-                _ => {
-                    // go back by one if next token isn't a trailing factor
-                    self.lexer.back();
-                    break;
-                }
+            let Ok(op) = MultiplicativeOp::try_from(tok) else {
+                self.lexer.back();
+                break;
             };
+
             let factor = self.parse_factor()?;
             trailing_factors.push((op, factor));
         }

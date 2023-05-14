@@ -142,6 +142,11 @@ impl Lexer {
         tok.map(|t| t.to_owned())
     }
 
+    pub fn peek(&self) -> Option<Token> {
+        let tok = self.tokens.get(self.curr_idx);
+        tok.map(|t| t.to_owned())
+    }
+
     pub fn back(&mut self) {
         self.curr_idx -= 1;
     }
