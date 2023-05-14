@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Keywords, Lexer, Token},
-    parser_enums::{AdditiveOp, EqualityOp, RelationOp},
+    parser_enums::{AdditiveOp, EqualityOp, MultiplicativeOp, RelationOp, UnaryOp},
     utils::{ParseError, RustCcError, RustCcResult},
 };
 
@@ -20,27 +20,11 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum UnaryOp {
-    Negation,
-    LogicalNegation,
-    BitwiseComplement,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Factor {
     Const(u64),
     Unary(UnaryOp, Box<Factor>),
     ParenExp(Box<Expression>),
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MultiplyDivide {
-    Multiply,
-    Divide,
-}
-
-// pub type Expression = (Term, Vec<(AdditiveOp, Term)>);
-// pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
 
 pub type Expression = (LogicalAndExpression, Vec<LogicalAndExpression>);
 pub type LogicalAndExpression = (EqualityExpression, Vec<EqualityExpression>);
@@ -50,18 +34,7 @@ pub type EqualityExpression = (
 );
 pub type RelationalExpression = (AdditiveExpression, Vec<(RelationOp, AdditiveExpression)>);
 pub type AdditiveExpression = (Term, Vec<(AdditiveOp, Term)>);
-pub type Term = (Factor, Vec<(MultiplyDivide, Factor)>);
-
-/// <exp> ::= <term> { ("+" | "-") <term> }
-/// <term> ::= <factor> { ("*" | "/") <factor> }
-/// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int_value>
-/// <unop> ::= "!" | "~" | "-"
-
-// <exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
-// <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
-// <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
-// <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
-// <additive-exp> ::= <term> { ("+" | "-") <term> }
+pub type Term = (Factor, Vec<(MultiplicativeOp, Factor)>);
 
 /// <program> ::= <function>
 /// <function> ::= "int" <id> "(" ")" "{" <statement> ""
@@ -236,8 +209,8 @@ impl Parser {
         let mut trailing_factors = vec![];
         while let Some(tok) = self.lexer.next_token() {
             let op = match tok {
-                Token::Star => MultiplyDivide::Multiply,
-                Token::Slash => MultiplyDivide::Divide,
+                Token::Star => MultiplicativeOp::Multiply,
+                Token::Slash => MultiplicativeOp::Divide,
                 _ => {
                     // go back by one if next token isn't a trailing factor
                     self.lexer.back();

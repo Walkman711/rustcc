@@ -1,9 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 
-use crate::parser::{
-    Expression, Factor, Function, MultiplyDivide, Program, Statement, Term, UnaryOp,
-};
+use crate::parser::{Expression, Factor, Function, Program, Statement, Term};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -67,7 +65,7 @@ impl AsmGenerator {
     fn generate_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
             Statement::Return(exp) => {
-                //                self.generate_expression_asm(exp);
+                // self.generate_expression_asm(exp);
             }
         }
         self.write_inst("ret");
