@@ -3,7 +3,14 @@ use crate::{
     utils::{ParseError, RustCcError},
 };
 
-pub type Level15Exp = (Level14Exp, Vec<(Level15Op, Level14Exp)>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
+
+impl std::fmt::Display for Level15Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "EXP")
+    }
+}
 
 // Variable assignment - lvalue cannot be an expression
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -12,17 +19,38 @@ pub enum Level14Exp {
     NonAssignment(Level13Exp),
 }
 
-pub type Level13Exp = (Level12Exp, Vec<(Level13Op, Level12Exp)>);
-pub type Level12Exp = (Level11Exp, Vec<(Level12Op, Level11Exp)>);
-pub type Level11Exp = (Level10Exp, Vec<(Level11Op, Level10Exp)>);
-pub type Level10Exp = (Level9Exp, Vec<(Level10Op, Level9Exp)>);
-pub type Level9Exp = (Level8Exp, Vec<(Level9Op, Level8Exp)>);
-pub type Level8Exp = (Level7Exp, Vec<(Level8Op, Level7Exp)>);
-pub type Level7Exp = (Level6Exp, Vec<(Level7Op, Level6Exp)>);
-pub type Level6Exp = (Level5Exp, Vec<(Level6Op, Level5Exp)>);
-pub type Level5Exp = (Level4Exp, Vec<(Level5Op, Level4Exp)>);
-pub type Level4Exp = (Level3Exp, Vec<(Level4Op, Level3Exp)>);
-pub type Level3Exp = (Level2Exp, Vec<(Level3Op, Level2Exp)>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level13Exp(pub (Level12Exp, Vec<(Level13Op, Level12Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level12Exp(pub (Level11Exp, Vec<(Level12Op, Level11Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level11Exp(pub (Level10Exp, Vec<(Level11Op, Level10Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level10Exp(pub (Level9Exp, Vec<(Level10Op, Level9Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level9Exp(pub (Level8Exp, Vec<(Level9Op, Level8Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level8Exp(pub (Level7Exp, Vec<(Level8Op, Level7Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level7Exp(pub (Level6Exp, Vec<(Level7Op, Level6Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level6Exp(pub (Level5Exp, Vec<(Level6Op, Level5Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level5Exp(pub (Level4Exp, Vec<(Level5Op, Level4Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level4Exp(pub (Level3Exp, Vec<(Level4Op, Level3Exp)>));
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Level3Exp(pub (Level2Exp, Vec<(Level3Op, Level2Exp)>));
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {

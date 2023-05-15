@@ -9,7 +9,7 @@ use crate::{
 
 pub struct Parser {
     lexer: Lexer,
-    var_map: HashMap<String, Option<u64>>,
+    _var_map: HashMap<String, Option<u64>>,
 }
 
 #[derive(Clone, Debug)]
@@ -17,9 +17,32 @@ pub enum Program {
     Func(Function),
 }
 
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "PROGRAM")?;
+        match self {
+            Program::Func(foo) => writeln!(f, "{foo}"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Function {
     Fun(String, Vec<Statement>),
+}
+
+impl std::fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Function::Fun(func_name, stmts) => {
+                writeln!(f, "\tFunction: {func_name}")?;
+                for stmt in stmts {
+                    writeln!(f, "\t{stmt}")?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,12 +52,29 @@ pub enum Statement {
     Exp(Level15Exp),
 }
 
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Statement::Return(exp) => {
+                writeln!(f, "\tRETVRN {exp}")
+            }
+            Statement::Declare(id, exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
+                None => writeln!(f, "\tDECLARE {id}"),
+            },
+            Statement::Exp(exp) => {
+                writeln!(f, "\tEXP: {exp}")
+            }
+        }
+    }
+}
+
 impl Parser {
     pub fn new(program: &str) -> RustCcResult<Self> {
         let lexer = Lexer::try_from(program)?;
         Ok(Self {
             lexer,
-            var_map: HashMap::new(),
+            _var_map: HashMap::new(),
         })
     }
 }
@@ -67,10 +107,7 @@ impl Parser {
         // loops?
         let mut statements = vec![];
         while Some(Token::CloseBrace) != self.lexer.peek() {
-            println!("XXXXXXXXX STATEMENT BEGIN XXXXXXXX");
             let statement = self.parse_statement()?;
-            println!("XXXXXXXXX STATEMENT PARSED XXXXXXXX");
-            dbg!(&statement);
             statements.push(statement);
         }
 
@@ -125,7 +162,7 @@ impl Parser {
             let l14_exp = self.parse_l14_exp()?;
             trailing_l14_exps.push((op, l14_exp));
         }
-        Ok((first_l14_exp, trailing_l14_exps))
+        Ok(Level15Exp((first_l14_exp, trailing_l14_exps)))
     }
 
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
@@ -169,7 +206,7 @@ impl Parser {
             let l12_exp = self.parse_l12_exp()?;
             trailing_l12_exps.push((op, l12_exp));
         }
-        Ok((first_l12_exp, trailing_l12_exps))
+        Ok(Level13Exp((first_l12_exp, trailing_l12_exps)))
     }
 
     fn parse_l12_exp(&mut self) -> RustCcResult<Level12Exp> {
@@ -184,7 +221,7 @@ impl Parser {
             let l11_exp = self.parse_l11_exp()?;
             trailing_l11_exps.push((op, l11_exp));
         }
-        Ok((first_l11_exp, trailing_l11_exps))
+        Ok(Level12Exp((first_l11_exp, trailing_l11_exps)))
     }
 
     fn parse_l11_exp(&mut self) -> RustCcResult<Level11Exp> {
@@ -199,7 +236,7 @@ impl Parser {
             let l10_exp = self.parse_l10_exp()?;
             trailing_l10_exps.push((op, l10_exp));
         }
-        Ok((first_l10_exp, trailing_l10_exps))
+        Ok(Level11Exp((first_l10_exp, trailing_l10_exps)))
     }
 
     fn parse_l10_exp(&mut self) -> RustCcResult<Level10Exp> {
@@ -214,7 +251,7 @@ impl Parser {
             let l9_exp = self.parse_l9_exp()?;
             trailing_l9_exps.push((op, l9_exp));
         }
-        Ok((first_l9_exp, trailing_l9_exps))
+        Ok(Level10Exp((first_l9_exp, trailing_l9_exps)))
     }
 
     fn parse_l9_exp(&mut self) -> RustCcResult<Level9Exp> {
@@ -229,7 +266,7 @@ impl Parser {
             let l8_exp = self.parse_l8_exp()?;
             trailing_l8_exps.push((op, l8_exp));
         }
-        Ok((first_l8_exp, trailing_l8_exps))
+        Ok(Level9Exp((first_l8_exp, trailing_l8_exps)))
     }
 
     fn parse_l8_exp(&mut self) -> RustCcResult<Level8Exp> {
@@ -244,7 +281,7 @@ impl Parser {
             let l7_exp = self.parse_l7_exp()?;
             trailing_l7_exps.push((op, l7_exp));
         }
-        Ok((first_l7_exp, trailing_l7_exps))
+        Ok(Level8Exp((first_l7_exp, trailing_l7_exps)))
     }
 
     fn parse_l7_exp(&mut self) -> RustCcResult<Level7Exp> {
@@ -259,7 +296,7 @@ impl Parser {
             let l6_exp = self.parse_l6_exp()?;
             trailing_l6_exps.push((op, l6_exp));
         }
-        Ok((first_l6_exp, trailing_l6_exps))
+        Ok(Level7Exp((first_l6_exp, trailing_l6_exps)))
     }
 
     fn parse_l6_exp(&mut self) -> RustCcResult<Level6Exp> {
@@ -274,7 +311,7 @@ impl Parser {
             let l5_exp = self.parse_l5_exp()?;
             trailing_l5_exps.push((op, l5_exp));
         }
-        Ok((first_l5_exp, trailing_l5_exps))
+        Ok(Level6Exp((first_l5_exp, trailing_l5_exps)))
     }
 
     fn parse_l5_exp(&mut self) -> RustCcResult<Level5Exp> {
@@ -289,7 +326,7 @@ impl Parser {
             let l4_exp = self.parse_l4_exp()?;
             trailing_l4_exps.push((op, l4_exp));
         }
-        Ok((first_l4_exp, trailing_l4_exps))
+        Ok(Level5Exp((first_l4_exp, trailing_l4_exps)))
     }
 
     fn parse_l4_exp(&mut self) -> RustCcResult<Level4Exp> {
@@ -304,7 +341,7 @@ impl Parser {
             let l3_exp = self.parse_l3_exp()?;
             trailing_l3_exps.push((op, l3_exp));
         }
-        Ok((first_l3_exp, trailing_l3_exps))
+        Ok(Level4Exp((first_l3_exp, trailing_l3_exps)))
     }
 
     fn parse_l3_exp(&mut self) -> RustCcResult<Level3Exp> {
@@ -319,7 +356,7 @@ impl Parser {
             let l2_exp = self.parse_l2_exp()?;
             trailing_l2_exps.push((op, l2_exp));
         }
-        Ok((first_l2_exp, trailing_l2_exps))
+        Ok(Level3Exp((first_l2_exp, trailing_l2_exps)))
     }
 
     fn parse_l2_exp(&mut self) -> RustCcResult<Level2Exp> {

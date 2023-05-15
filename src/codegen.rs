@@ -100,7 +100,7 @@ impl AsmGenerator {
     }
 
     fn gen_l15_asm(&mut self, l15: Level15Exp) {
-        let (first_l14_exp, trailing_l14_exps) = l15;
+        let (first_l14_exp, trailing_l14_exps) = l15.0;
         self.gen_l14_asm(first_l14_exp);
 
         for (op, l14_exp) in trailing_l14_exps {
@@ -134,7 +134,7 @@ impl AsmGenerator {
     }
 
     fn gen_l13_asm(&mut self, l13: Level13Exp) {
-        let (first_l12_exp, trailing_l12_exps) = l13;
+        let (first_l12_exp, trailing_l12_exps) = l13.0;
         self.gen_l12_asm(first_l12_exp);
 
         for (op, l12_exp) in trailing_l12_exps {
@@ -152,7 +152,7 @@ impl AsmGenerator {
         let exit_label = self.curr_jmp_label + 1;
         self.curr_jmp_label += 2;
 
-        let (first_l11_exp, trailing_l11_exps) = l12;
+        let (first_l11_exp, trailing_l11_exps) = l12.0;
         let print_jmp_insts = !trailing_l11_exps.is_empty();
 
         self.gen_l11_asm(first_l11_exp);
@@ -183,7 +183,7 @@ impl AsmGenerator {
         let success_label = self.curr_jmp_label + 1;
         self.curr_jmp_label += 2;
 
-        let (first_l10_exp, trailing_l10_exps) = l11;
+        let (first_l10_exp, trailing_l10_exps) = l11.0;
         let print_jmp_insts = !trailing_l10_exps.is_empty();
 
         self.gen_l10_asm(first_l10_exp);
@@ -211,7 +211,7 @@ impl AsmGenerator {
     }
 
     fn gen_l10_asm(&mut self, l10: Level10Exp) {
-        let (first_l9_exp, trailing_l9_exps) = l10;
+        let (first_l9_exp, trailing_l9_exps) = l10.0;
         self.gen_l9_asm(first_l9_exp);
 
         for (op, l9_exp) in trailing_l9_exps {
@@ -225,7 +225,7 @@ impl AsmGenerator {
     }
 
     fn gen_l9_asm(&mut self, l9: Level9Exp) {
-        let (first_l8_exp, trailing_l8_exps) = l9;
+        let (first_l8_exp, trailing_l8_exps) = l9.0;
         self.gen_l8_asm(first_l8_exp);
 
         for (op, l8_exp) in trailing_l8_exps {
@@ -239,7 +239,7 @@ impl AsmGenerator {
     }
 
     fn gen_l8_asm(&mut self, l8: Level8Exp) {
-        let (first_l7_exp, trailing_l7_exps) = l8;
+        let (first_l7_exp, trailing_l7_exps) = l8.0;
         self.gen_l7_asm(first_l7_exp);
 
         for (op, l7_exp) in trailing_l7_exps {
@@ -253,7 +253,7 @@ impl AsmGenerator {
     }
 
     fn gen_l7_asm(&mut self, l7: Level7Exp) {
-        let (first_l6_exp, trailing_l6_exps) = l7;
+        let (first_l6_exp, trailing_l6_exps) = l7.0;
         self.gen_l6_asm(first_l6_exp);
 
         for (op, l6_exp) in trailing_l6_exps {
@@ -269,7 +269,7 @@ impl AsmGenerator {
     }
 
     fn gen_l6_asm(&mut self, l6: Level6Exp) {
-        let (first_l5_exp, trailing_l5_exps) = l6;
+        let (first_l5_exp, trailing_l5_exps) = l6.0;
         self.gen_l5_asm(first_l5_exp);
 
         for (op, l5_exp) in trailing_l5_exps {
@@ -287,7 +287,7 @@ impl AsmGenerator {
     }
 
     fn gen_l5_asm(&mut self, l5: Level5Exp) {
-        let (first_l4_exp, trailing_l4_exps) = l5;
+        let (first_l4_exp, trailing_l4_exps) = l5.0;
         self.gen_l4_asm(first_l4_exp);
 
         for (op, l4_exp) in trailing_l4_exps {
@@ -302,7 +302,7 @@ impl AsmGenerator {
     }
 
     fn gen_l4_asm(&mut self, l4: Level4Exp) {
-        let (first_l3_exp, trailing_l3_exps) = l4;
+        let (first_l3_exp, trailing_l3_exps) = l4.0;
         self.gen_l3_asm(first_l3_exp);
 
         for (op, l3_exp) in trailing_l3_exps {
@@ -317,7 +317,7 @@ impl AsmGenerator {
     }
 
     fn gen_l3_asm(&mut self, l3: Level3Exp) {
-        let (first_l2_exp, trailing_l2_exps) = l3;
+        let (first_l2_exp, trailing_l2_exps) = l3.0;
         self.gen_l2_asm(first_l2_exp);
 
         for (op, l2_exp) in trailing_l2_exps {
