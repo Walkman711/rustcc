@@ -3,12 +3,18 @@ use crate::{
     utils::{ParseError, RustCcError},
 };
 
+use strum_macros::Display;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
 
 impl std::fmt::Display for Level15Exp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "EXP")
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
     }
 }
 
@@ -19,38 +25,157 @@ pub enum Level14Exp {
     NonAssignment(Level13Exp),
 }
 
+impl std::fmt::Display for Level14Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Level14Exp::SimpleAssignment(id, exp) => todo!("{id} = {exp}"),
+            Level14Exp::NonAssignment(exp) => write!(f, "{exp}"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level13Exp(pub (Level12Exp, Vec<(Level13Op, Level12Exp)>));
+
+impl std::fmt::Display for Level13Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level12Exp(pub (Level11Exp, Vec<(Level12Op, Level11Exp)>));
 
+impl std::fmt::Display for Level12Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level11Exp(pub (Level10Exp, Vec<(Level11Op, Level10Exp)>));
+
+impl std::fmt::Display for Level11Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level10Exp(pub (Level9Exp, Vec<(Level10Op, Level9Exp)>));
 
+impl std::fmt::Display for Level10Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level9Exp(pub (Level8Exp, Vec<(Level9Op, Level8Exp)>));
+
+impl std::fmt::Display for Level9Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level8Exp(pub (Level7Exp, Vec<(Level8Op, Level7Exp)>));
 
+impl std::fmt::Display for Level8Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level7Exp(pub (Level6Exp, Vec<(Level7Op, Level6Exp)>));
+
+impl std::fmt::Display for Level7Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level6Exp(pub (Level5Exp, Vec<(Level6Op, Level5Exp)>));
 
+impl std::fmt::Display for Level6Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level5Exp(pub (Level4Exp, Vec<(Level5Op, Level4Exp)>));
+
+impl std::fmt::Display for Level5Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level4Exp(pub (Level3Exp, Vec<(Level4Op, Level3Exp)>));
 
+impl std::fmt::Display for Level4Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level3Exp(pub (Level2Exp, Vec<(Level3Op, Level2Exp)>));
+
+impl std::fmt::Display for Level3Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0 .0)?;
+        for (op, exp) in &self.0 .1 {
+            write!(f, "{op} {exp}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {
@@ -60,9 +185,20 @@ pub enum Level2Exp {
     ParenExp(Box<Level15Exp>),
 }
 
+impl std::fmt::Display for Level2Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Level2Exp::Const(c) => write!(f, "{c} "),
+            Level2Exp::Var(v) => write!(f, "{v} "),
+            Level2Exp::Unary(op, exp) => write!(f, "{op} {exp}"),
+            Level2Exp::ParenExp(exp) => write!(f, "{exp}"),
+        }
+    }
+}
+
 // TODO: Level1 Expressions involve structs, arrays, and pointers, so save that for later
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level15Op {
     Comma,
 }
@@ -78,7 +214,7 @@ impl TryFrom<Token> for Level15Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level14Op {
     SimpleAssignment,
     AssignmentBySum,
@@ -114,7 +250,7 @@ impl TryFrom<Token> for Level14Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level13Op {
     TernaryConditional,
 }
@@ -130,7 +266,7 @@ impl TryFrom<Token> for Level13Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level12Op {
     LogicalOr,
 }
@@ -146,7 +282,7 @@ impl TryFrom<Token> for Level12Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level11Op {
     LogicalAnd,
 }
@@ -162,7 +298,7 @@ impl TryFrom<Token> for Level11Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level10Op {
     BitwiseOr,
 }
@@ -178,7 +314,7 @@ impl TryFrom<Token> for Level10Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level9Op {
     BitwiseXor,
 }
@@ -194,7 +330,7 @@ impl TryFrom<Token> for Level9Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level8Op {
     BitwiseAnd,
 }
@@ -210,7 +346,7 @@ impl TryFrom<Token> for Level8Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level7Op {
     Equals,
     NotEquals,
@@ -228,7 +364,7 @@ impl TryFrom<Token> for Level7Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level6Op {
     LessThan,
     LessThanEquals,
@@ -250,7 +386,7 @@ impl TryFrom<Token> for Level6Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level5Op {
     BitwiseLeftShift,
     BitwiseRightShift,
@@ -268,7 +404,7 @@ impl TryFrom<Token> for Level5Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level4Op {
     Addition,
     Subtraction,
@@ -286,7 +422,7 @@ impl TryFrom<Token> for Level4Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level3Op {
     Multiplication,
     Division,
@@ -306,7 +442,7 @@ impl TryFrom<Token> for Level3Op {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level2Op {
     PrefixIncrement,
     PrefixDecrement,
@@ -321,7 +457,7 @@ pub enum Level2Op {
     Align,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum Level1Op {
     PostfixIncrement,
     PostfixDecrement,
