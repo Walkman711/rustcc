@@ -6,6 +6,7 @@ use crate::{
         AdditiveExpression, EqualityExpression, Expression, Factor, Function, LogicalAndExpression,
         Program, RelationalExpression, Statement, Term,
     },
+    parser_II::{FunctionII, ProgramII, StatementII},
     parser_enums::{AdditiveOp, EqualityOp, MultiplicativeOp, RelationOp, UnaryOp},
     parser_precedence::*,
 };
@@ -239,6 +240,26 @@ impl AsmGenerator {
 }
 
 impl AsmGenerator {
+    pub fn generate_asm_II(&mut self, prog: ProgramII) {
+        match prog {
+            ProgramII::Func(func) => match func {
+                FunctionII::Fun(identifier, stmt) => {
+                    self.write_fn_header(&identifier);
+                    self.generate_stmt_asm_II(stmt);
+                }
+            },
+        }
+    }
+
+    fn generate_stmt_asm_II(&mut self, stmt: StatementII) {
+        match stmt {
+            StatementII::Return(exp) => {
+                self.generate_l15_asm(exp);
+            }
+        }
+        self.write_inst("ret");
+    }
+
     fn generate_l15_asm(&mut self, l15: Level15Exp) {
         let (first_l14_exp, trailing_l14_exps) = l15;
         self.generate_l14_asm(first_l14_exp);

@@ -1,8 +1,6 @@
-pub mod codegen_enums;
-
 use std::process::Command;
 
-use rustcc::{codegen::AsmGenerator, parser::Parser};
+use rustcc::{codegen::AsmGenerator, parser_II::ParserII};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -14,14 +12,14 @@ fn main() -> anyhow::Result<()> {
     let test_program = std::fs::read_to_string(c_filename)?;
 
     // Lex & parse program
-    let mut parser = Parser::new(&test_program)?;
+    let mut parser = ParserII::new(&test_program)?;
     let parsed_program = parser.parse()?;
 
     dbg!(&parsed_program);
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);
-    asm_generator.generate_asm(parsed_program);
+    asm_generator.generate_asm_II(parsed_program);
 
     // Build
     Command::new("gcc")
