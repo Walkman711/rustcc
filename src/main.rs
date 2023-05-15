@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);
-    asm_generator.generate_asm_II(parsed_program);
+    asm_generator.gen_asm(parsed_program);
 
     // Build
     Command::new("gcc")
