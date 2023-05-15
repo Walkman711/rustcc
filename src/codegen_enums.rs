@@ -1,7 +1,4 @@
-use crate::{
-    parser_enums::{EqualityOp, RelationOp},
-    parser_precedence::{Level6Op, Level7Op},
-};
+use crate::parser_precedence::{Level6Op, Level7Op};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -52,26 +49,6 @@ impl From<Level7Op> for Cond {
         match value {
             Level7Op::Equals => Self::Equals,
             Level7Op::NotEquals => Self::NotEquals,
-        }
-    }
-}
-
-impl From<EqualityOp> for Cond {
-    fn from(value: EqualityOp) -> Self {
-        match value {
-            EqualityOp::Equals => Self::Equals,
-            EqualityOp::NotEquals => Self::NotEquals,
-        }
-    }
-}
-
-impl From<RelationOp> for Cond {
-    fn from(value: RelationOp) -> Self {
-        match value {
-            RelationOp::LessThan => Self::LessThan,
-            RelationOp::LessThanEquals => Self::LessThanEquals,
-            RelationOp::GreaterThan => Self::GreaterThan,
-            RelationOp::GreaterThanEquals => Self::GreaterThanEquals,
         }
     }
 }

@@ -4,7 +4,15 @@ use crate::{
 };
 
 pub type Level15Exp = (Level14Exp, Vec<(Level15Op, Level14Exp)>);
-pub type Level14Exp = (Level13Exp, Vec<(Level14Op, Level13Exp)>);
+
+// Variable assignment - lvalue cannot be an expression
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Level14Exp {
+    SimpleAssignment(String, Level13Exp),
+    NonAssignment(Level13Exp),
+    Var(String),
+}
+
 pub type Level13Exp = (Level12Exp, Vec<(Level13Op, Level12Exp)>);
 pub type Level12Exp = (Level11Exp, Vec<(Level12Op, Level11Exp)>);
 pub type Level11Exp = (Level10Exp, Vec<(Level11Op, Level10Exp)>);

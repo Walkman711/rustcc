@@ -1,8 +1,12 @@
-use std::{fs::File, io::Write};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fs::File,
+    io::Write,
+};
 
 use crate::{
     codegen_enums::Cond,
-    parser_II::{FunctionII, ProgramII, StatementII},
+    parser::{Function, Program, Statement},
     parser_precedence::*,
 };
 
@@ -10,6 +14,7 @@ pub struct AsmGenerator {
     asm_file: File,
     sp: usize,
     curr_jmp_label: usize,
+    var_map: HashMap<String, Option<u64>>,
 }
 
 const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
@@ -22,6 +27,7 @@ impl AsmGenerator {
             asm_file: File::create(asm_filename).expect("Failed to create output .s file."),
             sp: 0,
             curr_jmp_label: 0,
+            var_map: HashMap::new(),
         }
     }
 
@@ -60,27 +66,35 @@ impl AsmGenerator {
         // set lower byte of reg_a based on if cond is satisfied
         self.write_inst(&format!("cset w0, {cond}"));
         // zero-pad reg_a since cset only sets the lower byte
-        self.write_inst(&format!("uxtb w0, w0"));
+        self.write_inst("uxtb w0, w0");
     }
 }
 
 impl AsmGenerator {
-    pub fn gen_asm(&mut self, prog: ProgramII) {
+    pub fn gen_asm(&mut self, prog: Program) {
         match prog {
-            ProgramII::Func(func) => match func {
-                FunctionII::Fun(identifier, stmt) => {
+            Program::Func(func) => match func {
+                Function::Fun(identifier, stmts) => {
                     self.write_fn_header(&identifier);
-                    self.gen_stmt_asm(stmt);
+                    for stmt in stmts {
+                        self.gen_stmt_asm(stmt);
+                    }
                 }
             },
         }
     }
 
-    fn gen_stmt_asm(&mut self, stmt: StatementII) {
+    fn gen_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
-            StatementII::Return(exp) => {
-                self.gen_l15_asm(exp);
+            Statement::Return(exp) => self.gen_l15_asm(exp),
+            Statement::Declare(identifier, exp_opt) => {
+                todo!()
+                // if self.var_map.contains_key(&identifier) && exp_opt.is_none() {
+                //     panic!("tried to uninitialize a variable that was already initialized: {identifier}");
+                // ;}
+                // self.var_map.insert(identifier, exp_opt)
             }
+            Statement::Exp(exp) => self.gen_l15_asm(exp),
         }
         self.write_inst("ret");
     }
@@ -100,17 +114,24 @@ impl AsmGenerator {
     }
 
     fn gen_l14_asm(&mut self, l14: Level14Exp) {
-        let (first_l13_exp, trailing_l13_exps) = l14;
-        self.gen_l13_asm(first_l13_exp);
-
-        for (op, l13_exp) in trailing_l13_exps {
-            self.push_stack();
-            self.gen_l13_asm(l13_exp);
-            self.pop_stack_into_w1();
-            match op {
-                _ => todo!("codegen assignment ops"),
+        match l14 {
+            Level14Exp::SimpleAssignment(_, _) => todo!(),
+            Level14Exp::NonAssignment(l13_exp) => {
+                self.gen_l13_asm(l13_exp);
             }
+            Level14Exp::Var(_var_name) => todo!(),
         }
+        // let (variable_identifier, trailing_l13_exps) = l14;
+        // // self.gen_l13_asm(first_l13_exp);
+
+        // for (op, l13_exp) in trailing_l13_exps {
+        //     self.push_stack();
+        //     self.gen_l13_asm(l13_exp);
+        //     self.pop_stack_into_w1();
+        //     match op {
+        //         _ => todo!("codegen assignment ops"),
+        //     }
+        // }
     }
 
     fn gen_l13_asm(&mut self, l13: Level13Exp) {

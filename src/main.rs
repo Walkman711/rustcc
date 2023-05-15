@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use rustcc::{codegen::AsmGenerator, parser_II::ParserII};
+use rustcc::{codegen::AsmGenerator, parser::Parser};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
     let test_program = std::fs::read_to_string(c_filename)?;
 
     // Lex & parse program
-    let mut parser = ParserII::new(&test_program)?;
+    let mut parser = Parser::new(&test_program)?;
     let parsed_program = parser.parse()?;
 
     dbg!(&parsed_program);

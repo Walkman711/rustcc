@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     lexer::Lexer,
     lexer_enums::{Keywords, Token},
@@ -5,39 +7,45 @@ use crate::{
     utils::{ParseError, RustCcError, RustCcResult},
 };
 
-pub struct ParserII {
+pub struct Parser {
     lexer: Lexer,
+    var_map: HashMap<String, Option<u64>>,
 }
 
 #[derive(Clone, Debug)]
-pub enum ProgramII {
-    Func(FunctionII),
+pub enum Program {
+    Func(Function),
 }
 
 #[derive(Clone, Debug)]
-pub enum FunctionII {
-    Fun(String, StatementII),
+pub enum Function {
+    Fun(String, Vec<Statement>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum StatementII {
+pub enum Statement {
     Return(Level15Exp),
+    Declare(String, Option<Level15Exp>),
+    Exp(Level15Exp),
 }
 
-impl ParserII {
+impl Parser {
     pub fn new(program: &str) -> RustCcResult<Self> {
         let lexer = Lexer::try_from(program)?;
-        Ok(Self { lexer })
+        Ok(Self {
+            lexer,
+            var_map: HashMap::new(),
+        })
     }
 }
 
-impl ParserII {
-    pub fn parse(&mut self) -> RustCcResult<ProgramII> {
+impl Parser {
+    pub fn parse(&mut self) -> RustCcResult<Program> {
         let function = self.parse_fn()?;
-        Ok(ProgramII::Func(function))
+        Ok(Program::Func(function))
     }
 
-    fn parse_fn(&mut self) -> RustCcResult<FunctionII> {
+    fn parse_fn(&mut self) -> RustCcResult<Function> {
         self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
 
         let tok = self
@@ -55,20 +63,54 @@ impl ParserII {
         self.lexer.expect_next(&Token::CloseParen)?;
         self.lexer.expect_next(&Token::OpenBrace)?;
 
-        let statement = self.parse_statement()?;
+        // TODO: will I need to keep a weird stack of brackets once we start doing conditionals and
+        // loops?
+        let mut statements = vec![];
+        while Some(Token::CloseBrace) != self.lexer.peek() {
+            println!("XXXXXXXXX STATEMENT BEGIN XXXXXXXX");
+            let statement = self.parse_statement()?;
+            println!("XXXXXXXXX STATEMENT PARSED XXXXXXXX");
+            dbg!(&statement);
+            statements.push(statement);
+        }
 
-        Ok(FunctionII::Fun(identifier, statement))
+        self.lexer.expect_next(&Token::CloseBrace)?;
+        Ok(Function::Fun(identifier, statements))
     }
 
-    fn parse_statement(&mut self) -> RustCcResult<StatementII> {
-        self.lexer.expect_next(&Token::Keyword(Keywords::Return))?;
+    fn parse_statement(&mut self) -> RustCcResult<Statement> {
+        let stmt = match self.lexer.peek() {
+            Some(Token::Keyword(Keywords::Return)) => {
+                let _ = self.lexer.next_token();
+                let exp = self.parse_l15_exp()?;
 
-        let exp = self.parse_l15_exp()?;
+                Ok(Statement::Return(exp))
+            }
+            Some(Token::Keyword(Keywords::Int)) => {
+                let _ = self.lexer.next_token();
+                let Some(Token::Identifier(id)) = self.lexer.next_token() else {
+                    panic!("assignment statment needs an identifier")
+                };
+
+                // Declaration vs initialization
+                let exp = if let Some(Token::Semicolon) = self.lexer.peek() {
+                    // don't advance the lexer on a match so we can catch semicolons below
+                    None
+                } else {
+                    // TODO: change for +=, -=, etc.
+                    self.lexer.expect_next(&Token::SingleEquals)?;
+                    let exp = self.parse_l15_exp()?;
+                    Some(exp)
+                };
+
+                Ok(Statement::Declare(id, exp))
+            }
+            _ => Ok(Statement::Exp(self.parse_l15_exp()?)),
+        };
 
         self.lexer.expect_next(&Token::Semicolon)?;
-        self.lexer.expect_next(&Token::CloseBrace)?;
 
-        Ok(StatementII::Return(exp))
+        stmt
     }
 
     fn parse_l15_exp(&mut self) -> RustCcResult<Level15Exp> {
@@ -87,18 +129,36 @@ impl ParserII {
     }
 
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
-        let first_l13_exp = self.parse_l13_exp()?;
-        let mut trailing_l13_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level14Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
+        // println!("l14");
+        // dbg!(self.lexer.peek());
+        // println!("peek");
+        if let Some(Token::Identifier(var_name)) = self.lexer.peek() {
+            let _ = self.lexer.next_token();
+            if let Some(Token::SingleEquals) = self.lexer.peek() {
+                let _ = self.lexer.next_token();
+                println!("SIMPLE ASSIGNMENT WOO: {var_name}");
+                let l13_exp = self.parse_l13_exp()?;
+                Ok(Level14Exp::SimpleAssignment(var_name, l13_exp))
+            } else {
+                println!("VAR REF: {var_name}");
+                Ok(Level14Exp::Var(var_name))
+            }
+        } else {
+            let first_l13_exp = self.parse_l13_exp()?;
+            // let mut trailing_l13_exps = vec![];
+            // while let Some(tok) = self.lexer.next_token() {
+            //     let Ok(op) = Level14Op::try_from(tok) else {
+            //     self.lexer.back();
+            //     break;
+            // };
 
-            let l13_exp = self.parse_l13_exp()?;
-            trailing_l13_exps.push((op, l13_exp));
+            //     let l13_exp = self.parse_l13_exp()?;
+            //     trailing_l13_exps.push((op, l13_exp));
+            // }
+
+            // NOTE: really not sure about this one
+            Ok(Level14Exp::NonAssignment(first_l13_exp))
         }
-        Ok((first_l13_exp, trailing_l13_exps))
     }
 
     fn parse_l13_exp(&mut self) -> RustCcResult<Level13Exp> {
@@ -285,7 +345,7 @@ impl ParserII {
                 Level2Exp::Unary(Level2Op::LogicalNot, Box::new(self.parse_l2_exp()?))
             }
             Token::Tilde => Level2Exp::Unary(Level2Op::BitwiseNot, Box::new(self.parse_l2_exp()?)),
-            _ => panic!("bad factor"),
+            t => panic!("bad l2 token: {t:?}"),
         };
 
         Ok(l2_exp)
