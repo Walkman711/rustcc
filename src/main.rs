@@ -1,3 +1,5 @@
+pub mod codegen_enums;
+
 use std::process::Command;
 
 use rustcc::{codegen::AsmGenerator, parser::Parser};

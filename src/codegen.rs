@@ -1,65 +1,14 @@
 use std::{fs::File, io::Write};
 
 use crate::{
+    codegen_enums::Cond,
     parser::{
         AdditiveExpression, EqualityExpression, Expression, Factor, Function, LogicalAndExpression,
         Program, RelationalExpression, Statement, Term,
     },
     parser_enums::{AdditiveOp, EqualityOp, MultiplicativeOp, RelationOp, UnaryOp},
+    parser_precedence::*,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-// TODO: make a trait s.t. we can generate x86 and ARM
-pub enum Arch {
-    x86,
-    ARM,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cond {
-    Equals,
-    NotEquals,
-    LessThan,
-    LessThanEquals,
-    GreaterThan,
-    GreaterThanEquals,
-    Always,
-}
-
-impl std::fmt::Display for Cond {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Equals => write!(f, "eq"),
-            Self::NotEquals => write!(f, "ne"),
-            Self::LessThan => write!(f, "lt"),
-            Self::LessThanEquals => write!(f, "le"),
-            Self::GreaterThan => write!(f, "gt"),
-            Self::GreaterThanEquals => write!(f, "ge"),
-            Self::Always => write!(f, "al"),
-        }
-    }
-}
-
-impl From<EqualityOp> for Cond {
-    fn from(value: EqualityOp) -> Self {
-        match value {
-            EqualityOp::Equals => Self::Equals,
-            EqualityOp::NotEquals => Self::NotEquals,
-        }
-    }
-}
-
-impl From<RelationOp> for Cond {
-    fn from(value: RelationOp) -> Self {
-        match value {
-            RelationOp::LessThan => Self::LessThan,
-            RelationOp::LessThanEquals => Self::LessThanEquals,
-            RelationOp::GreaterThan => Self::GreaterThan,
-            RelationOp::GreaterThanEquals => Self::GreaterThanEquals,
-        }
-    }
-}
 
 pub struct AsmGenerator {
     asm_file: File,
@@ -83,7 +32,7 @@ impl AsmGenerator {
     fn write_fn_header(&mut self, identifier: &str) {
         writeln!(self.asm_file, ".global _{identifier}").expect(WRITELN_EXPECT);
         writeln!(self.asm_file, ".align 2").expect(WRITELN_EXPECT);
-        writeln!(self.asm_file, "\n").expect(WRITELN_EXPECT);
+        writeln!(self.asm_file).expect(WRITELN_EXPECT);
         writeln!(self.asm_file, "_{identifier}:").expect(WRITELN_EXPECT);
     }
 
@@ -285,6 +234,264 @@ impl AsmGenerator {
                 }
             }
             Factor::ParenExp(exp) => self.generate_exp_asm(*exp),
+        }
+    }
+}
+
+impl AsmGenerator {
+    fn generate_l15_asm(&mut self, l15: Level15Exp) {
+        let (first_l14_exp, trailing_l14_exps) = l15;
+        self.generate_l14_asm(first_l14_exp);
+
+        for (op, l14_exp) in trailing_l14_exps {
+            self.push_stack();
+            self.generate_l14_asm(l14_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level15Op::Comma => todo!("codegen ,"),
+            }
+        }
+    }
+
+    fn generate_l14_asm(&mut self, l14: Level14Exp) {
+        let (first_l13_exp, trailing_l13_exps) = l14;
+        self.generate_l13_asm(first_l13_exp);
+
+        for (op, l13_exp) in trailing_l13_exps {
+            self.push_stack();
+            self.generate_l13_asm(l13_exp);
+            self.pop_stack_into_w1();
+            match op {
+                _ => todo!("codegen assignment ops"),
+            }
+        }
+    }
+
+    fn generate_l13_asm(&mut self, l13: Level13Exp) {
+        let (first_l12_exp, trailing_l12_exps) = l13;
+        self.generate_l12_asm(first_l12_exp);
+
+        for (op, l12_exp) in trailing_l12_exps {
+            self.push_stack();
+            self.generate_l12_asm(l12_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level13Op::TernaryConditional => todo!("TernaryConditional"),
+            }
+        }
+    }
+
+    fn generate_l12_asm(&mut self, l12: Level12Exp) {
+        let short_circuit_label = self.curr_jmp_label;
+        let exit_label = self.curr_jmp_label + 1;
+        self.curr_jmp_label += 2;
+
+        let (first_l11_exp, trailing_l11_exps) = l12;
+        let print_jmp_insts = !trailing_l11_exps.is_empty();
+
+        self.generate_l11_asm(first_l11_exp);
+
+        for (_op, l11_exp) in trailing_l11_exps {
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::NotEquals, short_circuit_label);
+
+            self.generate_l11_asm(l11_exp);
+        }
+
+        if print_jmp_insts {
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::NotEquals, short_circuit_label);
+
+            self.write_inst("mov  w0, wzr");
+            self.write_branch_inst(Cond::Always, exit_label);
+
+            self.write_jmp_label(short_circuit_label);
+            self.write_inst("mov  w0, 1");
+
+            self.write_jmp_label(exit_label);
+        }
+    }
+
+    fn generate_l11_asm(&mut self, l11: Level11Exp) {
+        let short_circuit_label = self.curr_jmp_label;
+        let success_label = self.curr_jmp_label + 1;
+        self.curr_jmp_label += 2;
+
+        let (first_l10_exp, trailing_l10_exps) = l11;
+        let print_jmp_insts = !trailing_l10_exps.is_empty();
+
+        self.generate_l10_asm(first_l10_exp);
+
+        for (_op, l10_exp) in trailing_l10_exps {
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::Equals, short_circuit_label);
+
+            self.generate_l10_asm(l10_exp);
+        }
+
+        if print_jmp_insts {
+            // Get the last term checked
+            self.write_inst("cmp  w0, wzr");
+            self.write_branch_inst(Cond::Equals, short_circuit_label);
+
+            self.write_inst("mov  w0, 1");
+            self.write_branch_inst(Cond::Always, success_label);
+
+            self.write_jmp_label(short_circuit_label);
+            self.write_inst("mov  w0, wzr");
+
+            self.write_jmp_label(success_label);
+        }
+    }
+
+    fn generate_l10_asm(&mut self, l10: Level10Exp) {
+        let (first_l9_exp, trailing_l9_exps) = l10;
+        self.generate_l9_asm(first_l9_exp);
+
+        for (op, l9_exp) in trailing_l9_exps {
+            self.push_stack();
+            self.generate_l9_asm(l9_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level10Op::BitwiseOr => todo!("Codegen |"),
+            }
+        }
+    }
+
+    fn generate_l9_asm(&mut self, l9: Level9Exp) {
+        let (first_l8_exp, trailing_l8_exps) = l9;
+        self.generate_l8_asm(first_l8_exp);
+
+        for (op, l8_exp) in trailing_l8_exps {
+            self.push_stack();
+            self.generate_l8_asm(l8_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level9Op::BitwiseXor => todo!("Codegen ^"),
+            }
+        }
+    }
+
+    fn generate_l8_asm(&mut self, l8: Level8Exp) {
+        let (first_l7_exp, trailing_l7_exps) = l8;
+        self.generate_l7_asm(first_l7_exp);
+
+        for (op, l7_exp) in trailing_l7_exps {
+            self.push_stack();
+            self.generate_l7_asm(l7_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level8Op::BitwiseAnd => todo!("Codegen & (bitwise and)"),
+            }
+        }
+    }
+
+    fn generate_l7_asm(&mut self, l7: Level7Exp) {
+        let (first_l6_exp, trailing_l6_exps) = l7;
+        self.generate_l6_asm(first_l6_exp);
+
+        for (op, l6_exp) in trailing_l6_exps {
+            self.push_stack();
+            self.generate_l6_asm(l6_exp);
+            self.pop_stack_into_w1();
+            let cond: Cond = op.into();
+            match op {
+                Level7Op::Equals => self.logical_comparison("w1", "w0", cond),
+                Level7Op::NotEquals => self.logical_comparison("w1", "w0", cond),
+            }
+        }
+    }
+
+    fn generate_l6_asm(&mut self, l6: Level6Exp) {
+        let (first_l5_exp, trailing_l5_exps) = l6;
+        self.generate_l5_asm(first_l5_exp);
+
+        for (op, l5_exp) in trailing_l5_exps {
+            self.push_stack();
+            self.generate_l5_asm(l5_exp);
+            self.pop_stack_into_w1();
+            let cond: Cond = op.into();
+            match op {
+                Level6Op::LessThan => self.logical_comparison("w1", "w0", cond),
+                Level6Op::LessThanEquals => self.logical_comparison("w1", "w0", cond),
+                Level6Op::GreaterThan => self.logical_comparison("w1", "w0", cond),
+                Level6Op::GreaterThanEquals => self.logical_comparison("w1", "w0", cond),
+            }
+        }
+    }
+
+    fn generate_l5_asm(&mut self, l5: Level5Exp) {
+        let (first_l4_exp, trailing_l4_exps) = l5;
+        self.generate_l4_asm(first_l4_exp);
+
+        for (op, l4_exp) in trailing_l4_exps {
+            self.push_stack();
+            self.generate_l4_asm(l4_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level5Op::BitwiseLeftShift => todo!("Codegen <<"),
+                Level5Op::BitwiseRightShift => todo!("Codegen >>"),
+            }
+        }
+    }
+
+    fn generate_l4_asm(&mut self, l4: Level4Exp) {
+        let (first_l3_exp, trailing_l3_exps) = l4;
+        self.generate_l3_asm(first_l3_exp);
+
+        for (op, l3_exp) in trailing_l3_exps {
+            self.push_stack();
+            self.generate_l3_asm(l3_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level4Op::Addition => self.write_inst("add w0, w0, w1"),
+                Level4Op::Subtraction => self.write_inst("sub w0, w1, w0"),
+            }
+        }
+    }
+
+    fn generate_l3_asm(&mut self, l3: Level3Exp) {
+        let (first_l2_exp, trailing_l2_exps) = l3;
+        self.generate_l2_asm(first_l2_exp);
+
+        for (op, l2_exp) in trailing_l2_exps {
+            self.push_stack();
+            self.generate_l2_asm(l2_exp);
+            self.pop_stack_into_w1();
+            match op {
+                Level3Op::Multiplication => self.write_inst("mul w0, w0, w1"),
+                Level3Op::Division => self.write_inst("sdiv w0, w1, w0"),
+                Level3Op::Remainder => todo!("Codegen %"),
+            }
+        }
+    }
+
+    fn generate_l2_asm(&mut self, l2: Level2Exp) {
+        match l2 {
+            Level2Exp::Const(u) => {
+                self.write_inst(&format!("mov  w0, {u}"));
+            }
+            Level2Exp::Unary(op, factor) => {
+                self.generate_l2_asm(*factor);
+                match op {
+                    Level2Op::PrefixIncrement => todo!(),
+                    Level2Op::PrefixDecrement => todo!(),
+                    Level2Op::UnaryPlus => todo!(),
+                    Level2Op::UnaryMinus => self.write_inst("neg  w0, w0"),
+                    Level2Op::LogicalNot => {
+                        self.write_inst("cmp  w0, wzr");
+                        self.write_inst("cset w0, eq");
+                        self.write_inst("uxtb w0, w0");
+                    }
+                    Level2Op::BitwiseNot => self.write_inst("mvn  w0, w0"),
+                    Level2Op::Cast => todo!(),
+                    Level2Op::Dereference => todo!(),
+                    Level2Op::AddressOf => todo!(),
+                    Level2Op::SizeOf => todo!(),
+                    Level2Op::Align => todo!(),
+                }
+            }
+            Level2Exp::ParenExp(exp) => self.generate_l15_asm(*exp),
         }
     }
 }
