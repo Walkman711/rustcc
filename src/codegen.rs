@@ -118,8 +118,7 @@ impl AsmGenerator {
             Level14Exp::SimpleAssignment(_, _) => todo!(),
             Level14Exp::NonAssignment(l13_exp) => {
                 self.gen_l13_asm(l13_exp);
-            }
-            Level14Exp::Var(_var_name) => todo!(),
+            } // Level14Exp::Var(_var_name) => todo!(),
         }
         // let (variable_identifier, trailing_l13_exps) = l14;
         // // self.gen_l13_asm(first_l13_exp);
@@ -337,6 +336,9 @@ impl AsmGenerator {
         match l2 {
             Level2Exp::Const(u) => {
                 self.write_inst(&format!("mov  w0, {u}"));
+            }
+            Level2Exp::Var(_id) => {
+                todo!("implement local variable map")
             }
             Level2Exp::Unary(op, factor) => {
                 self.gen_l2_asm(*factor);

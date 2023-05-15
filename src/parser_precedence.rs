@@ -8,9 +8,8 @@ pub type Level15Exp = (Level14Exp, Vec<(Level15Op, Level14Exp)>);
 // Variable assignment - lvalue cannot be an expression
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level14Exp {
-    SimpleAssignment(String, Level13Exp),
+    SimpleAssignment(String, Box<Level15Exp>),
     NonAssignment(Level13Exp),
-    Var(String),
 }
 
 pub type Level13Exp = (Level12Exp, Vec<(Level13Op, Level12Exp)>);
@@ -28,6 +27,7 @@ pub type Level3Exp = (Level2Exp, Vec<(Level3Op, Level2Exp)>);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {
     Const(u64),
+    Var(String),
     Unary(Level2Op, Box<Level2Exp>),
     ParenExp(Box<Level15Exp>),
 }

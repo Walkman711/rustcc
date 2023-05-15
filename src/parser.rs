@@ -129,19 +129,15 @@ impl Parser {
     }
 
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
-        // println!("l14");
-        // dbg!(self.lexer.peek());
-        // println!("peek");
         if let Some(Token::Identifier(var_name)) = self.lexer.peek() {
-            let _ = self.lexer.next_token();
             if let Some(Token::SingleEquals) = self.lexer.peek() {
                 let _ = self.lexer.next_token();
-                println!("SIMPLE ASSIGNMENT WOO: {var_name}");
-                let l13_exp = self.parse_l13_exp()?;
-                Ok(Level14Exp::SimpleAssignment(var_name, l13_exp))
+                let _ = self.lexer.next_token();
+                // println!("SIMPLE ASSIGNMENT WOO: {var_name}");
+                let exp = self.parse_l15_exp()?;
+                Ok(Level14Exp::SimpleAssignment(var_name, Box::new(exp)))
             } else {
-                println!("VAR REF: {var_name}");
-                Ok(Level14Exp::Var(var_name))
+                Ok(Level14Exp::NonAssignment(self.parse_l13_exp()?))
             }
         } else {
             let first_l13_exp = self.parse_l13_exp()?;
@@ -339,6 +335,7 @@ impl Parser {
                 f
             }
             Token::Integer(u) => Level2Exp::Const(u),
+            Token::Identifier(id) => Level2Exp::Var(id),
             Token::Plus => Level2Exp::Unary(Level2Op::UnaryPlus, Box::new(self.parse_l2_exp()?)),
             Token::Minus => Level2Exp::Unary(Level2Op::UnaryMinus, Box::new(self.parse_l2_exp()?)),
             Token::ExclamationPoint => {
