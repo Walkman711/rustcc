@@ -1,4 +1,5 @@
 use crate::{
+    impl_disp_for_exp,
     lexer_enums::Token,
     utils::{ParseError, RustCcError},
 };
@@ -6,15 +7,17 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
 
-impl std::fmt::Display for Level15Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
+impl_disp_for_exp!(Level15Exp);
+impl_disp_for_exp!(Level12Exp);
+impl_disp_for_exp!(Level11Exp);
+impl_disp_for_exp!(Level10Exp);
+impl_disp_for_exp!(Level9Exp);
+impl_disp_for_exp!(Level8Exp);
+impl_disp_for_exp!(Level7Exp);
+impl_disp_for_exp!(Level6Exp);
+impl_disp_for_exp!(Level5Exp);
+impl_disp_for_exp!(Level4Exp);
+impl_disp_for_exp!(Level3Exp);
 
 // Variable assignment - lvalue cannot be an expression
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,132 +56,32 @@ impl std::fmt::Display for Level13Exp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level12Exp(pub (Level11Exp, Vec<(Level12Op, Level11Exp)>));
 
-impl std::fmt::Display for Level12Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level11Exp(pub (Level10Exp, Vec<(Level11Op, Level10Exp)>));
-
-impl std::fmt::Display for Level11Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level10Exp(pub (Level9Exp, Vec<(Level10Op, Level9Exp)>));
 
-impl std::fmt::Display for Level10Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level9Exp(pub (Level8Exp, Vec<(Level9Op, Level8Exp)>));
-
-impl std::fmt::Display for Level9Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level8Exp(pub (Level7Exp, Vec<(Level8Op, Level7Exp)>));
 
-impl std::fmt::Display for Level8Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level7Exp(pub (Level6Exp, Vec<(Level7Op, Level6Exp)>));
-
-impl std::fmt::Display for Level7Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level6Exp(pub (Level5Exp, Vec<(Level6Op, Level5Exp)>));
 
-impl std::fmt::Display for Level6Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level5Exp(pub (Level4Exp, Vec<(Level5Op, Level4Exp)>));
-
-impl std::fmt::Display for Level5Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level4Exp(pub (Level3Exp, Vec<(Level4Op, Level3Exp)>));
 
-impl std::fmt::Display for Level4Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level3Exp(pub (Level2Exp, Vec<(Level3Op, Level2Exp)>));
-
-impl std::fmt::Display for Level3Exp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {
@@ -468,4 +371,19 @@ pub enum Level1Op {
     StructureAccess,
     StructureAccessThroughPointer,
     CompoundLiteral,
+}
+
+#[macro_export]
+macro_rules! impl_disp_for_exp {
+    ($exp: ident) => {
+        impl std::fmt::Display for $exp {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0 .0)?;
+                for (op, exp) in &self.0 .1 {
+                    write!(f, "{op} {exp}")?;
+                }
+                Ok(())
+            }
+        }
+    };
 }
