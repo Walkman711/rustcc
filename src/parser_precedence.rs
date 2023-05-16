@@ -32,16 +32,21 @@ impl std::fmt::Display for Level14Exp {
     }
 }
 
+// #[derive(Clone, Debug, Eq, PartialEq)]
+// pub struct Level13Exp(pub (Level12Exp, Vec<(Level13Op, Level12Exp)>));
+
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level13Exp(pub (Level12Exp, Vec<(Level13Op, Level12Exp)>));
+pub enum Level13Exp {
+    Ternary(Level12Exp, Box<Level15Exp>, Box<Level13Exp>),
+    NoTernary(Level12Exp),
+}
 
 impl std::fmt::Display for Level13Exp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0 .0)?;
-        for (op, exp) in &self.0 .1 {
-            write!(f, "{op} {exp}")?;
+        match self {
+            Level13Exp::Ternary(exp, pred, else_exp) => write!(f, "{exp} ? {pred} : {else_exp}"),
+            Level13Exp::NoTernary(exp) => write!(f, "{exp}"),
         }
-        Ok(())
     }
 }
 

@@ -190,16 +190,30 @@ impl AsmGenerator {
     }
 
     fn gen_l13_asm(&mut self, l13: Level13Exp) {
-        let (first_l12_exp, trailing_l12_exps) = l13.0;
-        self.gen_l12_asm(first_l12_exp);
+        match l13 {
+            Level13Exp::Ternary(exp, pred_exp, else_exp) => {
+                let else_label = self.curr_jmp_label;
+                let exit_label = self.curr_jmp_label + 1;
+                self.curr_jmp_label += 2;
 
-        for (op, l12_exp) in trailing_l12_exps {
-            self.push_stack();
-            self.gen_l12_asm(l12_exp);
-            self.pop_stack_into_w1();
-            match op {
-                Level13Op::TernaryConditional => todo!("TernaryConditional"),
+                self.gen_l12_asm(exp);
+
+                // If the exp == 0, trigger the else case to minimize the jump
+                // instructions we need
+                self.write_inst("cmp  w0, wzr");
+
+                self.write_branch_inst(Cond::Equals, else_label);
+
+                // Execute if the if-exp is nonzero
+                self.gen_l15_asm(*pred_exp);
+                self.write_branch_inst(Cond::Always, exit_label);
+
+                self.write_jmp_label(else_label);
+                self.gen_l13_asm(*else_exp);
+
+                self.write_jmp_label(exit_label);
             }
+            Level13Exp::NoTernary(l12) => self.gen_l12_asm(l12),
         }
     }
 

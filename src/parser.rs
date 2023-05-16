@@ -224,36 +224,27 @@ impl Parser {
                 Ok(Level14Exp::NonAssignment(self.parse_l13_exp()?))
             }
         } else {
-            let first_l13_exp = self.parse_l13_exp()?;
-            // let mut trailing_l13_exps = vec![];
-            // while let Some(tok) = self.lexer.next_token() {
-            //     let Ok(op) = Level14Op::try_from(tok) else {
-            //     self.lexer.back();
-            //     break;
-            // };
-
-            //     let l13_exp = self.parse_l13_exp()?;
-            //     trailing_l13_exps.push((op, l13_exp));
-            // }
-
-            // NOTE: really not sure about this one
-            Ok(Level14Exp::NonAssignment(first_l13_exp))
+            let l13_exp = self.parse_l13_exp()?;
+            Ok(Level14Exp::NonAssignment(l13_exp))
         }
     }
 
     fn parse_l13_exp(&mut self) -> RustCcResult<Level13Exp> {
         let first_l12_exp = self.parse_l12_exp()?;
-        let mut trailing_l12_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level13Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l12_exp = self.parse_l12_exp()?;
-            trailing_l12_exps.push((op, l12_exp));
+        if let Some(Token::QuestionMark) = self.lexer.peek() {
+            let _ = self.lexer.next_token();
+            let pred_exp = self.parse_l15_exp()?;
+            self.lexer.expect_next(&Token::Colon)?;
+            // From the C standard
+            let else_exp = self.parse_l13_exp()?;
+            Ok(Level13Exp::Ternary(
+                first_l12_exp,
+                Box::new(pred_exp),
+                Box::new(else_exp),
+            ))
+        } else {
+            Ok(Level13Exp::NoTernary(first_l12_exp))
         }
-        Ok(Level13Exp((first_l12_exp, trailing_l12_exps)))
     }
 
     fn parse_l12_exp(&mut self) -> RustCcResult<Level12Exp> {
