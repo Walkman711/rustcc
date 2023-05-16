@@ -130,7 +130,7 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
-        let stmt = match self.lexer.next_token() {
+        match self.lexer.next_token() {
             Some(Token::Keyword(Keywords::Return)) => {
                 let exp = self.parse_l15_exp()?;
 
@@ -144,16 +144,15 @@ impl Parser {
                 };
 
                 // Declaration vs initialization
-                let exp = if let Some(Token::Semicolon) = self.lexer.peek() {
+                let exp = if self.lexer.advance_if_match(&Token::Semicolon) {
                     None
                 } else {
                     // TODO: change for +=, -=, etc.
                     self.lexer.expect_next(&Token::SingleEquals)?;
                     let exp = self.parse_l15_exp()?;
+                    self.lexer.expect_next(&Token::Semicolon)?;
                     Some(exp)
                 };
-
-                self.lexer.expect_next(&Token::Semicolon)?;
 
                 Ok(Statement::Declare(id, exp))
             }
@@ -170,8 +169,7 @@ impl Parser {
 
                 // TODO: handle else-if? i think this implicitly handles it if else_stmt is
                 // actually an IF
-                if let Some(Token::Keyword(Keywords::Else)) = self.lexer.peek() {
-                    let _ = self.lexer.next_token();
+                if self.lexer.advance_if_match(&Token::Keyword(Keywords::Else)) {
                     let else_stmt = self.parse_statement()?;
                     Ok(Statement::If(
                         exp,
@@ -191,9 +189,7 @@ impl Parser {
 
                 exp
             }
-        };
-
-        stmt
+        }
     }
 
     fn parse_l15_exp(&mut self) -> RustCcResult<Level15Exp> {
@@ -214,9 +210,7 @@ impl Parser {
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
         if let Some(Token::Identifier(var_name)) = self.lexer.peek() {
             let _ = self.lexer.next_token();
-            if let Some(Token::SingleEquals) = self.lexer.peek() {
-                let _ = self.lexer.next_token();
-                // println!("SIMPLE ASSIGNMENT WOO: {var_name}");
+            if self.lexer.advance_if_match(&Token::SingleEquals) {
                 let exp = self.parse_l15_exp()?;
                 Ok(Level14Exp::SimpleAssignment(var_name, Box::new(exp)))
             } else {
@@ -231,8 +225,7 @@ impl Parser {
 
     fn parse_l13_exp(&mut self) -> RustCcResult<Level13Exp> {
         let first_l12_exp = self.parse_l12_exp()?;
-        if let Some(Token::QuestionMark) = self.lexer.peek() {
-            let _ = self.lexer.next_token();
+        if self.lexer.advance_if_match(&Token::QuestionMark) {
             let pred_exp = self.parse_l15_exp()?;
             self.lexer.expect_next(&Token::Colon)?;
             // From the C standard
