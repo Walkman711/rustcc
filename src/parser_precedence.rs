@@ -3,8 +3,6 @@ use crate::{
     utils::{ParseError, RustCcError},
 };
 
-use strum_macros::Display;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
 

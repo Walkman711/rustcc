@@ -14,7 +14,7 @@ pub struct AsmGenerator {
     asm_file: File,
     sp: usize,
     curr_jmp_label: usize,
-    var_map: HashMap<String, Option<u64>>,
+    var_map: HashMap<String, usize>,
 }
 
 const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
@@ -68,6 +68,21 @@ impl AsmGenerator {
         // zero-pad reg_a since cset only sets the lower byte
         self.write_inst("uxtb w0, w0");
     }
+
+    fn ret(&mut self) {
+        self.fn_epilogue();
+        self.write_inst("ret");
+    }
+
+    fn fn_prologue(&mut self, identifier: &str) {
+        self.write_fn_header(identifier);
+        // self.write_inst("push lr");
+    }
+
+    fn fn_epilogue(&mut self) {
+        // self.write_inst("pop pc");
+        // self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
+    }
 }
 
 impl AsmGenerator {
@@ -75,10 +90,11 @@ impl AsmGenerator {
         match prog {
             Program::Func(func) => match func {
                 Function::Fun(identifier, stmts) => {
-                    self.write_fn_header(&identifier);
+                    self.fn_prologue(&identifier);
                     for stmt in stmts {
                         self.gen_stmt_asm(stmt);
                     }
+                    self.ret();
                 }
             },
         }
@@ -88,15 +104,19 @@ impl AsmGenerator {
         match stmt {
             Statement::Return(exp) => self.gen_l15_asm(exp),
             Statement::Declare(identifier, exp_opt) => {
-                todo!()
-                // if self.var_map.contains_key(&identifier) && exp_opt.is_none() {
-                //     panic!("tried to uninitialize a variable that was already initialized: {identifier}");
-                // ;}
-                // self.var_map.insert(identifier, exp_opt)
+                if self.var_map.contains_key(&identifier) {
+                    panic!("tried to initialize variable `{identifier}` multiple times");
+                }
+
+                // Store location of variable in stack
+                self.var_map.insert(identifier, self.sp + 4);
+                if let Some(exp) = exp_opt {
+                    self.gen_l15_asm(exp);
+                }
+                self.push_stack();
             }
             Statement::Exp(exp) => self.gen_l15_asm(exp),
         }
-        self.write_inst("ret");
     }
 
     fn gen_l15_asm(&mut self, l15: Level15Exp) {
@@ -115,7 +135,17 @@ impl AsmGenerator {
 
     fn gen_l14_asm(&mut self, l14: Level14Exp) {
         match l14 {
-            Level14Exp::SimpleAssignment(_, _) => todo!(),
+            Level14Exp::SimpleAssignment(identifier, l15_exp) => {
+                // if self.var_map.contains_key(&identifier) {
+                //     panic!("tried to initialize variable `{identifier}` multiple times");
+                // }
+
+                // Store location of variable in stack
+                self.var_map.insert(identifier, self.sp + 4);
+
+                self.gen_l15_asm(*l15_exp);
+                self.push_stack();
+            }
             Level14Exp::NonAssignment(l13_exp) => {
                 self.gen_l13_asm(l13_exp);
             } // Level14Exp::Var(_var_name) => todo!(),
@@ -337,8 +367,12 @@ impl AsmGenerator {
             Level2Exp::Const(u) => {
                 self.write_inst(&format!("mov  w0, {u}"));
             }
-            Level2Exp::Var(_id) => {
-                todo!("implement local variable map")
+            Level2Exp::Var(id) => {
+                if let Some(stack_offset) = self.var_map.get(&id) {
+                    self.write_inst(&format!("ldr  w0, [sp, {}]", stack_offset));
+                } else {
+                    panic!("{id} not allocated on stack")
+                }
             }
             Level2Exp::Unary(op, factor) => {
                 self.gen_l2_asm(*factor);

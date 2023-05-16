@@ -21,7 +21,7 @@ impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "PROGRAM")?;
         match self {
-            Program::Func(foo) => writeln!(f, "{foo}"),
+            Program::Func(func_name) => writeln!(f, "{func_name}"),
         }
     }
 }
@@ -167,13 +167,14 @@ impl Parser {
 
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
         if let Some(Token::Identifier(var_name)) = self.lexer.peek() {
+            let _ = self.lexer.next_token();
             if let Some(Token::SingleEquals) = self.lexer.peek() {
-                let _ = self.lexer.next_token();
                 let _ = self.lexer.next_token();
                 // println!("SIMPLE ASSIGNMENT WOO: {var_name}");
                 let exp = self.parse_l15_exp()?;
                 Ok(Level14Exp::SimpleAssignment(var_name, Box::new(exp)))
             } else {
+                self.lexer.back();
                 Ok(Level14Exp::NonAssignment(self.parse_l13_exp()?))
             }
         } else {
