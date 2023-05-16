@@ -128,6 +128,33 @@ impl AsmGenerator {
                 }
             }
             Statement::Exp(exp) => self.gen_l15_asm(exp),
+            Statement::If(exp, predicate, else_opt) => {
+                let else_label = self.curr_jmp_label;
+                let exit_label = self.curr_jmp_label + 1;
+                self.curr_jmp_label += 2;
+
+                // Evaluate exp and store in w0
+                self.gen_l15_asm(exp);
+
+                // If the exp == 0, trigger the else case to minimize the jump
+                // instructions we need
+                self.write_inst("cmp  w0, wzr");
+
+                self.write_branch_inst(Cond::Equals, else_label);
+
+                // Execute if the if-exp is nonzero
+                self.gen_stmt_asm(*predicate);
+                self.write_branch_inst(Cond::Always, exit_label);
+
+                // If we don't have an else case, jumping to this label
+                // will just cause us to fall through to the exit label
+                self.write_jmp_label(else_label);
+
+                if let Some(else_stmt) = else_opt {
+                    self.gen_stmt_asm(*else_stmt);
+                }
+                self.write_jmp_label(exit_label);
+            }
         }
     }
 

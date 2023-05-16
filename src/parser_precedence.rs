@@ -26,7 +26,7 @@ pub enum Level14Exp {
 impl std::fmt::Display for Level14Exp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Level14Exp::SimpleAssignment(id, exp) => todo!("{id} = {exp}"),
+            Level14Exp::SimpleAssignment(id, exp) => write!(f, "{id} = {exp}"),
             Level14Exp::NonAssignment(exp) => write!(f, "{exp}"),
         }
     }

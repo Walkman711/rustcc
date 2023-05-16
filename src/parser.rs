@@ -50,6 +50,7 @@ pub enum Statement {
     Return(Option<Level15Exp>),
     Declare(String, Option<Level15Exp>),
     Exp(Level15Exp),
+    If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
 }
 
 impl std::fmt::Display for Statement {
@@ -66,6 +67,13 @@ impl std::fmt::Display for Statement {
             Statement::Exp(exp) => {
                 writeln!(f, "\tEXP: {exp}")
             }
+            Statement::If(exp, pred, else_opt) => match else_opt {
+                Some(else_stmt) => writeln!(
+                    f,
+                    "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} else {{\n\t\t{else_stmt}\n\t\t}}"
+                ),
+                None => writeln!(f, "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} "),
+            },
         }
     }
 }
@@ -122,22 +130,21 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
-        let stmt = match self.lexer.peek() {
+        let stmt = match self.lexer.next_token() {
             Some(Token::Keyword(Keywords::Return)) => {
-                let _ = self.lexer.next_token();
                 let exp = self.parse_l15_exp()?;
+
+                self.lexer.expect_next(&Token::Semicolon)?;
 
                 Ok(Statement::Return(Some(exp)))
             }
             Some(Token::Keyword(Keywords::Int)) => {
-                let _ = self.lexer.next_token();
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     panic!("assignment statment needs an identifier")
                 };
 
                 // Declaration vs initialization
                 let exp = if let Some(Token::Semicolon) = self.lexer.peek() {
-                    // don't advance the lexer on a match so we can catch semicolons below
                     None
                 } else {
                     // TODO: change for +=, -=, etc.
@@ -146,12 +153,45 @@ impl Parser {
                     Some(exp)
                 };
 
+                self.lexer.expect_next(&Token::Semicolon)?;
+
                 Ok(Statement::Declare(id, exp))
             }
-            _ => Ok(Statement::Exp(self.parse_l15_exp()?)),
-        };
+            Some(Token::Keyword(Keywords::If)) => {
+                let exp = self.parse_l15_exp()?;
 
-        self.lexer.expect_next(&Token::Semicolon)?;
+                // Brace is optional in C-style if statements
+                // TODO: how to handle that we can only have one liners like that
+                self.lexer.skip_if_next(&Token::OpenBrace);
+
+                let pred_stmt = self.parse_statement()?;
+
+                self.lexer.skip_if_next(&Token::CloseBrace);
+
+                // TODO: handle else-if? i think this implicitly handles it if else_stmt is
+                // actually an IF
+                if let Some(Token::Keyword(Keywords::Else)) = self.lexer.peek() {
+                    let _ = self.lexer.next_token();
+                    let else_stmt = self.parse_statement()?;
+                    Ok(Statement::If(
+                        exp,
+                        Box::new(pred_stmt),
+                        Some(Box::new(else_stmt)),
+                    ))
+                } else {
+                    Ok(Statement::If(exp, Box::new(pred_stmt), None))
+                }
+            }
+            _ => {
+                self.lexer.back();
+
+                let exp = Ok(Statement::Exp(self.parse_l15_exp()?));
+
+                self.lexer.expect_next(&Token::Semicolon)?;
+
+                exp
+            }
+        };
 
         stmt
     }

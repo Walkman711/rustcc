@@ -209,4 +209,12 @@ impl Lexer {
             None => Err(RustCcError::ParseError(ParseError::UnexpectedTokenEnd)),
         }
     }
+
+    pub fn skip_if_next(&mut self, tok: &Token) {
+        if let Some(pk) = self.peek() {
+            if pk == *tok {
+                let _ = self.next_token();
+            }
+        }
+    }
 }
