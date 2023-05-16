@@ -284,13 +284,11 @@ impl AsmGenerator {
         let (first_l9_exp, trailing_l9_exps) = l10.0;
         self.gen_l9_asm(first_l9_exp);
 
-        for (op, l9_exp) in trailing_l9_exps {
+        for (_op, l9_exp) in trailing_l9_exps {
             self.push_stack();
             self.gen_l9_asm(l9_exp);
             self.pop_stack_into_w1();
-            match op {
-                Level10Op::BitwiseOr => todo!("Codegen |"),
-            }
+            self.write_inst("orr w0, w0, w1");
         }
     }
 
@@ -298,13 +296,11 @@ impl AsmGenerator {
         let (first_l8_exp, trailing_l8_exps) = l9.0;
         self.gen_l8_asm(first_l8_exp);
 
-        for (op, l8_exp) in trailing_l8_exps {
+        for (_op, l8_exp) in trailing_l8_exps {
             self.push_stack();
             self.gen_l8_asm(l8_exp);
             self.pop_stack_into_w1();
-            match op {
-                Level9Op::BitwiseXor => todo!("Codegen ^"),
-            }
+            self.write_inst("eor w0, w0, w1");
         }
     }
 
@@ -312,13 +308,11 @@ impl AsmGenerator {
         let (first_l7_exp, trailing_l7_exps) = l8.0;
         self.gen_l7_asm(first_l7_exp);
 
-        for (op, l7_exp) in trailing_l7_exps {
+        for (_op, l7_exp) in trailing_l7_exps {
             self.push_stack();
             self.gen_l7_asm(l7_exp);
             self.pop_stack_into_w1();
-            match op {
-                Level8Op::BitwiseAnd => todo!("Codegen & (bitwise and)"),
-            }
+            self.write_inst("and w0, w0, w1");
         }
     }
 
@@ -330,11 +324,7 @@ impl AsmGenerator {
             self.push_stack();
             self.gen_l6_asm(l6_exp);
             self.pop_stack_into_w1();
-            let cond: Cond = op.into();
-            match op {
-                Level7Op::Equals => self.logical_comparison("w1", "w0", cond),
-                Level7Op::NotEquals => self.logical_comparison("w1", "w0", cond),
-            }
+            self.logical_comparison("w1", "w0", op.into());
         }
     }
 
@@ -346,13 +336,7 @@ impl AsmGenerator {
             self.push_stack();
             self.gen_l5_asm(l5_exp);
             self.pop_stack_into_w1();
-            let cond: Cond = op.into();
-            match op {
-                Level6Op::LessThan => self.logical_comparison("w1", "w0", cond),
-                Level6Op::LessThanEquals => self.logical_comparison("w1", "w0", cond),
-                Level6Op::GreaterThan => self.logical_comparison("w1", "w0", cond),
-                Level6Op::GreaterThanEquals => self.logical_comparison("w1", "w0", cond),
-            }
+            self.logical_comparison("w1", "w0", op.into());
         }
     }
 
@@ -380,7 +364,7 @@ impl AsmGenerator {
             self.gen_l3_asm(l3_exp);
             self.pop_stack_into_w1();
             match op {
-                Level4Op::Addition => self.write_inst("add w0, w0, w1"),
+                Level4Op::Addition => self.write_inst("add w0, w1, w0"),
                 Level4Op::Subtraction => self.write_inst("sub w0, w1, w0"),
             }
         }
@@ -419,7 +403,7 @@ impl AsmGenerator {
                 match op {
                     Level2Op::PrefixIncrement => todo!(),
                     Level2Op::PrefixDecrement => todo!(),
-                    Level2Op::UnaryPlus => todo!(),
+                    Level2Op::UnaryPlus => todo!("unary plus isn't a no-op, and requires getting into lvalue vs rvalue stuff"),
                     Level2Op::UnaryMinus => self.write_inst("neg  w0, w0"),
                     Level2Op::LogicalNot => {
                         self.write_inst("cmp  w0, wzr");
@@ -427,7 +411,7 @@ impl AsmGenerator {
                         self.write_inst("uxtb w0, w0");
                     }
                     Level2Op::BitwiseNot => self.write_inst("mvn  w0, w0"),
-                    Level2Op::Cast => todo!(),
+                    Level2Op::Cast => todo!("only thinking of ints for now, so put off casting"),
                     Level2Op::Dereference => todo!(),
                     Level2Op::AddressOf => todo!(),
                     Level2Op::SizeOf => todo!(),

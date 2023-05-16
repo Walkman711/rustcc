@@ -6,19 +6,6 @@ use crate::{
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
-
-impl_disp_for_exp!(Level15Exp);
-impl_disp_for_exp!(Level12Exp);
-impl_disp_for_exp!(Level11Exp);
-impl_disp_for_exp!(Level10Exp);
-impl_disp_for_exp!(Level9Exp);
-impl_disp_for_exp!(Level8Exp);
-impl_disp_for_exp!(Level7Exp);
-impl_disp_for_exp!(Level6Exp);
-impl_disp_for_exp!(Level5Exp);
-impl_disp_for_exp!(Level4Exp);
-impl_disp_for_exp!(Level3Exp);
-
 // Variable assignment - lvalue cannot be an expression
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level14Exp {
@@ -101,6 +88,18 @@ impl std::fmt::Display for Level2Exp {
         }
     }
 }
+
+impl_disp_for_exp!(Level15Exp);
+impl_disp_for_exp!(Level12Exp);
+impl_disp_for_exp!(Level11Exp);
+impl_disp_for_exp!(Level10Exp);
+impl_disp_for_exp!(Level9Exp);
+impl_disp_for_exp!(Level8Exp);
+impl_disp_for_exp!(Level7Exp);
+impl_disp_for_exp!(Level6Exp);
+impl_disp_for_exp!(Level5Exp);
+impl_disp_for_exp!(Level4Exp);
+impl_disp_for_exp!(Level3Exp);
 
 // TODO: Level1 Expressions involve structs, arrays, and pointers, so save that for later
 
