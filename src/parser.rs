@@ -112,6 +112,7 @@ impl Parser {
         }
 
         self.lexer.expect_next(&Token::CloseBrace)?;
+
         Ok(Function::Fun(identifier, statements))
     }
 

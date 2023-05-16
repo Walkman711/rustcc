@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    fs::File,
-    io::Write,
-};
+use std::{collections::HashMap, fs::File, io::Write};
 
 use crate::{
     codegen_enums::Cond,
@@ -11,10 +7,11 @@ use crate::{
 };
 
 pub struct AsmGenerator {
-    asm_file: File,
+    asm_filename: String,
     sp: usize,
     curr_jmp_label: usize,
     var_map: HashMap<String, usize>,
+    buffer: Vec<String>,
 }
 
 const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
@@ -24,26 +21,33 @@ const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
 impl AsmGenerator {
     pub fn new(asm_filename: &str) -> Self {
         Self {
-            asm_file: File::create(asm_filename).expect("Failed to create output .s file."),
+            asm_filename: asm_filename.to_owned(), // File::create(asm_filename).expect("Failed to create output .s file."),
             sp: 0,
             curr_jmp_label: 0,
             var_map: HashMap::new(),
+            buffer: vec![],
         }
     }
 
     fn write_fn_header(&mut self, identifier: &str) {
-        writeln!(self.asm_file, ".global _{identifier}").expect(WRITELN_EXPECT);
-        writeln!(self.asm_file, ".align 2").expect(WRITELN_EXPECT);
-        writeln!(self.asm_file).expect(WRITELN_EXPECT);
-        writeln!(self.asm_file, "_{identifier}:").expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file, ".global _{identifier}").expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file, ".align 2").expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file).expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file, "_{identifier}:").expect(WRITELN_EXPECT);
+        self.buffer.push(format!(".global _{identifier}"));
+        self.buffer.push(".align 2".to_string());
+        self.buffer.push("\n".to_string());
+        self.buffer.push(format!("_{identifier}:"));
     }
 
     fn write_inst(&mut self, inst: &str) {
-        writeln!(self.asm_file, "\t{inst}").expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file, "\t{inst}").expect(WRITELN_EXPECT);
+        self.buffer.push(format!("\t{inst}"));
     }
 
     fn write_jmp_label(&mut self, lbl: usize) {
-        writeln!(self.asm_file, ".L{lbl}:").expect(WRITELN_EXPECT);
+        // writeln!(self.asm_file, ".L{lbl}:").expect(WRITELN_EXPECT);
+        self.buffer.push(format!(".L{lbl}:"));
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
@@ -97,6 +101,13 @@ impl AsmGenerator {
                     self.ret();
                 }
             },
+        };
+
+        let mut asm_file =
+            File::create(&self.asm_filename).expect("Failed to create output .s file.");
+
+        for line in &self.buffer {
+            writeln!(asm_file, "{line}").expect(WRITELN_EXPECT);
         }
     }
 
@@ -136,12 +147,12 @@ impl AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
-                // if self.var_map.contains_key(&identifier) {
-                //     panic!("tried to initialize variable `{identifier}` multiple times");
-                // }
+                if !self.var_map.contains_key(&identifier) {
+                    panic!("`{identifier}` is uninitialized");
+                }
 
                 // Store location of variable in stack
-                self.var_map.insert(identifier, self.sp + 4);
+                // self.var_map.insert(identifier, self.sp + 4);
 
                 self.gen_l15_asm(*l15_exp);
                 self.push_stack();
