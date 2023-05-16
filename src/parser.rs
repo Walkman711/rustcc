@@ -47,7 +47,7 @@ impl std::fmt::Display for Function {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    Return(Level15Exp),
+    Return(Option<Level15Exp>),
     Declare(String, Option<Level15Exp>),
     Exp(Level15Exp),
 }
@@ -55,9 +55,10 @@ pub enum Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Return(exp) => {
-                writeln!(f, "\tRETVRN {exp}")
-            }
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "\tRETVRN {exp}"),
+                None => writeln!(f, "\tRETVRN 0 (omitted)"),
+            },
             Statement::Declare(id, exp_opt) => match exp_opt {
                 Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
                 None => writeln!(f, "\tDECLARE {id}"),
@@ -113,6 +114,10 @@ impl Parser {
 
         self.lexer.expect_next(&Token::CloseBrace)?;
 
+        if statements.is_empty() {
+            statements.push(Statement::Return(None));
+        }
+
         Ok(Function::Fun(identifier, statements))
     }
 
@@ -122,7 +127,7 @@ impl Parser {
                 let _ = self.lexer.next_token();
                 let exp = self.parse_l15_exp()?;
 
-                Ok(Statement::Return(exp))
+                Ok(Statement::Return(Some(exp)))
             }
             Some(Token::Keyword(Keywords::Int)) => {
                 let _ = self.lexer.next_token();

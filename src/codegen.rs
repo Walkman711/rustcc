@@ -113,7 +113,10 @@ impl AsmGenerator {
 
     fn gen_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
-            Statement::Return(exp) => self.gen_l15_asm(exp),
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => self.gen_l15_asm(exp),
+                None => self.write_inst("mov  w0, wzr"),
+            },
             Statement::Declare(identifier, exp_opt) => {
                 if self.var_map.contains_key(&identifier) {
                     panic!("tried to initialize variable `{identifier}` multiple times");
@@ -123,8 +126,8 @@ impl AsmGenerator {
                 self.var_map.insert(identifier, self.sp + 4);
                 if let Some(exp) = exp_opt {
                     self.gen_l15_asm(exp);
+                    self.push_stack();
                 }
-                self.push_stack();
             }
             Statement::Exp(exp) => self.gen_l15_asm(exp),
         }
