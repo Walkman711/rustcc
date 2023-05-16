@@ -30,10 +30,6 @@ impl AsmGenerator {
     }
 
     fn write_fn_header(&mut self, identifier: &str) {
-        // writeln!(self.asm_file, ".global _{identifier}").expect(WRITELN_EXPECT);
-        // writeln!(self.asm_file, ".align 2").expect(WRITELN_EXPECT);
-        // writeln!(self.asm_file).expect(WRITELN_EXPECT);
-        // writeln!(self.asm_file, "_{identifier}:").expect(WRITELN_EXPECT);
         self.buffer.push(format!(".global _{identifier}"));
         self.buffer.push(".align 2".to_string());
         self.buffer.push("\n".to_string());
@@ -41,12 +37,10 @@ impl AsmGenerator {
     }
 
     fn write_inst(&mut self, inst: &str) {
-        // writeln!(self.asm_file, "\t{inst}").expect(WRITELN_EXPECT);
         self.buffer.push(format!("\t{inst}"));
     }
 
     fn write_jmp_label(&mut self, lbl: usize) {
-        // writeln!(self.asm_file, ".L{lbl}:").expect(WRITELN_EXPECT);
         self.buffer.push(format!(".L{lbl}:"));
     }
 
@@ -57,6 +51,10 @@ impl AsmGenerator {
     fn push_stack(&mut self) {
         self.sp += 4;
         self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
+    }
+
+    fn save_to_stack(&mut self, stack_offset: usize) {
+        self.write_inst(&format!("str  w0, [sp, {stack_offset}]"));
     }
 
     fn pop_stack_into_w1(&mut self) {
@@ -150,31 +148,18 @@ impl AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
-                if !self.var_map.contains_key(&identifier) {
-                    panic!("`{identifier}` is uninitialized");
-                }
-
-                // Store location of variable in stack
-                // self.var_map.insert(identifier, self.sp + 4);
-
+                let stack_offset = self
+                    .var_map
+                    .get(&identifier)
+                    .unwrap_or_else(|| panic!("`{identifier}` is uninitialized"))
+                    .to_owned();
                 self.gen_l15_asm(*l15_exp);
-                self.push_stack();
+                self.save_to_stack(stack_offset);
             }
             Level14Exp::NonAssignment(l13_exp) => {
                 self.gen_l13_asm(l13_exp);
-            } // Level14Exp::Var(_var_name) => todo!(),
+            }
         }
-        // let (variable_identifier, trailing_l13_exps) = l14;
-        // // self.gen_l13_asm(first_l13_exp);
-
-        // for (op, l13_exp) in trailing_l13_exps {
-        //     self.push_stack();
-        //     self.gen_l13_asm(l13_exp);
-        //     self.pop_stack_into_w1();
-        //     match op {
-        //         _ => todo!("codegen assignment ops"),
-        //     }
-        // }
     }
 
     fn gen_l13_asm(&mut self, l13: Level13Exp) {

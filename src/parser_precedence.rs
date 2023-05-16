@@ -258,7 +258,7 @@ impl TryFrom<Token> for Level13Op {
 
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
-            // Token::TernaryConditional => Ok(Self::TernaryConditional),
+            Token::QuestionMark => Ok(Self::TernaryConditional),
             _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
         }
     }
