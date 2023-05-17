@@ -1,7 +1,7 @@
 use crate::{
     lexer::Lexer,
     lexer_enums::{Keywords, Token},
-    parser_precedence::*,
+    parser_types::*,
     utils::{ParseError, RustCcError, RustCcResult},
 };
 

@@ -1,4 +1,4 @@
-use crate::parser_precedence::{Level6Op, Level7Op};
+use crate::parser_types::{Level6Op, Level7Op};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]

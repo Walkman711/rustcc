@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::File, io::Write};
 
-use crate::{codegen_enums::Cond, parser_precedence::*};
+use crate::{codegen_enums::Cond, parser_types::*};
 
 pub struct AsmGenerator {
     asm_filename: String,
