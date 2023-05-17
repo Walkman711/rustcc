@@ -4,6 +4,72 @@ use crate::{
     utils::{ParseError, RustCcError},
 };
 
+#[derive(Clone, Debug)]
+pub enum Program {
+    Func(Function),
+}
+
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "PROGRAM")?;
+        match self {
+            Program::Func(func_name) => writeln!(f, "{func_name}"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Function {
+    Fun(String, Vec<Statement>),
+}
+
+impl std::fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Function::Fun(func_name, stmts) => {
+                writeln!(f, "\tFunction: {func_name}")?;
+                for stmt in stmts {
+                    writeln!(f, "\t{stmt}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Statement {
+    Return(Option<Level15Exp>),
+    Declare(String, Option<Level15Exp>),
+    Exp(Level15Exp),
+    If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
+}
+
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "\tRETVRN {exp}"),
+                None => writeln!(f, "\tRETVRN 0 (omitted)"),
+            },
+            Statement::Declare(id, exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
+                None => writeln!(f, "\tDECLARE {id}"),
+            },
+            Statement::Exp(exp) => {
+                writeln!(f, "\tEXP: {exp}")
+            }
+            Statement::If(exp, pred, else_opt) => match else_opt {
+                Some(else_stmt) => writeln!(
+                    f,
+                    "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} else {{\n\t\t{else_stmt}\n\t\t}}"
+                ),
+                None => writeln!(f, "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} "),
+            },
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
 // Variable assignment - lvalue cannot be an expression
