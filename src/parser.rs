@@ -42,22 +42,23 @@ impl Parser {
 
         // TODO: will I need to keep a weird stack of brackets once we start doing conditionals and
         // loops?
-        let mut statements = vec![];
+        let mut block_items = vec![];
         while Some(Token::CloseBrace) != self.lexer.peek() {
-            let statement = self.parse_statement()?;
-            statements.push(statement);
+            let block_item = self.parse_block_items()?;
+            block_items.push(block_item);
         }
 
         self.lexer.expect_next(&Token::CloseBrace)?;
 
-        if statements.is_empty() {
-            statements.push(Statement::Return(None));
+        if block_items.is_empty() {
+            block_items.push(BlockItem::Stmt(Statement::Return(None)));
         }
 
-        Ok(Function::Fun(identifier, statements))
+        Ok(Function::Fun(identifier, block_items))
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
+        dbg!(self.lexer.peek());
         match self.lexer.next_token() {
             Some(Token::Keyword(Keywords::Return)) => {
                 let exp = self.parse_l15_exp()?;
@@ -65,24 +66,6 @@ impl Parser {
                 self.lexer.expect_next(&Token::Semicolon)?;
 
                 Ok(Statement::Return(Some(exp)))
-            }
-            Some(Token::Keyword(Keywords::Int)) => {
-                let Some(Token::Identifier(id)) = self.lexer.next_token() else {
-                    panic!("assignment statment needs an identifier")
-                };
-
-                // Declaration vs initialization
-                let exp = if self.lexer.advance_if_match(&Token::Semicolon) {
-                    None
-                } else {
-                    // TODO: change for +=, -=, etc.
-                    self.lexer.expect_next(&Token::SingleEquals)?;
-                    let exp = self.parse_l15_exp()?;
-                    self.lexer.expect_next(&Token::Semicolon)?;
-                    Some(exp)
-                };
-
-                Ok(Statement::Declare(id, exp))
             }
             Some(Token::Keyword(Keywords::If)) => {
                 let exp = self.parse_l15_exp()?;
@@ -92,6 +75,7 @@ impl Parser {
                 self.lexer.skip_if_next(&Token::OpenBrace);
 
                 let pred_stmt = self.parse_statement()?;
+                println!("pred: {pred_stmt}");
 
                 self.lexer.skip_if_next(&Token::CloseBrace);
 
@@ -117,6 +101,29 @@ impl Parser {
 
                 exp
             }
+        }
+    }
+
+    fn parse_block_items(&mut self) -> RustCcResult<BlockItem> {
+        if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+            let Some(Token::Identifier(id)) = self.lexer.next_token() else {
+                    panic!("assignment statment needs an identifier")
+                };
+
+            // Declaration vs initialization
+            let exp = if self.lexer.advance_if_match(&Token::Semicolon) {
+                None
+            } else {
+                // TODO: change for +=, -=, etc.
+                self.lexer.expect_next(&Token::SingleEquals)?;
+                let exp = self.parse_l15_exp()?;
+                self.lexer.expect_next(&Token::Semicolon)?;
+                Some(exp)
+            };
+
+            Ok(BlockItem::Declare((id, exp)))
+        } else {
+            Ok(BlockItem::Stmt(self.parse_statement()?))
         }
     }
 

@@ -87,10 +87,10 @@ impl AsmGenerator {
     pub fn gen_asm(&mut self, prog: Program) {
         match prog {
             Program::Func(func) => match func {
-                Function::Fun(identifier, stmts) => {
+                Function::Fun(identifier, block_items) => {
                     self.fn_prologue(&identifier);
-                    for stmt in stmts {
-                        self.gen_stmt_asm(stmt);
+                    for block_item in block_items {
+                        self.gen_block_item_asm(block_item);
                     }
                     self.ret();
                 }
@@ -105,13 +105,10 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_stmt_asm(&mut self, stmt: Statement) {
-        match stmt {
-            Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => self.gen_l15_asm(exp),
-                None => self.write_inst("mov  w0, wzr"),
-            },
-            Statement::Declare(identifier, exp_opt) => {
+    fn gen_block_item_asm(&mut self, block_item: BlockItem) {
+        match block_item {
+            BlockItem::Stmt(s) => self.gen_stmt_asm(s),
+            BlockItem::Declare((identifier, exp_opt)) => {
                 if self.var_map.contains_key(&identifier) {
                     panic!("tried to initialize variable `{identifier}` multiple times");
                 }
@@ -123,6 +120,15 @@ impl AsmGenerator {
                     self.push_stack();
                 }
             }
+        }
+    }
+
+    fn gen_stmt_asm(&mut self, stmt: Statement) {
+        match stmt {
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => self.gen_l15_asm(exp),
+                None => self.write_inst("mov  w0, wzr"),
+            },
             Statement::Exp(exp) => self.gen_l15_asm(exp),
             Statement::If(exp, predicate, else_opt) => {
                 let else_label = self.curr_jmp_label;
@@ -151,6 +157,7 @@ impl AsmGenerator {
                 }
                 self.write_jmp_label(exit_label);
             }
+            Statement::Compound(_) => todo!("compound statement codegen"),
         }
     }
 

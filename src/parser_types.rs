@@ -20,16 +20,16 @@ impl std::fmt::Display for Program {
 
 #[derive(Clone, Debug)]
 pub enum Function {
-    Fun(String, Vec<Statement>),
+    Fun(String, Vec<BlockItem>),
 }
 
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Function::Fun(func_name, stmts) => {
+            Function::Fun(func_name, block_items) => {
                 writeln!(f, "\tFunction: {func_name}")?;
-                for stmt in stmts {
-                    writeln!(f, "\t{stmt}")?;
+                for block_item in block_items {
+                    writeln!(f, "\t{block_item}")?;
                 }
             }
         }
@@ -37,12 +37,14 @@ impl std::fmt::Display for Function {
     }
 }
 
+pub type Declaration = (String, Option<Level15Exp>);
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Return(Option<Level15Exp>),
-    Declare(String, Option<Level15Exp>),
     Exp(Level15Exp),
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
+    Compound(Vec<BlockItem>),
 }
 
 impl std::fmt::Display for Statement {
@@ -51,10 +53,6 @@ impl std::fmt::Display for Statement {
             Statement::Return(exp_opt) => match exp_opt {
                 Some(exp) => writeln!(f, "\tRETVRN {exp}"),
                 None => writeln!(f, "\tRETVRN 0 (omitted)"),
-            },
-            Statement::Declare(id, exp_opt) => match exp_opt {
-                Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
-                None => writeln!(f, "\tDECLARE {id}"),
             },
             Statement::Exp(exp) => {
                 writeln!(f, "\tEXP: {exp}")
@@ -65,6 +63,30 @@ impl std::fmt::Display for Statement {
                     "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} else {{\n\t\t{else_stmt}\n\t\t}}"
                 ),
                 None => writeln!(f, "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} "),
+            },
+            Statement::Compound(block_items) => {
+                for block_item in block_items {
+                    writeln!(f, "{block_item}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BlockItem {
+    Stmt(Statement),
+    Declare(Declaration),
+}
+
+impl std::fmt::Display for BlockItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockItem::Stmt(s) => writeln!(f, "{s}"),
+            BlockItem::Declare((id, exp_opt)) => match exp_opt {
+                Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
+                None => writeln!(f, "\tDECLARE {id}"),
             },
         }
     }
