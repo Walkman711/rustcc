@@ -65,9 +65,11 @@ impl std::fmt::Display for Statement {
                 None => writeln!(f, "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} "),
             },
             Statement::Compound(block_items) => {
+                writeln!(f, "START BLOCK")?;
                 for block_item in block_items {
-                    writeln!(f, "{block_item}")?;
+                    writeln!(f, "\t{block_item}")?;
                 }
+                writeln!(f, "END BLOCK")?;
                 Ok(())
             }
         }

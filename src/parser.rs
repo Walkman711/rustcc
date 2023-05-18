@@ -38,17 +38,16 @@ impl Parser {
 
         self.lexer.expect_next(&Token::OpenParen)?;
         self.lexer.expect_next(&Token::CloseParen)?;
-        self.lexer.expect_next(&Token::OpenBrace)?;
+        // self.lexer.expect_next(&Token::OpenBrace)?;
 
-        // TODO: will I need to keep a weird stack of brackets once we start doing conditionals and
-        // loops?
         let mut block_items = vec![];
-        while Some(Token::CloseBrace) != self.lexer.peek() {
-            let block_item = self.parse_block_items()?;
-            block_items.push(block_item);
+        while let Some(Token::OpenBrace) = self.lexer.peek() {
+            let curr_block = self.parse_block_items()?;
+            self.lexer.expect_next(&Token::CloseBrace)?;
+            for bi in curr_block {
+                block_items.push(bi);
+            }
         }
-
-        self.lexer.expect_next(&Token::CloseBrace)?;
 
         if block_items.is_empty() {
             block_items.push(BlockItem::Stmt(Statement::Return(None)));
@@ -70,17 +69,8 @@ impl Parser {
             Some(Token::Keyword(Keywords::If)) => {
                 let exp = self.parse_l15_exp()?;
 
-                // Brace is optional in C-style if statements
-                // TODO: how to handle that we can only have one liners like that
-                self.lexer.skip_if_next(&Token::OpenBrace);
-
                 let pred_stmt = self.parse_statement()?;
-                println!("pred: {pred_stmt}");
 
-                self.lexer.skip_if_next(&Token::CloseBrace);
-
-                // TODO: handle else-if? i think this implicitly handles it if else_stmt is
-                // actually an IF
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Else)) {
                     let else_stmt = self.parse_statement()?;
                     Ok(Statement::If(
@@ -92,6 +82,7 @@ impl Parser {
                     Ok(Statement::If(exp, Box::new(pred_stmt), None))
                 }
             }
+            Some(Token::OpenBrace) => Ok(Statement::Compound(self.parse_block_items()?)),
             _ => {
                 self.lexer.back();
 
@@ -104,27 +95,32 @@ impl Parser {
         }
     }
 
-    fn parse_block_items(&mut self) -> RustCcResult<BlockItem> {
-        if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
-            let Some(Token::Identifier(id)) = self.lexer.next_token() else {
+    fn parse_block_items(&mut self) -> RustCcResult<Vec<BlockItem>> {
+        let mut block_items = vec![];
+        while Some(Token::CloseBrace) != self.lexer.peek() {
+            let block_item = if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+                let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     panic!("assignment statment needs an identifier")
                 };
 
-            // Declaration vs initialization
-            let exp = if self.lexer.advance_if_match(&Token::Semicolon) {
-                None
-            } else {
-                // TODO: change for +=, -=, etc.
-                self.lexer.expect_next(&Token::SingleEquals)?;
-                let exp = self.parse_l15_exp()?;
-                self.lexer.expect_next(&Token::Semicolon)?;
-                Some(exp)
-            };
+                // Declaration vs initialization
+                let exp = if self.lexer.advance_if_match(&Token::Semicolon) {
+                    None
+                } else {
+                    // TODO: change for +=, -=, etc.
+                    self.lexer.expect_next(&Token::SingleEquals)?;
+                    let exp = self.parse_l15_exp()?;
+                    self.lexer.expect_next(&Token::Semicolon)?;
+                    Some(exp)
+                };
 
-            Ok(BlockItem::Declare((id, exp)))
-        } else {
-            Ok(BlockItem::Stmt(self.parse_statement()?))
+                BlockItem::Declare((id, exp))
+            } else {
+                BlockItem::Stmt(self.parse_statement()?)
+            };
+            block_items.push(block_item);
         }
+        Ok(block_items)
     }
 
     fn parse_l15_exp(&mut self) -> RustCcResult<Level15Exp> {

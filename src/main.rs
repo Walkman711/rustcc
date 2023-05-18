@@ -10,13 +10,14 @@ fn main() -> anyhow::Result<()> {
     let out_filename = c_filename.replace(".c", "");
 
     let test_program = std::fs::read_to_string(c_filename)?;
-    // println!("{test_program}");
+    // println!("\n{test_program}");
 
     // Lex & parse program
     let mut parser = Parser::new(&test_program)?;
     let parsed_program = parser.parse()?;
 
-    // println!("{parsed_program}");
+    // dbg!(&parsed_program);
+    println!("{parsed_program}");
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);
