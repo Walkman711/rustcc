@@ -5,6 +5,7 @@ use rustcc::{
     // parser_types::PrettyPrinter,
     codegen::AsmGenerator,
     parser::Parser,
+    x86_generator::x86Generator,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -26,8 +27,11 @@ fn main() -> anyhow::Result<()> {
     // parsed_program.pretty_print(0);
 
     // Translate to assembly
-    let mut arm_generator = ArmGenerator::default();
-    arm_generator.gen_asm(&asm_filename, parsed_program);
+    // let mut arm_generator = ArmGenerator::default();
+    // arm_generator.gen_asm(&asm_filename, parsed_program);
+
+    let mut x86_generator = x86Generator::default();
+    x86_generator.gen_asm(&asm_filename, parsed_program);
 
     // Build
     Command::new("gcc")

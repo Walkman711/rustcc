@@ -5,7 +5,7 @@ use crate::{
     codegen_enums::{Arch, Cond},
 };
 
-pub struct ArmGenerator {
+pub struct x86Generator {
     sp: usize,
     curr_jmp_label: usize,
     var_map: HashMap<String, usize>,
@@ -13,23 +13,23 @@ pub struct ArmGenerator {
     arch: Arch,
 }
 
-impl Default for ArmGenerator {
+impl Default for x86Generator {
     fn default() -> Self {
         Self {
             sp: 0,
             curr_jmp_label: 0,
             var_map: HashMap::new(),
             buffer: vec![],
-            arch: Arch::ARM,
+            arch: Arch::x86,
         }
     }
 }
 
-impl AsmGenerator for ArmGenerator {
-    const PRIMARY_REGISTER: &'static str = "w0";
-    const BACKUP_REGISTER: &'static str = "w1";
-    const DEFAULT_ARGS: &'static str = "w0, w1, w0";
-    const UNARY_ARGS: &'static str = "w0, w0";
+impl AsmGenerator for x86Generator {
+    const PRIMARY_REGISTER: &'static str = "eax";
+    const BACKUP_REGISTER: &'static str = "edx";
+    const DEFAULT_ARGS: &'static str = "eax, edx";
+    const UNARY_ARGS: &'static str = "eax";
 
     fn get_variable(&self, var: &str) -> Option<&usize> {
         self.var_map.get(var)
@@ -52,18 +52,18 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn write_fn_header(&mut self, identifier: &str) {
-        self.write_to_buffer(format!(".global _{identifier}"));
-        self.write_to_buffer(".align 2".to_string());
-        self.write_to_buffer(format!("_{identifier}:"));
+        self.write_to_buffer(format!("{identifier}:"));
     }
 
     fn fn_prologue(&mut self, identifier: &str) {
         self.write_fn_header(identifier);
-        // self.write_inst("push lr");
+        self.write_inst("push  rbp");
+        self.write_inst("mov   rbp, rsp");
+        self.write_inst("sub   rsp, 16");
     }
 
     fn fn_epilogue(&mut self) {
-        // self.write_inst("pop pc");
+        self.write_inst("pop   rbp");
         // self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
     }
 
@@ -73,7 +73,7 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
-        self.write_inst(&format!("ldr  {reg}, [sp, {stack_offset}]"));
+        self.write_inst(&format!("mov   {reg}, DWORD PTR [rbp - {stack_offset}]"));
     }
 
     fn stack_ptr(&self) -> usize {
@@ -96,15 +96,15 @@ impl AsmGenerator for ArmGenerator {
             Self::PRIMARY_REGISTER
         ));
         // set lower byte of reg_a based on if cond is satisfied
-        self.write_inst(&format!("cset w0, {}", cond.for_arch(self.get_arch())));
+        self.write_inst(&format!("set{} al", cond.for_arch(self.get_arch())));
         // zero-pad reg_a since cset only sets the lower byte
-        self.write_inst("uxtb w0, w0");
+        self.write_inst("movzx eax, al");
     }
 
     fn logical_not(&mut self) {
         self.cmp_primary_with_zero();
-        self.write_inst("cset w0, eq");
-        self.write_inst("uxtb w0, w0");
+        self.write_inst("sete  al");
+        self.write_inst("movzx eax, al");
     }
 
     fn get_next_jmp_label(&mut self) -> usize {
@@ -113,6 +113,7 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
-        self.write_inst(&format!("b{} .L{lbl}", cond.for_arch(self.get_arch())));
+        self.write_inst("BRANCH INST")
+        // self.write_inst(&format!("b{cond} .L{lbl}"));
     }
 }

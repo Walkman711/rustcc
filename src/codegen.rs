@@ -2,6 +2,7 @@ use std::{fs::File, io::Write};
 
 use crate::{
     codegen_enums::{Arch, Cond, Mnemonic},
+    gen_level_asm,
     parser_types::*,
 };
 
@@ -9,6 +10,10 @@ pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
     const DEFAULT_ARGS: &'static str;
+    const UNARY_ARGS: &'static str;
+
+    fn get_variable(&self, var: &str) -> Option<&usize>;
+    fn save_variable(&mut self, var: &str);
 
     fn write_to_buffer(&mut self, s: String);
     fn get_buffer(&self) -> &[String];
@@ -25,9 +30,17 @@ pub trait AsmGenerator {
 
     fn write_mnemonic(&mut self, mnemonic: Mnemonic) {
         self.write_inst(&format!(
-            "{:4} {}",
+            "{:5} {}",
             mnemonic.for_arch(self.get_arch()),
             Self::DEFAULT_ARGS
+        ));
+    }
+
+    fn write_unary_inst(&mut self, mnemonic: Mnemonic) {
+        self.write_inst(&format!(
+            "{:5} {}",
+            mnemonic.for_arch(self.get_arch()),
+            Self::UNARY_ARGS
         ));
     }
 
@@ -38,24 +51,37 @@ pub trait AsmGenerator {
     fn fn_epilogue(&mut self);
     fn ret(&mut self);
 
+    fn stack_ptr(&self) -> usize;
+    fn increment_stack_ptr(&mut self);
+    fn decrement_stack_ptr(&mut self);
+    fn load_from_stack(&mut self, reg: &str, stack_offset: usize);
+    fn pop_stack_into_backup(&mut self) {
+        self.load_from_stack(Self::BACKUP_REGISTER, self.stack_ptr());
+        self.decrement_stack_ptr();
+    }
+    fn push_stack(&mut self) {
+        self.increment_stack_ptr();
+        self.save_to_stack(self.stack_ptr());
+    }
     fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_inst(&format!("str  w0, [sp, {stack_offset}]"));
+        self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
     }
 
-    fn push_stack(&mut self);
-    fn pop_stack_into_backup(&mut self);
+    fn logical_comparison(&mut self, cond: Cond);
+    fn logical_not(&mut self);
 
-    fn logical_comparison(&mut self, reg_a: &str, reg_b: &str, cond: Cond);
     fn get_next_jmp_label(&mut self) -> usize;
-    fn write_jmp_label(&mut self, lbl: usize);
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
+    fn write_jmp_label(&mut self, lbl: usize) {
+        self.write_to_buffer(format!(".L{lbl}:"));
+    }
 
-    fn cmp_primary_with_zero(&mut self);
-
-    fn gen_block_item_asm(&mut self, block_item: BlockItem);
+    fn cmp_primary_with_zero(&mut self) {
+        self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
+    }
 
     fn mov_into_primary(&mut self, val: &str) {
-        self.write_inst(&format!("mov  {}, {val}", Self::PRIMARY_REGISTER));
+        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
     }
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) {
@@ -75,6 +101,27 @@ pub trait AsmGenerator {
     fn gen_block_asm(&mut self, block_items: Vec<BlockItem>) {
         for block_item in block_items {
             self.gen_block_item_asm(block_item);
+        }
+    }
+
+    fn gen_block_item_asm(&mut self, block_item: BlockItem) {
+        match block_item {
+            BlockItem::Stmt(s) => self.gen_stmt_asm(s),
+            BlockItem::Declare((identifier, exp_opt)) => {
+                if self.get_variable(&identifier).is_some() {
+                    panic!("tried to initialize variable `{identifier}` multiple times");
+                }
+
+                // Store location of variable in stack
+                self.save_variable(&identifier);
+                if let Some(exp) = exp_opt {
+                    self.gen_l15_asm(exp);
+                    self.push_stack();
+                } else {
+                    self.mov_into_primary("0");
+                    self.push_stack();
+                }
+            }
         }
     }
 
@@ -116,9 +163,6 @@ pub trait AsmGenerator {
         }
     }
 
-    fn gen_l14_asm(&mut self, l14: Level14Exp);
-    fn gen_l2_asm(&mut self, l2: Level2Exp);
-
     fn gen_l15_asm(&mut self, l15: Level15Exp) {
         let (first_l14_exp, trailing_l14_exps) = l15.0;
         self.gen_l14_asm(first_l14_exp);
@@ -129,6 +173,22 @@ pub trait AsmGenerator {
             self.pop_stack_into_backup();
             match op {
                 Level15Op::Comma => todo!("codegen ,"),
+            }
+        }
+    }
+
+    fn gen_l14_asm(&mut self, l14: Level14Exp) {
+        match l14 {
+            Level14Exp::SimpleAssignment(identifier, l15_exp) => {
+                let stack_offset = self
+                    .get_variable(&identifier)
+                    .unwrap_or_else(|| panic!("`{identifier}` is uninitialized"))
+                    .to_owned();
+                self.gen_l15_asm(*l15_exp);
+                self.save_to_stack(stack_offset);
+            }
+            Level14Exp::NonAssignment(l13_exp) => {
+                self.gen_l13_asm(l13_exp);
             }
         }
     }
@@ -221,109 +281,52 @@ pub trait AsmGenerator {
         }
     }
 
-    fn gen_l10_asm(&mut self, l10: Level10Exp) {
-        let (first_l9_exp, trailing_l9_exps) = l10.0;
-        self.gen_l9_asm(first_l9_exp);
+    gen_level_asm!(gen_l10_asm, Level10Exp, gen_l9_asm, write_mnemonic);
+    gen_level_asm!(gen_l9_asm, Level9Exp, gen_l8_asm, write_mnemonic);
+    gen_level_asm!(gen_l8_asm, Level8Exp, gen_l7_asm, write_mnemonic);
+    gen_level_asm!(gen_l7_asm, Level7Exp, gen_l6_asm, logical_comparison);
+    gen_level_asm!(gen_l6_asm, Level6Exp, gen_l5_asm, logical_comparison);
+    gen_level_asm!(gen_l5_asm, Level5Exp, gen_l4_asm, write_mnemonic);
+    gen_level_asm!(gen_l4_asm, Level4Exp, gen_l3_asm, write_mnemonic);
+    gen_level_asm!(gen_l3_asm, Level3Exp, gen_l2_asm, write_mnemonic);
 
-        for (_op, l9_exp) in trailing_l9_exps {
-            self.push_stack();
-            self.gen_l9_asm(l9_exp);
-            self.pop_stack_into_backup();
-            self.write_mnemonic(Mnemonic::Or);
+    fn gen_l2_asm(&mut self, l2: Level2Exp) {
+        match l2 {
+            Level2Exp::Const(u) => self.mov_into_primary(&u.to_string()),
+            Level2Exp::Var(identifier) => {
+                let stack_offset = self
+                    .get_variable(&identifier)
+                    .unwrap_or_else(|| panic!("`{identifier}` is uninitialized"))
+                    .to_owned();
+                self.load_from_stack(Self::PRIMARY_REGISTER, stack_offset);
+            }
+            Level2Exp::Unary(op, factor) => {
+                self.gen_l2_asm(*factor);
+                match op {
+                    Level2Op::UnaryMinus => self.write_unary_inst(Mnemonic::Neg),
+                    Level2Op::LogicalNot => self.logical_not(),
+                    Level2Op::BitwiseNot => self.write_unary_inst(Mnemonic::BitwiseNot),
+                    _ => todo!("{op} is unimplemented for now"),
+                }
+            }
+            Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp),
         }
     }
+}
 
-    fn gen_l9_asm(&mut self, l9: Level9Exp) {
-        let (first_l8_exp, trailing_l8_exps) = l9.0;
-        self.gen_l8_asm(first_l8_exp);
+#[macro_export]
+macro_rules! gen_level_asm {
+    ($fn_name: ident, $t: ty, $next_fn: ident, $inst_fn: ident) => {
+        fn $fn_name(&mut self, exp: $t) {
+            let (first_lower_level_exp, trailing_lower_level_exps) = exp.0;
+            self.$next_fn(first_lower_level_exp);
 
-        for (_op, l8_exp) in trailing_l8_exps {
-            self.push_stack();
-            self.gen_l8_asm(l8_exp);
-            self.pop_stack_into_backup();
-            self.write_mnemonic(Mnemonic::Xor);
-        }
-    }
-
-    fn gen_l8_asm(&mut self, l8: Level8Exp) {
-        let (first_l7_exp, trailing_l7_exps) = l8.0;
-        self.gen_l7_asm(first_l7_exp);
-
-        for (_op, l7_exp) in trailing_l7_exps {
-            self.push_stack();
-            self.gen_l7_asm(l7_exp);
-            self.pop_stack_into_backup();
-            self.write_mnemonic(Mnemonic::And);
-        }
-    }
-
-    fn gen_l7_asm(&mut self, l7: Level7Exp) {
-        let (first_l6_exp, trailing_l6_exps) = l7.0;
-        self.gen_l6_asm(first_l6_exp);
-
-        for (op, l6_exp) in trailing_l6_exps {
-            self.push_stack();
-            self.gen_l6_asm(l6_exp);
-            self.pop_stack_into_backup();
-            self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
-        }
-    }
-
-    fn gen_l6_asm(&mut self, l6: Level6Exp) {
-        let (first_l5_exp, trailing_l5_exps) = l6.0;
-        self.gen_l5_asm(first_l5_exp);
-
-        for (op, l5_exp) in trailing_l5_exps {
-            self.push_stack();
-            self.gen_l5_asm(l5_exp);
-            self.pop_stack_into_backup();
-            self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
-        }
-    }
-
-    fn gen_l5_asm(&mut self, l5: Level5Exp) {
-        let (first_l4_exp, trailing_l4_exps) = l5.0;
-        self.gen_l4_asm(first_l4_exp);
-
-        for (op, l4_exp) in trailing_l4_exps {
-            self.push_stack();
-            self.gen_l4_asm(l4_exp);
-            self.pop_stack_into_backup();
-            match op {
-                Level5Op::BitwiseLeftShift => todo!("Codegen <<"),
-                Level5Op::BitwiseRightShift => todo!("Codegen >>"),
+            for (op, lower_level_exp) in trailing_lower_level_exps {
+                self.push_stack();
+                self.$next_fn(lower_level_exp);
+                self.pop_stack_into_backup();
+                self.$inst_fn(op.into());
             }
         }
-    }
-
-    fn gen_l4_asm(&mut self, l4: Level4Exp) {
-        let (first_l3_exp, trailing_l3_exps) = l4.0;
-        self.gen_l3_asm(first_l3_exp);
-
-        for (op, l3_exp) in trailing_l3_exps {
-            self.push_stack();
-            self.gen_l3_asm(l3_exp);
-            self.pop_stack_into_backup();
-            match op {
-                Level4Op::Addition => self.write_mnemonic(Mnemonic::Add),
-                Level4Op::Subtraction => self.write_mnemonic(Mnemonic::Subtract),
-            }
-        }
-    }
-
-    fn gen_l3_asm(&mut self, l3: Level3Exp) {
-        let (first_l2_exp, trailing_l2_exps) = l3.0;
-        self.gen_l2_asm(first_l2_exp);
-
-        for (op, l2_exp) in trailing_l2_exps {
-            self.push_stack();
-            self.gen_l2_asm(l2_exp);
-            self.pop_stack_into_backup();
-            match op {
-                Level3Op::Multiplication => self.write_mnemonic(Mnemonic::Multiply),
-                Level3Op::Division => self.write_mnemonic(Mnemonic::Divide),
-                Level3Op::Remainder => todo!("Codegen %"),
-            }
-        }
-    }
+    };
 }
