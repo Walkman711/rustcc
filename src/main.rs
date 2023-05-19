@@ -1,6 +1,16 @@
+#![warn(
+    clippy::all,
+    clippy::restriction,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
+
 use std::process::Command;
 
-use rustcc::{arm_generator::ArmGenerator, codegen::AsmGenerator, x86_generator::x86Generator};
+use rustcc::{
+    arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser, x86_generator::x86Generator,
+};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
