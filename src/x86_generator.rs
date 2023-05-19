@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use std::collections::HashMap;
 
 use crate::{
@@ -112,7 +114,7 @@ impl AsmGenerator for x86Generator {
         self.curr_jmp_label
     }
 
-    fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
+    fn write_branch_inst(&mut self, _cond: Cond, _lbl: usize) {
         self.write_inst("BRANCH INST")
         // self.write_inst(&format!("b{cond} .L{lbl}"));
     }

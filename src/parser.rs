@@ -1,6 +1,7 @@
 use crate::{
     lexer::Lexer,
     lexer_enums::{Keywords, Token},
+    parse_level,
     parser_types::*,
     utils::{ParseError, RustCcError, RustCcResult},
 };
@@ -41,14 +42,12 @@ impl Parser {
 
         let mut block_items = vec![];
         while let Some(Token::OpenBrace) = self.lexer.peek() {
-            let curr_block = self.parse_block_items()?;
+            let mut curr_block = self.parse_block_items()?;
             self.lexer.expect_next(&Token::CloseBrace)?;
-            for bi in curr_block {
-                block_items.push(bi);
-            }
+            block_items.append(&mut curr_block);
         }
 
-        if block_items.is_empty() {
+        if !block_items.iter().any(|bi| bi.has_return()) {
             block_items.push(BlockItem::Stmt(Statement::Return(None)));
         }
 
@@ -121,20 +120,17 @@ impl Parser {
         Ok(block_items)
     }
 
-    fn parse_l15_exp(&mut self) -> RustCcResult<Level15Exp> {
-        let first_l14_exp = self.parse_l14_exp()?;
-        let mut trailing_l14_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level15Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l14_exp = self.parse_l14_exp()?;
-            trailing_l14_exps.push((op, l14_exp));
-        }
-        Ok(Level15Exp((first_l14_exp, trailing_l14_exps)))
-    }
+    parse_level!(parse_l15_exp, Level15Exp, Level15Op, parse_l14_exp);
+    parse_level!(parse_l12_exp, Level12Exp, Level12Op, parse_l11_exp);
+    parse_level!(parse_l11_exp, Level11Exp, Level11Op, parse_l10_exp);
+    parse_level!(parse_l10_exp, Level10Exp, Level10Op, parse_l9_exp);
+    parse_level!(parse_l9_exp, Level9Exp, Level9Op, parse_l8_exp);
+    parse_level!(parse_l8_exp, Level8Exp, Level8Op, parse_l7_exp);
+    parse_level!(parse_l7_exp, Level7Exp, Level7Op, parse_l6_exp);
+    parse_level!(parse_l6_exp, Level6Exp, Level6Op, parse_l5_exp);
+    parse_level!(parse_l5_exp, Level5Exp, Level5Op, parse_l4_exp);
+    parse_level!(parse_l4_exp, Level4Exp, Level4Op, parse_l3_exp);
+    parse_level!(parse_l3_exp, Level3Exp, Level3Op, parse_l2_exp);
 
     fn parse_l14_exp(&mut self) -> RustCcResult<Level14Exp> {
         if let Some(Token::Identifier(var_name)) = self.lexer.peek() {
@@ -169,156 +165,6 @@ impl Parser {
         }
     }
 
-    fn parse_l12_exp(&mut self) -> RustCcResult<Level12Exp> {
-        let first_l11_exp = self.parse_l11_exp()?;
-        let mut trailing_l11_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level12Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l11_exp = self.parse_l11_exp()?;
-            trailing_l11_exps.push((op, l11_exp));
-        }
-        Ok(Level12Exp((first_l11_exp, trailing_l11_exps)))
-    }
-
-    fn parse_l11_exp(&mut self) -> RustCcResult<Level11Exp> {
-        let first_l10_exp = self.parse_l10_exp()?;
-        let mut trailing_l10_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level11Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l10_exp = self.parse_l10_exp()?;
-            trailing_l10_exps.push((op, l10_exp));
-        }
-        Ok(Level11Exp((first_l10_exp, trailing_l10_exps)))
-    }
-
-    fn parse_l10_exp(&mut self) -> RustCcResult<Level10Exp> {
-        let first_l9_exp = self.parse_l9_exp()?;
-        let mut trailing_l9_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level10Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l9_exp = self.parse_l9_exp()?;
-            trailing_l9_exps.push((op, l9_exp));
-        }
-        Ok(Level10Exp((first_l9_exp, trailing_l9_exps)))
-    }
-
-    fn parse_l9_exp(&mut self) -> RustCcResult<Level9Exp> {
-        let first_l8_exp = self.parse_l8_exp()?;
-        let mut trailing_l8_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level9Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l8_exp = self.parse_l8_exp()?;
-            trailing_l8_exps.push((op, l8_exp));
-        }
-        Ok(Level9Exp((first_l8_exp, trailing_l8_exps)))
-    }
-
-    fn parse_l8_exp(&mut self) -> RustCcResult<Level8Exp> {
-        let first_l7_exp = self.parse_l7_exp()?;
-        let mut trailing_l7_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level8Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l7_exp = self.parse_l7_exp()?;
-            trailing_l7_exps.push((op, l7_exp));
-        }
-        Ok(Level8Exp((first_l7_exp, trailing_l7_exps)))
-    }
-
-    fn parse_l7_exp(&mut self) -> RustCcResult<Level7Exp> {
-        let first_l6_exp = self.parse_l6_exp()?;
-        let mut trailing_l6_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level7Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l6_exp = self.parse_l6_exp()?;
-            trailing_l6_exps.push((op, l6_exp));
-        }
-        Ok(Level7Exp((first_l6_exp, trailing_l6_exps)))
-    }
-
-    fn parse_l6_exp(&mut self) -> RustCcResult<Level6Exp> {
-        let first_l5_exp = self.parse_l5_exp()?;
-        let mut trailing_l5_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level6Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l5_exp = self.parse_l5_exp()?;
-            trailing_l5_exps.push((op, l5_exp));
-        }
-        Ok(Level6Exp((first_l5_exp, trailing_l5_exps)))
-    }
-
-    fn parse_l5_exp(&mut self) -> RustCcResult<Level5Exp> {
-        let first_l4_exp = self.parse_l4_exp()?;
-        let mut trailing_l4_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level5Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l4_exp = self.parse_l4_exp()?;
-            trailing_l4_exps.push((op, l4_exp));
-        }
-        Ok(Level5Exp((first_l4_exp, trailing_l4_exps)))
-    }
-
-    fn parse_l4_exp(&mut self) -> RustCcResult<Level4Exp> {
-        let first_l3_exp = self.parse_l3_exp()?;
-        let mut trailing_l3_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level4Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l3_exp = self.parse_l3_exp()?;
-            trailing_l3_exps.push((op, l3_exp));
-        }
-        Ok(Level4Exp((first_l3_exp, trailing_l3_exps)))
-    }
-
-    fn parse_l3_exp(&mut self) -> RustCcResult<Level3Exp> {
-        let first_l2_exp = self.parse_l2_exp()?;
-        let mut trailing_l2_exps = vec![];
-        while let Some(tok) = self.lexer.next_token() {
-            let Ok(op) = Level3Op::try_from(tok) else {
-                self.lexer.back();
-                break;
-            };
-
-            let l2_exp = self.parse_l2_exp()?;
-            trailing_l2_exps.push((op, l2_exp));
-        }
-        Ok(Level3Exp((first_l2_exp, trailing_l2_exps)))
-    }
-
     fn parse_l2_exp(&mut self) -> RustCcResult<Level2Exp> {
         let tok = self
             .lexer
@@ -344,4 +190,25 @@ impl Parser {
 
         Ok(l2_exp)
     }
+}
+
+#[macro_export]
+macro_rules! parse_level {
+    ($fn_name: ident, $exp_type: ident, $op_type: ty, $next_fn: ident) => {
+        fn $fn_name(&mut self) -> RustCcResult<$exp_type> {
+            let first_exp = self.$next_fn()?;
+            let mut trailing_exps = vec![];
+            while let Some(tok) = self.lexer.next_token() {
+                if let Ok(op) = <$op_type>::try_from(tok) {
+                    let trailing_exp = self.$next_fn()?;
+                    trailing_exps.push((op, trailing_exp));
+                } else {
+                    self.lexer.back();
+                    break;
+                }
+            }
+            let ret = $exp_type((first_exp, trailing_exps));
+            Ok(ret)
+        }
+    };
 }

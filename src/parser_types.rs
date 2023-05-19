@@ -145,10 +145,38 @@ impl std::fmt::Display for Statement {
     }
 }
 
+impl Statement {
+    pub fn has_return(&self) -> bool {
+        match self {
+            Statement::Return(_) => true,
+            Statement::Exp(_) => false,
+            Statement::If(_, pred, else_opt) => {
+                let pred_has_ret = pred.has_return();
+                if let Some(else_stmt) = else_opt {
+                    let else_stmt_has_ret = else_stmt.has_return();
+                    pred_has_ret && else_stmt_has_ret
+                } else {
+                    pred_has_ret
+                }
+            }
+            Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BlockItem {
     Stmt(Statement),
     Declare(Declaration),
+}
+
+impl BlockItem {
+    pub fn has_return(&self) -> bool {
+        match self {
+            BlockItem::Stmt(s) => s.has_return(),
+            BlockItem::Declare(_) => false,
+        }
+    }
 }
 
 impl PrettyPrinter for BlockItem {

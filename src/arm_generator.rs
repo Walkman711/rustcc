@@ -73,7 +73,7 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
-        self.write_inst(&format!("ldr  {reg}, [sp, {stack_offset}]"));
+        self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
     }
 
     fn stack_ptr(&self) -> usize {
