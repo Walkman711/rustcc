@@ -1,8 +1,6 @@
 use std::process::Command;
 
-use rustcc::{
-    arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser, x86_generator::x86Generator,
-};
+use rustcc::{arm_generator::ArmGenerator, codegen::AsmGenerator, x86_generator::x86Generator};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
