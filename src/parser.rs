@@ -38,7 +38,6 @@ impl Parser {
 
         self.lexer.expect_next(&Token::OpenParen)?;
         self.lexer.expect_next(&Token::CloseParen)?;
-        // self.lexer.expect_next(&Token::OpenBrace)?;
 
         let mut block_items = vec![];
         while let Some(Token::OpenBrace) = self.lexer.peek() {
@@ -57,7 +56,6 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
-        dbg!(self.lexer.peek());
         match self.lexer.next_token() {
             Some(Token::Keyword(Keywords::Return)) => {
                 let exp = self.parse_l15_exp()?;

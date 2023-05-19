@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use rustcc::{codegen::AsmGenerator, parser::Parser};
+use rustcc::{codegen::AsmGenerator, parser::Parser, parser_types::PrettyPrinter};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -17,7 +17,8 @@ fn main() -> anyhow::Result<()> {
     let parsed_program = parser.parse()?;
 
     // dbg!(&parsed_program);
-    println!("{parsed_program}");
+    // println!("{parsed_program}");
+    parsed_program.pretty_print(0);
 
     // Translate to assembly
     let mut asm_generator = AsmGenerator::new(&asm_filename);

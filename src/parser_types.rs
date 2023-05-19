@@ -9,11 +9,26 @@ pub enum Program {
     Func(Function),
 }
 
+pub trait PrettyPrinter {
+    fn pretty_print(&self, indentation_level: usize);
+}
+
+impl PrettyPrinter for Program {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        println!("{tabs}PROGRAM");
+        match self {
+            Program::Func(function) => {
+                function.pretty_print(indentation_level + 1);
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "PROGRAM")?;
         match self {
-            Program::Func(func_name) => writeln!(f, "{func_name}"),
+            Program::Func(function) => writeln!(f, "{function}"),
         }
     }
 }
@@ -23,14 +38,32 @@ pub enum Function {
     Fun(String, Vec<BlockItem>),
 }
 
+impl PrettyPrinter for Function {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        match self {
+            Function::Fun(func_name, block_items) => {
+                println!("{tabs}FUNCTION: {func_name}()");
+                println!("{tabs}{{");
+                for block_item in block_items {
+                    block_item.pretty_print(indentation_level + 1);
+                }
+                println!("{tabs}}}");
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Function::Fun(func_name, block_items) => {
-                writeln!(f, "\tFunction: {func_name}")?;
+                writeln!(f, "FUNCTION: {func_name}()")?;
+                writeln!(f, "{{")?;
                 for block_item in block_items {
-                    writeln!(f, "\t{block_item}")?;
+                    write!(f, "{block_item}")?;
                 }
+                writeln!(f, "}}")?;
             }
         }
         Ok(())
@@ -47,29 +80,65 @@ pub enum Statement {
     Compound(Vec<BlockItem>),
 }
 
+impl PrettyPrinter for Statement {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        match self {
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => println!("{tabs}RETVRN {exp}"),
+                None => println!("{tabs}RETVRN 0 (omitted)"),
+            },
+            Statement::Exp(exp) => {
+                println!("{tabs}EXP: {exp}")
+            }
+            Statement::If(exp, pred, else_opt) => match else_opt {
+                Some(else_stmt) => {
+                    println!("{tabs}IF: ({exp}) {{");
+                    println!("{tabs}\t{pred}");
+                    println!("{tabs}}} else {{");
+                    println!("{tabs}\t{else_stmt}");
+                    println!("{tabs}}}");
+                }
+                None => {
+                    println!("{tabs}IF: ({exp}) {{");
+                    println!("{tabs}\t{pred}");
+                    println!("{tabs}}}");
+                }
+            },
+            Statement::Compound(block_items) => {
+                println!("{tabs}{{");
+                for block_item in block_items {
+                    block_item.pretty_print(indentation_level + 1);
+                }
+                println!("{tabs}}}");
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => writeln!(f, "\tRETVRN {exp}"),
-                None => writeln!(f, "\tRETVRN 0 (omitted)"),
+                Some(exp) => writeln!(f, "RETVRN {exp}"),
+                None => writeln!(f, "RETVRN 0 (omitted)"),
             },
             Statement::Exp(exp) => {
-                writeln!(f, "\tEXP: {exp}")
+                writeln!(f, "EXP: {exp}")
             }
             Statement::If(exp, pred, else_opt) => match else_opt {
                 Some(else_stmt) => writeln!(
                     f,
-                    "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} else {{\n\t\t{else_stmt}\n\t\t}}"
+                    "IF: {exp} {{\n\t{pred}\n\t}} else {{\n\t{else_stmt}\n\t}}"
                 ),
-                None => writeln!(f, "\tIF: {exp} {{\n\t\t{pred}\n\t\t}} "),
+                None => writeln!(f, "IF: {exp} {{\n\t{pred}\n\t}}"),
             },
             Statement::Compound(block_items) => {
-                writeln!(f, "START BLOCK")?;
+                writeln!(f, "{{")?;
                 for block_item in block_items {
-                    writeln!(f, "\t{block_item}")?;
+                    write!(f, "{block_item}")?;
                 }
-                writeln!(f, "END BLOCK")?;
+                writeln!(f, "}}")?;
                 Ok(())
             }
         }
@@ -82,13 +151,24 @@ pub enum BlockItem {
     Declare(Declaration),
 }
 
+impl PrettyPrinter for BlockItem {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        if let BlockItem::Stmt(s) = self {
+            s.pretty_print(indentation_level);
+        } else {
+            println!("{tabs}{}", self);
+        }
+    }
+}
+
 impl std::fmt::Display for BlockItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BlockItem::Stmt(s) => writeln!(f, "{s}"),
             BlockItem::Declare((id, exp_opt)) => match exp_opt {
-                Some(exp) => writeln!(f, "\tINITIALIZE {id} = {exp}"),
-                None => writeln!(f, "\tDECLARE {id}"),
+                Some(exp) => writeln!(f, "INITIALIZE {id} = {exp}"),
+                None => writeln!(f, "DECLARE {id}"),
             },
         }
     }
