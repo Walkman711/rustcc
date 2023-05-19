@@ -1,5 +1,5 @@
 use crate::{
-    impl_disp_for_exp,
+    define_exp_level,
     lexer_enums::Token,
     utils::{ParseError, RustCcError},
 };
@@ -202,8 +202,18 @@ impl std::fmt::Display for BlockItem {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level15Exp(pub (Level14Exp, Vec<(Level15Op, Level14Exp)>));
+define_exp_level!(Level15Exp, Level15Op, Level14Exp);
+define_exp_level!(Level12Exp, Level12Op, Level11Exp);
+define_exp_level!(Level11Exp, Level11Op, Level10Exp);
+define_exp_level!(Level10Exp, Level10Op, Level9Exp);
+define_exp_level!(Level9Exp, Level9Op, Level8Exp);
+define_exp_level!(Level8Exp, Level8Op, Level7Exp);
+define_exp_level!(Level7Exp, Level7Op, Level6Exp);
+define_exp_level!(Level6Exp, Level6Op, Level5Exp);
+define_exp_level!(Level5Exp, Level5Op, Level4Exp);
+define_exp_level!(Level4Exp, Level4Op, Level3Exp);
+define_exp_level!(Level3Exp, Level3Op, Level2Exp);
+
 // Variable assignment - lvalue cannot be an expression
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level14Exp {
@@ -239,36 +249,6 @@ impl std::fmt::Display for Level13Exp {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level12Exp(pub (Level11Exp, Vec<(Level12Op, Level11Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level11Exp(pub (Level10Exp, Vec<(Level11Op, Level10Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level10Exp(pub (Level9Exp, Vec<(Level10Op, Level9Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level9Exp(pub (Level8Exp, Vec<(Level9Op, Level8Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level8Exp(pub (Level7Exp, Vec<(Level8Op, Level7Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level7Exp(pub (Level6Exp, Vec<(Level7Op, Level6Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level6Exp(pub (Level5Exp, Vec<(Level6Op, Level5Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level5Exp(pub (Level4Exp, Vec<(Level5Op, Level4Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level4Exp(pub (Level3Exp, Vec<(Level4Op, Level3Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Level3Exp(pub (Level2Exp, Vec<(Level3Op, Level2Exp)>));
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {
     Const(u64),
     Var(String),
@@ -286,18 +266,6 @@ impl std::fmt::Display for Level2Exp {
         }
     }
 }
-
-impl_disp_for_exp!(Level15Exp);
-impl_disp_for_exp!(Level12Exp);
-impl_disp_for_exp!(Level11Exp);
-impl_disp_for_exp!(Level10Exp);
-impl_disp_for_exp!(Level9Exp);
-impl_disp_for_exp!(Level8Exp);
-impl_disp_for_exp!(Level7Exp);
-impl_disp_for_exp!(Level6Exp);
-impl_disp_for_exp!(Level5Exp);
-impl_disp_for_exp!(Level4Exp);
-impl_disp_for_exp!(Level3Exp);
 
 // TODO: Level1 Expressions involve structs, arrays, and pointers, so save that for later
 
@@ -571,8 +539,11 @@ pub enum Level1Op {
 }
 
 #[macro_export]
-macro_rules! impl_disp_for_exp {
-    ($exp: ident) => {
+macro_rules! define_exp_level {
+    ($exp: ident, $op: ty, $lower_level_exp: ty) => {
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub struct $exp(pub ($lower_level_exp, Vec<($op, $lower_level_exp)>));
+
         impl std::fmt::Display for $exp {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.0 .0)?;
