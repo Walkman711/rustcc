@@ -3,7 +3,7 @@ use std::process::Command;
 use rustcc::{
     codegen::{ArmGenerator, AsmGenerator},
     parser::Parser,
-    parser_types::PrettyPrinter,
+    // parser_types::PrettyPrinter,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -25,7 +25,7 @@ fn main() -> anyhow::Result<()> {
     // parsed_program.pretty_print(0);
 
     // Translate to assembly
-    let mut arm_generator = ArmGenerator::new(&asm_filename);
+    let mut arm_generator = ArmGenerator::default();
     arm_generator.gen_asm(&asm_filename, parsed_program);
 
     // Build

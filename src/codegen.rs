@@ -3,7 +3,6 @@ use std::{collections::HashMap, fs::File, io::Write};
 use crate::{codegen_enums::Cond, parser_types::*};
 
 pub struct ArmGenerator {
-    asm_filename: String,
     sp: usize,
     curr_jmp_label: usize,
     var_map: HashMap<String, usize>,
@@ -13,6 +12,20 @@ pub struct ArmGenerator {
 const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
 
 pub trait AsmGenerator {
+    const PRIMARY_REGISTER: &'static str;
+    const BACKUP_REGISTER: &'static str;
+
+    fn write_to_buffer(&mut self, s: String);
+    fn write_to_file(&mut self, asm_filename: &str);
+    fn write_inst(&mut self, inst: &str);
+
+    fn write_fn_header(&mut self, identifier: &str);
+    fn fn_prologue(&mut self, identifier: &str);
+    fn fn_epilogue(&mut self);
+    fn ret(&mut self);
+
+    fn gen_block_item_asm(&mut self, block_item: BlockItem);
+
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) {
         match prog {
             Program::Func(func) => match func {
@@ -27,77 +40,55 @@ pub trait AsmGenerator {
         self.write_to_file(asm_filename);
     }
 
-    fn write_to_file(&mut self, asm_filename: &str);
-
     fn gen_block_asm(&mut self, block_items: Vec<BlockItem>) {
         for block_item in block_items {
             self.gen_block_item_asm(block_item);
         }
     }
 
-    fn fn_prologue(&mut self, identifier: &str);
-    fn fn_epilogue(&mut self);
-    fn ret(&mut self);
-    fn gen_block_item_asm(&mut self, block_item: BlockItem);
+    fn save_to_stack(&mut self, stack_offset: usize) {
+        self.write_inst(&format!("str  w0, [sp, {stack_offset}]"));
+    }
+
+    fn mov_into_primary(&mut self, val: &str) {
+        self.write_inst(&format!("mov  {}, {val}", Self::PRIMARY_REGISTER));
+    }
+
+    fn gen_l15_asm(&mut self, l15: Level15Exp);
+    fn gen_l14_asm(&mut self, l14: Level14Exp);
+    fn gen_l13_asm(&mut self, l13: Level13Exp);
+    fn gen_l12_asm(&mut self, l12: Level12Exp);
+    fn gen_l11_asm(&mut self, l11: Level11Exp);
+    fn gen_l10_asm(&mut self, l10: Level10Exp);
+    fn gen_l9_asm(&mut self, l9: Level9Exp);
+    fn gen_l8_asm(&mut self, l8: Level8Exp);
+    fn gen_l7_asm(&mut self, l7: Level7Exp);
+    fn gen_l6_asm(&mut self, l6: Level6Exp);
+    fn gen_l5_asm(&mut self, l5: Level5Exp);
+    fn gen_l4_asm(&mut self, l4: Level4Exp);
+    fn gen_l3_asm(&mut self, l3: Level3Exp);
+    fn gen_l2_asm(&mut self, l2: Level2Exp);
 }
 
-// TODO: better printing of assembly so that it's evenly spaced
-// FIX: how much to subtract stack pointer by? Oh wait, can just add that at the top
-impl ArmGenerator {
-    pub fn new(asm_filename: &str) -> Self {
+impl Default for ArmGenerator {
+    fn default() -> Self {
         Self {
-            asm_filename: asm_filename.to_owned(), // File::create(asm_filename).expect("Failed to create output .s file."),
             sp: 0,
             curr_jmp_label: 0,
             var_map: HashMap::new(),
             buffer: vec![],
         }
     }
-
-    fn write_fn_header(&mut self, identifier: &str) {
-        self.buffer.push(format!(".global _{identifier}"));
-        self.buffer.push(".align 2".to_string());
-        self.buffer.push("\n".to_string());
-        self.buffer.push(format!("_{identifier}:"));
-    }
-
-    fn write_inst(&mut self, inst: &str) {
-        self.buffer.push(format!("\t{inst}"));
-    }
-
-    fn write_jmp_label(&mut self, lbl: usize) {
-        self.buffer.push(format!(".L{lbl}:"));
-    }
-
-    fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
-        self.write_inst(&format!("b{cond} .L{lbl}"));
-    }
-
-    fn push_stack(&mut self) {
-        self.sp += 4;
-        self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
-    }
-
-    fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_inst(&format!("str  w0, [sp, {stack_offset}]"));
-    }
-
-    fn pop_stack_into_w1(&mut self) {
-        self.write_inst(&format!("ldr  w1, [sp, {}]", self.sp));
-        self.sp -= 4;
-    }
-
-    fn logical_comparison(&mut self, reg_a: &str, reg_b: &str, cond: Cond) {
-        // Compare registers
-        self.write_inst(&format!("cmp  {reg_a}, {reg_b}"));
-        // set lower byte of reg_a based on if cond is satisfied
-        self.write_inst(&format!("cset w0, {cond}"));
-        // zero-pad reg_a since cset only sets the lower byte
-        self.write_inst("uxtb w0, w0");
-    }
 }
 
 impl AsmGenerator for ArmGenerator {
+    const PRIMARY_REGISTER: &'static str = "w0";
+    const BACKUP_REGISTER: &'static str = "w1";
+
+    fn write_to_buffer(&mut self, s: String) {
+        self.buffer.push(s);
+    }
+
     fn write_to_file(&mut self, asm_filename: &str) {
         let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
         for line in &self.buffer {
@@ -105,10 +96,21 @@ impl AsmGenerator for ArmGenerator {
         }
     }
 
+    fn write_inst(&mut self, inst: &str) {
+        self.write_to_buffer(format!("\t{inst}"));
+    }
+
+    fn write_fn_header(&mut self, identifier: &str) {
+        self.write_to_buffer(format!(".global _{identifier}"));
+        self.write_to_buffer(".align 2".to_string());
+        self.write_to_buffer(format!("_{identifier}:"));
+    }
+
     fn fn_prologue(&mut self, identifier: &str) {
         self.write_fn_header(identifier);
         // self.write_inst("push lr");
     }
+
     fn fn_epilogue(&mut self) {
         // self.write_inst("pop pc");
         // self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
@@ -134,47 +136,6 @@ impl AsmGenerator for ArmGenerator {
                     self.push_stack();
                 }
             }
-        }
-    }
-}
-
-impl ArmGenerator {
-    fn gen_stmt_asm(&mut self, stmt: Statement) {
-        match stmt {
-            Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => self.gen_l15_asm(exp),
-                // C standard states that int fns without a return value return 0 by default
-                None => self.write_inst("mov  w0, wzr"),
-            },
-            Statement::Exp(exp) => self.gen_l15_asm(exp),
-            Statement::If(exp, predicate, else_opt) => {
-                let else_label = self.curr_jmp_label;
-                let exit_label = self.curr_jmp_label + 1;
-                self.curr_jmp_label += 2;
-
-                // Evaluate exp and store in w0
-                self.gen_l15_asm(exp);
-
-                // If the exp == 0, trigger the else case to minimize the jump
-                // instructions we need
-                self.write_inst("cmp  w0, wzr");
-
-                self.write_branch_inst(Cond::Equals, else_label);
-
-                // Execute if the if-exp is nonzero
-                self.gen_stmt_asm(*predicate);
-                self.write_branch_inst(Cond::Always, exit_label);
-
-                // If we don't have an else case, jumping to this label
-                // will just cause us to fall through to the exit label
-                self.write_jmp_label(else_label);
-
-                if let Some(else_stmt) = else_opt {
-                    self.gen_stmt_asm(*else_stmt);
-                }
-                self.write_jmp_label(exit_label);
-            }
-            Statement::Compound(block_items) => self.gen_block_asm(block_items),
         }
     }
 
@@ -258,11 +219,11 @@ impl ArmGenerator {
             self.write_inst("cmp  w0, wzr");
             self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
-            self.write_inst("mov  w0, wzr");
+            self.mov_into_primary("wzr");
             self.write_branch_inst(Cond::Always, exit_label);
 
             self.write_jmp_label(short_circuit_label);
-            self.write_inst("mov  w0, 1");
+            self.mov_into_primary("1");
 
             self.write_jmp_label(exit_label);
         }
@@ -290,11 +251,11 @@ impl ArmGenerator {
             self.write_inst("cmp  w0, wzr");
             self.write_branch_inst(Cond::Equals, short_circuit_label);
 
-            self.write_inst("mov  w0, 1");
+            self.mov_into_primary("1");
             self.write_branch_inst(Cond::Always, success_label);
 
             self.write_jmp_label(short_circuit_label);
-            self.write_inst("mov  w0, wzr");
+            self.mov_into_primary("wzr");
 
             self.write_jmp_label(success_label);
         }
@@ -344,7 +305,7 @@ impl ArmGenerator {
             self.push_stack();
             self.gen_l6_asm(l6_exp);
             self.pop_stack_into_w1();
-            self.logical_comparison("w1", "w0", op.into());
+            self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
         }
     }
 
@@ -356,7 +317,7 @@ impl ArmGenerator {
             self.push_stack();
             self.gen_l5_asm(l5_exp);
             self.pop_stack_into_w1();
-            self.logical_comparison("w1", "w0", op.into());
+            self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
         }
     }
 
@@ -408,9 +369,7 @@ impl ArmGenerator {
 
     fn gen_l2_asm(&mut self, l2: Level2Exp) {
         match l2 {
-            Level2Exp::Const(u) => {
-                self.write_inst(&format!("mov  w0, {u}"));
-            }
+            Level2Exp::Const(u) => self.mov_into_primary(&u.to_string()),
             Level2Exp::Var(id) => {
                 if let Some(stack_offset) = self.var_map.get(&id) {
                     self.write_inst(&format!("ldr  w0, [sp, {}]", stack_offset));
@@ -439,6 +398,74 @@ impl ArmGenerator {
                 }
             }
             Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp),
+        }
+    }
+}
+
+impl ArmGenerator {
+    fn write_jmp_label(&mut self, lbl: usize) {
+        self.write_to_buffer(format!(".L{lbl}:"));
+    }
+
+    fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
+        self.write_inst(&format!("b{cond} .L{lbl}"));
+    }
+
+    fn push_stack(&mut self) {
+        self.sp += 4;
+        self.save_to_stack(self.sp);
+    }
+
+    fn pop_stack_into_w1(&mut self) {
+        self.write_inst(&format!("ldr  w1, [sp, {}]", self.sp));
+        self.sp -= 4;
+    }
+
+    fn logical_comparison(&mut self, reg_a: &str, reg_b: &str, cond: Cond) {
+        // Compare registers
+        self.write_inst(&format!("cmp  {reg_a}, {reg_b}"));
+        // set lower byte of reg_a based on if cond is satisfied
+        self.write_inst(&format!("cset w0, {cond}"));
+        // zero-pad reg_a since cset only sets the lower byte
+        self.write_inst("uxtb w0, w0");
+    }
+
+    fn gen_stmt_asm(&mut self, stmt: Statement) {
+        match stmt {
+            Statement::Return(exp_opt) => match exp_opt {
+                Some(exp) => self.gen_l15_asm(exp),
+                // C standard states that int fns without a return value return 0 by default
+                None => self.mov_into_primary("wzr"),
+            },
+            Statement::Exp(exp) => self.gen_l15_asm(exp),
+            Statement::If(exp, predicate, else_opt) => {
+                let else_label = self.curr_jmp_label;
+                let exit_label = self.curr_jmp_label + 1;
+                self.curr_jmp_label += 2;
+
+                // Evaluate exp and store in w0
+                self.gen_l15_asm(exp);
+
+                // If the exp == 0, trigger the else case to minimize the jump
+                // instructions we need
+                self.write_inst("cmp  w0, wzr");
+
+                self.write_branch_inst(Cond::Equals, else_label);
+
+                // Execute if the if-exp is nonzero
+                self.gen_stmt_asm(*predicate);
+                self.write_branch_inst(Cond::Always, exit_label);
+
+                // If we don't have an else case, jumping to this label
+                // will just cause us to fall through to the exit label
+                self.write_jmp_label(else_label);
+
+                if let Some(else_stmt) = else_opt {
+                    self.gen_stmt_asm(*else_stmt);
+                }
+                self.write_jmp_label(exit_label);
+            }
+            Statement::Compound(block_items) => self.gen_block_asm(block_items),
         }
     }
 }
