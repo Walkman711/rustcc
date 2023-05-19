@@ -1,9 +1,10 @@
 use std::process::Command;
 
 use rustcc::{
-    codegen::{ArmGenerator, AsmGenerator},
-    parser::Parser,
+    arm_generator::ArmGenerator,
     // parser_types::PrettyPrinter,
+    codegen::AsmGenerator,
+    parser::Parser,
 };
 
 fn main() -> anyhow::Result<()> {
