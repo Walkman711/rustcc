@@ -72,6 +72,10 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("ret");
     }
 
+    fn save_to_stack(&mut self, stack_offset: usize) {
+        self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
+    }
+
     fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
         self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
     }

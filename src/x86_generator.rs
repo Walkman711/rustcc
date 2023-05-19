@@ -90,6 +90,13 @@ impl AsmGenerator for x86Generator {
         self.sp -= 4;
     }
 
+    fn save_to_stack(&mut self, stack_offset: usize) {
+        self.write_inst(&format!(
+            "mov   DWORD PTR [rbp - {stack_offset}], {}",
+            Self::PRIMARY_REGISTER
+        ));
+    }
+
     fn logical_comparison(&mut self, cond: Cond) {
         // Compare registers
         self.write_inst(&format!(

@@ -55,6 +55,7 @@ pub trait AsmGenerator {
     fn stack_ptr(&self) -> usize;
     fn increment_stack_ptr(&mut self);
     fn decrement_stack_ptr(&mut self);
+    fn save_to_stack(&mut self, stack_offset: usize);
     fn load_from_stack(&mut self, reg: &str, stack_offset: usize);
     fn pop_stack_into_backup(&mut self) {
         self.load_from_stack(Self::BACKUP_REGISTER, self.stack_ptr());
@@ -63,9 +64,6 @@ pub trait AsmGenerator {
     fn push_stack(&mut self) {
         self.increment_stack_ptr();
         self.save_to_stack(self.stack_ptr());
-    }
-    fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
     }
 
     fn logical_comparison(&mut self, cond: Cond);
