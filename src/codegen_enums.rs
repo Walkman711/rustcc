@@ -8,6 +8,37 @@ pub enum Arch {
     ARM,
 }
 
+pub enum Mnemonic {
+    Or,
+    Xor,
+    And,
+    BitwiseLeftShift,
+    BitwiseRightShift,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
+impl Mnemonic {
+    pub fn for_arch(&self, arch: Arch) -> &str {
+        match arch {
+            Arch::x86 => todo!("implement x86"),
+            Arch::ARM => match self {
+                Mnemonic::Xor => "eor",
+                Mnemonic::And => "and",
+                Mnemonic::Or => "orr",
+                Mnemonic::BitwiseLeftShift => todo!(),
+                Mnemonic::BitwiseRightShift => todo!(),
+                Mnemonic::Add => "add",
+                Mnemonic::Subtract => "sub",
+                Mnemonic::Multiply => "mul",
+                Mnemonic::Divide => "sdiv",
+            },
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cond {
     Equals,
