@@ -1,6 +1,10 @@
 use std::process::Command;
 
-use rustcc::{codegen::AsmGenerator, parser::Parser, parser_types::PrettyPrinter};
+use rustcc::{
+    codegen::{ArmGenerator, AsmGenerator},
+    parser::Parser,
+    parser_types::PrettyPrinter,
+};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -18,11 +22,11 @@ fn main() -> anyhow::Result<()> {
 
     // dbg!(&parsed_program);
     // println!("{parsed_program}");
-    parsed_program.pretty_print(0);
+    // parsed_program.pretty_print(0);
 
     // Translate to assembly
-    let mut asm_generator = AsmGenerator::new(&asm_filename);
-    asm_generator.gen_asm(parsed_program);
+    let mut arm_generator = ArmGenerator::new(&asm_filename);
+    arm_generator.gen_asm(&asm_filename, parsed_program);
 
     // Build
     Command::new("gcc")

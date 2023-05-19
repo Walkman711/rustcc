@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::Write};
 
 use crate::{codegen_enums::Cond, parser_types::*};
 
-pub struct AsmGenerator {
+pub struct ArmGenerator {
     asm_filename: String,
     sp: usize,
     curr_jmp_label: usize,
@@ -12,9 +12,38 @@ pub struct AsmGenerator {
 
 const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
 
+pub trait AsmGenerator {
+    fn gen_asm(&mut self, asm_filename: &str, prog: Program) {
+        match prog {
+            Program::Func(func) => match func {
+                Function::Fun(identifier, block_items) => {
+                    self.fn_prologue(&identifier);
+                    self.gen_block_asm(block_items);
+                    self.ret();
+                }
+            },
+        };
+
+        self.write_to_file(asm_filename);
+    }
+
+    fn write_to_file(&mut self, asm_filename: &str);
+
+    fn gen_block_asm(&mut self, block_items: Vec<BlockItem>) {
+        for block_item in block_items {
+            self.gen_block_item_asm(block_item);
+        }
+    }
+
+    fn fn_prologue(&mut self, identifier: &str);
+    fn fn_epilogue(&mut self);
+    fn ret(&mut self);
+    fn gen_block_item_asm(&mut self, block_item: BlockItem);
+}
+
 // TODO: better printing of assembly so that it's evenly spaced
 // FIX: how much to subtract stack pointer by? Oh wait, can just add that at the top
-impl AsmGenerator {
+impl ArmGenerator {
     pub fn new(asm_filename: &str) -> Self {
         Self {
             asm_filename: asm_filename.to_owned(), // File::create(asm_filename).expect("Failed to create output .s file."),
@@ -66,43 +95,28 @@ impl AsmGenerator {
         // zero-pad reg_a since cset only sets the lower byte
         self.write_inst("uxtb w0, w0");
     }
+}
 
-    fn ret(&mut self) {
-        self.fn_epilogue();
-        self.write_inst("ret");
+impl AsmGenerator for ArmGenerator {
+    fn write_to_file(&mut self, asm_filename: &str) {
+        let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
+        for line in &self.buffer {
+            writeln!(asm_file, "{line}").expect(WRITELN_EXPECT);
+        }
     }
 
     fn fn_prologue(&mut self, identifier: &str) {
         self.write_fn_header(identifier);
         // self.write_inst("push lr");
     }
-
     fn fn_epilogue(&mut self) {
         // self.write_inst("pop pc");
         // self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
     }
-}
 
-impl AsmGenerator {
-    pub fn gen_asm(&mut self, prog: Program) {
-        match prog {
-            Program::Func(func) => match func {
-                Function::Fun(identifier, block_items) => {
-                    self.fn_prologue(&identifier);
-                    for block_item in block_items {
-                        self.gen_block_item_asm(block_item);
-                    }
-                    self.ret();
-                }
-            },
-        };
-
-        let mut asm_file =
-            File::create(&self.asm_filename).expect("Failed to create output .s file.");
-
-        for line in &self.buffer {
-            writeln!(asm_file, "{line}").expect(WRITELN_EXPECT);
-        }
+    fn ret(&mut self) {
+        self.fn_epilogue();
+        self.write_inst("ret");
     }
 
     fn gen_block_item_asm(&mut self, block_item: BlockItem) {
@@ -122,11 +136,14 @@ impl AsmGenerator {
             }
         }
     }
+}
 
+impl ArmGenerator {
     fn gen_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
             Statement::Return(exp_opt) => match exp_opt {
                 Some(exp) => self.gen_l15_asm(exp),
+                // C standard states that int fns without a return value return 0 by default
                 None => self.write_inst("mov  w0, wzr"),
             },
             Statement::Exp(exp) => self.gen_l15_asm(exp),
@@ -157,7 +174,7 @@ impl AsmGenerator {
                 }
                 self.write_jmp_label(exit_label);
             }
-            Statement::Compound(_) => todo!("compound statement codegen"),
+            Statement::Compound(block_items) => self.gen_block_asm(block_items),
         }
     }
 
