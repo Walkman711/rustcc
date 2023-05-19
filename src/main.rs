@@ -1,15 +1,7 @@
-#![warn(
-    clippy::all,
-    clippy::restriction,
-    clippy::pedantic,
-    clippy::nursery,
-    clippy::cargo
-)]
-
 use std::process::Command;
 
 use rustcc::{
-    arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser, x86_generator::x86Generator,
+    arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser, parser_types::PrettyPrinter,
 };
 
 fn main() -> anyhow::Result<()> {

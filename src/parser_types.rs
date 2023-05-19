@@ -255,8 +255,8 @@ pub enum Level2Exp {
 impl std::fmt::Display for Level2Exp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Level2Exp::Const(c) => write!(f, "{c} "),
-            Level2Exp::Var(v) => write!(f, "{v} "),
+            Level2Exp::Const(c) => write!(f, "{c}"),
+            Level2Exp::Var(v) => write!(f, "{v}"),
             Level2Exp::Unary(op, exp) => write!(f, "{op} {exp}"),
             Level2Exp::ParenExp(exp) => write!(f, "{exp}"),
         }

@@ -1,18 +1,17 @@
 #![allow(non_camel_case_types)]
 
-use std::collections::HashMap;
-
 use crate::{
     codegen::AsmGenerator,
     codegen_enums::{Arch, Cond},
+    utils::ScopedMap,
 };
 
 pub struct x86Generator {
     sp: usize,
     curr_jmp_label: usize,
-    var_map: HashMap<String, usize>,
     buffer: Vec<String>,
     arch: Arch,
+    scoped_map: ScopedMap,
 }
 
 impl Default for x86Generator {
@@ -20,9 +19,9 @@ impl Default for x86Generator {
         Self {
             sp: 0,
             curr_jmp_label: 0,
-            var_map: HashMap::new(),
             buffer: vec![],
             arch: Arch::x86,
+            scoped_map: ScopedMap::default(),
         }
     }
 }
@@ -33,12 +32,12 @@ impl AsmGenerator for x86Generator {
     const DEFAULT_ARGS: &'static str = "eax, edx";
     const UNARY_ARGS: &'static str = "eax";
 
-    fn get_variable(&self, var: &str) -> Option<&usize> {
-        self.var_map.get(var)
+    fn get_scoped_map(&self) -> &ScopedMap {
+        &self.scoped_map
     }
 
-    fn save_variable(&mut self, var: &str) {
-        self.var_map.insert(var.to_owned(), self.stack_ptr() + 4);
+    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
+        &mut self.scoped_map
     }
 
     fn write_to_buffer(&mut self, s: String) {
@@ -74,10 +73,6 @@ impl AsmGenerator for x86Generator {
         self.write_inst("ret");
     }
 
-    fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
-        self.write_inst(&format!("mov   {reg}, DWORD PTR [rbp - {stack_offset}]"));
-    }
-
     fn stack_ptr(&self) -> usize {
         self.sp
     }
@@ -95,6 +90,10 @@ impl AsmGenerator for x86Generator {
             "mov   DWORD PTR [rbp - {stack_offset}], {}",
             Self::PRIMARY_REGISTER
         ));
+    }
+
+    fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
+        self.write_inst(&format!("mov   {reg}, DWORD PTR [rbp - {stack_offset}]"));
     }
 
     fn logical_comparison(&mut self, cond: Cond) {

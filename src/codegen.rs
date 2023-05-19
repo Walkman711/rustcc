@@ -5,6 +5,7 @@ use crate::{
     gen_level_asm,
     ops::*,
     parser_types::*,
+    utils::ScopedMap,
 };
 
 pub trait AsmGenerator {
@@ -13,8 +14,8 @@ pub trait AsmGenerator {
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
 
-    fn get_variable(&self, var: &str) -> Option<&usize>;
-    fn save_variable(&mut self, var: &str);
+    fn get_scoped_map(&self) -> &ScopedMap;
+    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
 
     fn write_to_buffer(&mut self, s: String);
     fn get_buffer(&self) -> &[String];
@@ -98,29 +99,45 @@ pub trait AsmGenerator {
     }
 
     fn gen_block_asm(&mut self, block_items: Vec<BlockItem>) {
-        for block_item in block_items {
-            self.gen_block_item_asm(block_item);
+        {
+            self.get_scoped_map_mut()
+                .new_scope()
+                .unwrap_or_else(|e| panic!("{e:?}"));
         }
-    }
 
-    fn gen_block_item_asm(&mut self, block_item: BlockItem) {
-        match block_item {
-            BlockItem::Stmt(s) => self.gen_stmt_asm(s),
-            BlockItem::Declare((identifier, exp_opt)) => {
-                if self.get_variable(&identifier).is_some() {
-                    panic!("tried to initialize variable `{identifier}` multiple times");
-                }
-
-                // Store location of variable in stack
-                self.save_variable(&identifier);
-                if let Some(exp) = exp_opt {
-                    self.gen_l15_asm(exp);
-                    self.push_stack();
-                } else {
-                    self.mov_into_primary("0");
-                    self.push_stack();
+        for block_item in block_items {
+            match block_item {
+                BlockItem::Stmt(s) => self.gen_stmt_asm(s),
+                BlockItem::Declare((identifier, exp_opt)) => {
+                    // println!("DECL {exp_opt:?}");
+                    let var_loc = self.stack_ptr() + 4;
+                    let sm = self.get_scoped_map_mut();
+                    match exp_opt {
+                        Some(exp) => {
+                            sm.initialize_var(&identifier, var_loc)
+                                .unwrap_or_else(|e| panic!("{e:?}"));
+                            self.gen_l15_asm(exp);
+                            self.push_stack();
+                        }
+                        None => {
+                            sm.declare_var(&identifier, var_loc)
+                                .unwrap_or_else(|e| panic!("{e:?}"));
+                            self.mov_into_primary("999");
+                            self.push_stack();
+                        }
+                    }
                 }
             }
+        }
+
+        {
+            for _ in 0..self.get_scoped_map().len() {
+                self.decrement_stack_ptr();
+            }
+
+            self.get_scoped_map_mut()
+                .exit_scope()
+                .unwrap_or_else(|e| panic!("{e:?}"));
         }
     }
 
@@ -179,12 +196,14 @@ pub trait AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
-                let stack_offset = self
-                    .get_variable(&identifier)
-                    .unwrap_or_else(|| panic!("`{identifier}` is uninitialized"))
-                    .to_owned();
+                // println!("ASSIGN {identifier} = {l15_exp}");
+                // let var_loc = self.stack_ptr();
+                let sm = self.get_scoped_map_mut();
+                let var_loc = sm
+                    .assign_var(&identifier)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
                 self.gen_l15_asm(*l15_exp);
-                self.save_to_stack(stack_offset);
+                self.save_to_stack(var_loc);
             }
             Level14Exp::NonAssignment(l13_exp) => {
                 self.gen_l13_asm(l13_exp);
@@ -293,11 +312,9 @@ pub trait AsmGenerator {
         match l2 {
             Level2Exp::Const(u) => self.mov_into_primary(&u.to_string()),
             Level2Exp::Var(identifier) => {
-                let stack_offset = self
-                    .get_variable(&identifier)
-                    .unwrap_or_else(|| panic!("`{identifier}` is uninitialized"))
-                    .to_owned();
-                self.load_from_stack(Self::PRIMARY_REGISTER, stack_offset);
+                let sm = self.get_scoped_map_mut();
+                let var_details = sm.get_var(&identifier).unwrap_or_else(|e| panic!("{e:?}"));
+                self.load_from_stack(Self::PRIMARY_REGISTER, var_details.stack_offset);
             }
             Level2Exp::Unary(op, factor) => {
                 self.gen_l2_asm(*factor);

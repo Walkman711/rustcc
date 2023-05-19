@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-
 use crate::{
     codegen::AsmGenerator,
     codegen_enums::{Arch, Cond},
+    utils::ScopedMap,
 };
 
 pub struct ArmGenerator {
     sp: usize,
     curr_jmp_label: usize,
-    var_map: HashMap<String, usize>,
+    scoped_map: ScopedMap,
     buffer: Vec<String>,
     arch: Arch,
 }
@@ -18,7 +17,7 @@ impl Default for ArmGenerator {
         Self {
             sp: 0,
             curr_jmp_label: 0,
-            var_map: HashMap::new(),
+            scoped_map: ScopedMap::default(),
             buffer: vec![],
             arch: Arch::ARM,
         }
@@ -31,12 +30,12 @@ impl AsmGenerator for ArmGenerator {
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
     const UNARY_ARGS: &'static str = "w0, w0";
 
-    fn get_variable(&self, var: &str) -> Option<&usize> {
-        self.var_map.get(var)
+    fn get_scoped_map(&self) -> &ScopedMap {
+        &self.scoped_map
     }
 
-    fn save_variable(&mut self, var: &str) {
-        self.var_map.insert(var.to_owned(), self.stack_ptr() + 4);
+    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
+        &mut self.scoped_map
     }
 
     fn write_to_buffer(&mut self, s: String) {
