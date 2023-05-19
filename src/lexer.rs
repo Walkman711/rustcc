@@ -210,14 +210,6 @@ impl Lexer {
         }
     }
 
-    pub fn skip_if_next(&mut self, tok: &Token) {
-        if let Some(pk) = self.peek() {
-            if pk == *tok {
-                let _ = self.next_token();
-            }
-        }
-    }
-
     pub fn advance_if_match(&mut self, tok: &Token) -> bool {
         match self.peek() {
             Some(pk) => {

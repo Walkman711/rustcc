@@ -3,6 +3,7 @@ use std::{fs::File, io::Write};
 use crate::{
     codegen_enums::{Arch, Cond, Mnemonic},
     gen_level_asm,
+    ops::*,
     parser_types::*,
 };
 
