@@ -14,10 +14,12 @@ const WRITELN_EXPECT: &str = "writeln! failed to write instruction to file.";
 pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
+    const DEFAULT_ARGS: &'static str;
 
     fn write_to_buffer(&mut self, s: String);
     fn write_to_file(&mut self, asm_filename: &str);
     fn write_inst(&mut self, inst: &str);
+    fn write_mnemonic(&mut self, mnemonic: &str);
 
     fn write_fn_header(&mut self, identifier: &str);
     fn fn_prologue(&mut self, identifier: &str);
@@ -54,6 +56,8 @@ pub trait AsmGenerator {
         self.write_inst(&format!("mov  {}, {val}", Self::PRIMARY_REGISTER));
     }
 
+    fn cmp_primary_with_zero(&mut self);
+
     fn gen_l15_asm(&mut self, l15: Level15Exp);
     fn gen_l14_asm(&mut self, l14: Level14Exp);
     fn gen_l13_asm(&mut self, l13: Level13Exp);
@@ -84,6 +88,7 @@ impl Default for ArmGenerator {
 impl AsmGenerator for ArmGenerator {
     const PRIMARY_REGISTER: &'static str = "w0";
     const BACKUP_REGISTER: &'static str = "w1";
+    const DEFAULT_ARGS: &'static str = "w0, w1, w0";
 
     fn write_to_buffer(&mut self, s: String) {
         self.buffer.push(s);
@@ -98,6 +103,10 @@ impl AsmGenerator for ArmGenerator {
 
     fn write_inst(&mut self, inst: &str) {
         self.write_to_buffer(format!("\t{inst}"));
+    }
+
+    fn write_mnemonic(&mut self, mnemonic: &str) {
+        self.write_inst(&format!("{mnemonic:4} {}", Self::DEFAULT_ARGS));
     }
 
     fn write_fn_header(&mut self, identifier: &str) {
@@ -139,6 +148,10 @@ impl AsmGenerator for ArmGenerator {
         }
     }
 
+    fn cmp_primary_with_zero(&mut self) {
+        self.write_inst(&format!("cmp {}, wzr", Self::PRIMARY_REGISTER));
+    }
+
     fn gen_l15_asm(&mut self, l15: Level15Exp) {
         let (first_l14_exp, trailing_l14_exps) = l15.0;
         self.gen_l14_asm(first_l14_exp);
@@ -146,7 +159,7 @@ impl AsmGenerator for ArmGenerator {
         for (op, l14_exp) in trailing_l14_exps {
             self.push_stack();
             self.gen_l14_asm(l14_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             match op {
                 Level15Op::Comma => todo!("codegen ,"),
             }
@@ -181,7 +194,7 @@ impl AsmGenerator for ArmGenerator {
 
                 // If the exp == 0, trigger the else case to minimize the jump
                 // instructions we need
-                self.write_inst("cmp  w0, wzr");
+                self.cmp_primary_with_zero();
 
                 self.write_branch_inst(Cond::Equals, else_label);
 
@@ -209,14 +222,14 @@ impl AsmGenerator for ArmGenerator {
         self.gen_l11_asm(first_l11_exp);
 
         for (_op, l11_exp) in trailing_l11_exps {
-            self.write_inst("cmp  w0, wzr");
+            self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
             self.gen_l11_asm(l11_exp);
         }
 
         if print_jmp_insts {
-            self.write_inst("cmp  w0, wzr");
+            self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::NotEquals, short_circuit_label);
 
             self.mov_into_primary("wzr");
@@ -240,7 +253,7 @@ impl AsmGenerator for ArmGenerator {
         self.gen_l10_asm(first_l10_exp);
 
         for (_op, l10_exp) in trailing_l10_exps {
-            self.write_inst("cmp  w0, wzr");
+            self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::Equals, short_circuit_label);
 
             self.gen_l10_asm(l10_exp);
@@ -248,7 +261,7 @@ impl AsmGenerator for ArmGenerator {
 
         if print_jmp_insts {
             // Get the last term checked
-            self.write_inst("cmp  w0, wzr");
+            self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::Equals, short_circuit_label);
 
             self.mov_into_primary("1");
@@ -268,8 +281,8 @@ impl AsmGenerator for ArmGenerator {
         for (_op, l9_exp) in trailing_l9_exps {
             self.push_stack();
             self.gen_l9_asm(l9_exp);
-            self.pop_stack_into_w1();
-            self.write_inst("orr w0, w0, w1");
+            self.pop_stack_into_backup();
+            self.write_mnemonic("orr");
         }
     }
 
@@ -280,8 +293,8 @@ impl AsmGenerator for ArmGenerator {
         for (_op, l8_exp) in trailing_l8_exps {
             self.push_stack();
             self.gen_l8_asm(l8_exp);
-            self.pop_stack_into_w1();
-            self.write_inst("eor w0, w0, w1");
+            self.pop_stack_into_backup();
+            self.write_mnemonic("eor");
         }
     }
 
@@ -292,8 +305,8 @@ impl AsmGenerator for ArmGenerator {
         for (_op, l7_exp) in trailing_l7_exps {
             self.push_stack();
             self.gen_l7_asm(l7_exp);
-            self.pop_stack_into_w1();
-            self.write_inst("and w0, w0, w1");
+            self.pop_stack_into_backup();
+            self.write_mnemonic("and");
         }
     }
 
@@ -304,7 +317,7 @@ impl AsmGenerator for ArmGenerator {
         for (op, l6_exp) in trailing_l6_exps {
             self.push_stack();
             self.gen_l6_asm(l6_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
         }
     }
@@ -316,7 +329,7 @@ impl AsmGenerator for ArmGenerator {
         for (op, l5_exp) in trailing_l5_exps {
             self.push_stack();
             self.gen_l5_asm(l5_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             self.logical_comparison(Self::BACKUP_REGISTER, Self::PRIMARY_REGISTER, op.into());
         }
     }
@@ -328,7 +341,7 @@ impl AsmGenerator for ArmGenerator {
         for (op, l4_exp) in trailing_l4_exps {
             self.push_stack();
             self.gen_l4_asm(l4_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             match op {
                 Level5Op::BitwiseLeftShift => todo!("Codegen <<"),
                 Level5Op::BitwiseRightShift => todo!("Codegen >>"),
@@ -343,10 +356,10 @@ impl AsmGenerator for ArmGenerator {
         for (op, l3_exp) in trailing_l3_exps {
             self.push_stack();
             self.gen_l3_asm(l3_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             match op {
-                Level4Op::Addition => self.write_inst("add w0, w1, w0"),
-                Level4Op::Subtraction => self.write_inst("sub w0, w1, w0"),
+                Level4Op::Addition => self.write_mnemonic("add"),
+                Level4Op::Subtraction => self.write_mnemonic("sub"),
             }
         }
     }
@@ -358,10 +371,10 @@ impl AsmGenerator for ArmGenerator {
         for (op, l2_exp) in trailing_l2_exps {
             self.push_stack();
             self.gen_l2_asm(l2_exp);
-            self.pop_stack_into_w1();
+            self.pop_stack_into_backup();
             match op {
-                Level3Op::Multiplication => self.write_inst("mul w0, w0, w1"),
-                Level3Op::Division => self.write_inst("sdiv w0, w1, w0"),
+                Level3Op::Multiplication => self.write_mnemonic("mul"),
+                Level3Op::Division => self.write_mnemonic("sdiv"),
                 Level3Op::Remainder => todo!("Codegen %"),
             }
         }
@@ -385,7 +398,7 @@ impl AsmGenerator for ArmGenerator {
                     Level2Op::UnaryPlus => todo!("unary plus isn't a no-op, and requires getting into lvalue vs rvalue stuff"),
                     Level2Op::UnaryMinus => self.write_inst("neg  w0, w0"),
                     Level2Op::LogicalNot => {
-                        self.write_inst("cmp  w0, wzr");
+                        self.cmp_primary_with_zero();
                         self.write_inst("cset w0, eq");
                         self.write_inst("uxtb w0, w0");
                     }
@@ -416,8 +429,12 @@ impl ArmGenerator {
         self.save_to_stack(self.sp);
     }
 
-    fn pop_stack_into_w1(&mut self) {
-        self.write_inst(&format!("ldr  w1, [sp, {}]", self.sp));
+    fn pop_stack_into_backup(&mut self) {
+        self.write_inst(&format!(
+            "ldr  {}, [sp, {}]",
+            Self::BACKUP_REGISTER,
+            self.sp
+        ));
         self.sp -= 4;
     }
 
@@ -448,7 +465,7 @@ impl ArmGenerator {
 
                 // If the exp == 0, trigger the else case to minimize the jump
                 // instructions we need
-                self.write_inst("cmp  w0, wzr");
+                self.cmp_primary_with_zero();
 
                 self.write_branch_inst(Cond::Equals, else_label);
 
