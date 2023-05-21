@@ -79,13 +79,30 @@ impl Parser {
             }
             Some(Token::OpenBrace) => {
                 self.lexer.back();
-                let compound = Statement::Compound(self.parse_block_items()?);
-                Ok(compound)
+                Ok(Statement::Compound(self.parse_block_items()?))
+            }
+            Some(Token::Keyword(Keywords::While)) => {
+                self.lexer.expect_next(&Token::OpenParen)?;
+                let exp = self.parse_l15_exp()?;
+                self.lexer.expect_next(&Token::CloseParen)?;
+                let body = self.parse_statement()?;
+                Ok(Statement::While(exp, Box::new(body)))
+            }
+            Some(Token::Keyword(Keywords::Break)) => Ok(Statement::Break),
+            Some(Token::Keyword(Keywords::Continue)) => Ok(Statement::Continue),
+            Some(Token::Keyword(Keywords::Do)) => {
+                let body = self.parse_statement()?;
+                self.lexer.expect_next(&Token::Keyword(Keywords::While))?;
+                self.lexer.expect_next(&Token::OpenParen)?;
+                let exp = self.parse_l15_exp()?;
+                self.lexer.expect_next(&Token::CloseParen)?;
+                self.lexer.expect_next(&Token::Semicolon)?;
+                Ok(Statement::DoWhile(Box::new(body), exp))
             }
             _ => {
                 self.lexer.back();
 
-                let exp = Ok(Statement::Exp(self.parse_l15_exp()?));
+                let exp = Ok(Statement::Exp(Some(self.parse_l15_exp()?)));
 
                 self.lexer.expect_next(&Token::Semicolon)?;
 

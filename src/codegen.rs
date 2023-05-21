@@ -158,7 +158,11 @@ pub trait AsmGenerator {
                 // C standard states that int fns without a return value return 0 by default
                 None => self.mov_into_primary("0"),
             },
-            Statement::Exp(exp) => self.gen_l15_asm(exp),
+            Statement::Exp(exp_opt) => {
+                if let Some(exp) = exp_opt {
+                    self.gen_l15_asm(exp);
+                }
+            }
             Statement::If(exp, predicate, else_opt) => {
                 let else_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
@@ -186,6 +190,40 @@ pub trait AsmGenerator {
                 self.write_jmp_label(exit_label);
             }
             Statement::Compound(block_items) => self.gen_block_asm(block_items),
+            Statement::While(exp, stmt) => {
+                let continue_label = self.get_next_jmp_label();
+                let exit_label = self.get_next_jmp_label();
+
+                self.write_jmp_label(continue_label);
+                // Evaluate exp and store in w0
+                self.gen_l15_asm(exp);
+
+                // If the exp == 0, trigger the else case to minimize the jump
+                // instructions we need
+                self.cmp_primary_with_zero();
+
+                self.write_branch_inst(Cond::Equals, exit_label);
+
+                // Execute if the if-exp is nonzero
+                self.gen_stmt_asm(*stmt);
+                self.write_branch_inst(Cond::Always, continue_label);
+
+                self.write_jmp_label(exit_label);
+            }
+            Statement::DoWhile(stmt, exp) => {
+                let continue_label = self.get_next_jmp_label();
+
+                // DO stmt
+                self.write_jmp_label(continue_label);
+                self.gen_stmt_asm(*stmt);
+
+                // Evaluate exp and store in w0
+                self.gen_l15_asm(exp);
+
+                self.cmp_primary_with_zero();
+                self.write_branch_inst(Cond::NotEquals, continue_label);
+            }
+            _ => todo!("codegen for {stmt}"),
         }
     }
 

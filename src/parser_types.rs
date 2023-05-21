@@ -71,9 +71,13 @@ pub type Declaration = (String, Option<Level15Exp>);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Return(Option<Level15Exp>),
-    Exp(Level15Exp),
+    Exp(Option<Level15Exp>),
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
     Compound(Vec<BlockItem>),
+    While(Level15Exp, Box<Statement>),
+    DoWhile(Box<Statement>, Level15Exp),
+    Break,
+    Continue,
 }
 
 impl PrettyPrinter for Statement {
@@ -84,8 +88,10 @@ impl PrettyPrinter for Statement {
                 Some(exp) => println!("{tabs}RETVRN {exp}"),
                 None => println!("{tabs}RETVRN 0 (omitted)"),
             },
-            Statement::Exp(exp) => {
-                println!("{tabs}EXP: {exp}")
+            Statement::Exp(exp_opt) => {
+                if let Some(exp) = exp_opt {
+                    println!("{tabs}EXP: {exp}");
+                }
             }
             Statement::If(exp, pred, else_opt) => match else_opt {
                 Some(else_stmt) => {
@@ -108,6 +114,18 @@ impl PrettyPrinter for Statement {
                 }
                 println!("{tabs}}}");
             }
+            Statement::While(exp, stmt) => {
+                println!("{tabs}WHILE ({exp}) {{");
+                stmt.pretty_print(indentation_level + 1);
+                println!("{tabs}}}");
+            }
+            Statement::DoWhile(stmt, exp) => {
+                println!("{tabs}DO {{");
+                stmt.pretty_print(indentation_level + 1);
+                println!("{tabs}}} WHILE ({exp})");
+            }
+            Statement::Break => println!("{tabs}BREAK"),
+            Statement::Continue => println!("{tabs}CONTINUE"),
         }
     }
 }
@@ -119,9 +137,10 @@ impl std::fmt::Display for Statement {
                 Some(exp) => writeln!(f, "RETVRN {exp}"),
                 None => writeln!(f, "RETVRN 0 (omitted)"),
             },
-            Statement::Exp(exp) => {
-                writeln!(f, "EXP: {exp}")
-            }
+            Statement::Exp(exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "EXP: {exp}"),
+                None => writeln!(f, "NULL EXP"),
+            },
             Statement::If(exp, pred, else_opt) => match else_opt {
                 Some(else_stmt) => writeln!(
                     f,
@@ -137,6 +156,14 @@ impl std::fmt::Display for Statement {
                 writeln!(f, "}}")?;
                 Ok(())
             }
+            Statement::While(exp, stmt) => {
+                writeln!(f, "WHILE ({exp}) {{\n\t{stmt}\n}}")
+            }
+            Statement::DoWhile(exp, stmt) => {
+                writeln!(f, "DO {{\n\t{stmt}\n}} WHILE ({exp})")
+            }
+            Statement::Break => writeln!(f, "BREAK"),
+            Statement::Continue => writeln!(f, "CONTINUE"),
         }
     }
 }
@@ -145,7 +172,6 @@ impl Statement {
     pub fn has_return(&self) -> bool {
         match self {
             Statement::Return(_) => true,
-            Statement::Exp(_) => false,
             Statement::If(_, pred, else_opt) => {
                 let pred_has_ret = pred.has_return();
                 if let Some(else_stmt) = else_opt {
@@ -156,6 +182,11 @@ impl Statement {
                 }
             }
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
+            Statement::While(_, stmt) => stmt.has_return(),
+            Statement::DoWhile(stmt, _) => stmt.has_return(),
+            Statement::Exp(_) => false,
+            Statement::Break => false,
+            Statement::Continue => false,
         }
     }
 }

@@ -135,9 +135,8 @@ impl ScopedMap {
     }
 
     pub fn new_scope(&mut self) -> RustCcResult<()> {
-        // println!("new scope: {:?}", self.var_maps.last().unwrap());
         let mut new_map = self.var_maps.last().unwrap().clone();
-        for (_var, details) in &mut new_map {
+        for details in new_map.values_mut() {
             match details.state {
                 VarState::InitializedInThisScope => {
                     details.state = VarState::InitializedInOuterScope
@@ -146,7 +145,6 @@ impl ScopedMap {
                 _ => {}
             }
         }
-        // println!("NEW SCOPE: {new_map:?}");
         self.var_maps.push(new_map);
         Ok(())
     }
@@ -155,7 +153,6 @@ impl ScopedMap {
         let mut num_initialized_in_scope = 0;
         match self.var_maps.pop() {
             Some(vm) => {
-                // println!("exit scope: {vm:?}");
                 for (_var, details) in vm {
                     if details.state == VarState::InitializedInThisScope {
                         num_initialized_in_scope += 1;
