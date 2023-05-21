@@ -98,6 +98,30 @@ pub trait AsmGenerator {
         self.write_to_file(asm_filename);
     }
 
+    fn gen_var_decl_asm(&mut self, decl: Declaration) {
+        let (id, exp_opt) = decl;
+        // println!("DECL {exp_opt:?}");
+        self.increment_stack_ptr();
+        let var_loc = self.stack_ptr();
+        let sm = self.get_scoped_map_mut();
+        match exp_opt {
+            Some(exp) => {
+                sm.initialize_var(&id, var_loc)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
+                self.gen_l15_asm(exp);
+                // self.push_stack();
+                self.save_to_stack(var_loc);
+            }
+            None => {
+                sm.declare_var(&id, var_loc)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
+                self.mov_into_primary("999");
+                self.save_to_stack(var_loc);
+                // self.push_stack();
+            }
+        }
+    }
+
     fn gen_block_asm(&mut self, block_items: Vec<BlockItem>) {
         {
             self.get_scoped_map_mut()
@@ -108,27 +132,9 @@ pub trait AsmGenerator {
         for block_item in block_items {
             match block_item {
                 BlockItem::Stmt(s) => self.gen_stmt_asm(s),
-                BlockItem::Declare((identifier, exp_opt)) => {
-                    // println!("DECL {exp_opt:?}");
-                    self.increment_stack_ptr();
-                    let var_loc = self.stack_ptr();
-                    let sm = self.get_scoped_map_mut();
-                    match exp_opt {
-                        Some(exp) => {
-                            sm.initialize_var(&identifier, var_loc)
-                                .unwrap_or_else(|e| panic!("{e:?}"));
-                            self.gen_l15_asm(exp);
-                            // self.push_stack();
-                            self.save_to_stack(var_loc);
-                        }
-                        None => {
-                            sm.declare_var(&identifier, var_loc)
-                                .unwrap_or_else(|e| panic!("{e:?}"));
-                            self.mov_into_primary("999");
-                            self.save_to_stack(var_loc);
-                            // self.push_stack();
-                        }
-                    }
+                // BlockItem::Declare((identifier, exp_opt)) => {
+                BlockItem::Declare(decl) => {
+                    self.gen_var_decl_asm(decl);
                 }
             }
         }
@@ -222,6 +228,66 @@ pub trait AsmGenerator {
 
                 self.cmp_primary_with_zero();
                 self.write_branch_inst(Cond::NotEquals, continue_label);
+            }
+            Statement::For(initial_exp, controlling_exp, post_exp, body) => {
+                let continue_label = self.get_next_jmp_label();
+                let exit_label = self.get_next_jmp_label();
+
+                if let Some(exp) = initial_exp {
+                    self.gen_l15_asm(exp);
+                }
+
+                self.write_jmp_label(continue_label);
+                // Empty controlling exps evaluate to true
+                match controlling_exp {
+                    Some(exp) => self.gen_l15_asm(exp),
+                    None => self.mov_into_primary("1"),
+                };
+
+                // Skip to end if primary reg == 0
+                self.cmp_primary_with_zero();
+                self.write_branch_inst(Cond::Equals, exit_label);
+
+                // Exec stmt
+                self.gen_stmt_asm(*body);
+
+                // Eval post exp
+                if let Some(exp) = post_exp {
+                    self.gen_l15_asm(exp)
+                }
+
+                self.write_branch_inst(Cond::Always, continue_label);
+
+                self.write_jmp_label(exit_label);
+            }
+            Statement::ForDecl(decl, controlling_exp, post_exp, body) => {
+                let continue_label = self.get_next_jmp_label();
+                let exit_label = self.get_next_jmp_label();
+
+                self.gen_var_decl_asm(decl);
+
+                self.write_jmp_label(continue_label);
+                // Empty controlling exps evaluate to true
+                match controlling_exp {
+                    Some(exp) => self.gen_l15_asm(exp),
+                    None => self.mov_into_primary("1"),
+                };
+
+                // Skip to end if primary reg == 0
+                self.cmp_primary_with_zero();
+                self.write_branch_inst(Cond::Equals, exit_label);
+
+                // Exec stmt
+                self.gen_stmt_asm(*body);
+
+                // Eval post exp
+                if let Some(exp) = post_exp {
+                    self.gen_l15_asm(exp)
+                }
+
+                self.write_branch_inst(Cond::Always, continue_label);
+
+                self.write_jmp_label(exit_label);
             }
             _ => todo!("codegen for {stmt}"),
         }

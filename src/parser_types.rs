@@ -74,6 +74,18 @@ pub enum Statement {
     Exp(Option<Level15Exp>),
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
     Compound(Vec<BlockItem>),
+    For(
+        Option<Level15Exp>,
+        Option<Level15Exp>,
+        Option<Level15Exp>,
+        Box<Statement>,
+    ),
+    ForDecl(
+        Declaration,
+        Option<Level15Exp>,
+        Option<Level15Exp>,
+        Box<Statement>,
+    ),
     While(Level15Exp, Box<Statement>),
     DoWhile(Box<Statement>, Level15Exp),
     Break,
@@ -126,6 +138,45 @@ impl PrettyPrinter for Statement {
             }
             Statement::Break => println!("{tabs}BREAK"),
             Statement::Continue => println!("{tabs}CONTINUE"),
+            Statement::For(exp1, exp2, exp3, body) => {
+                print!("{tabs}FOR (");
+                if let Some(exp) = exp1 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp2 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp3 {
+                    print!("{exp};");
+                }
+
+                println!(") {{");
+                body.pretty_print(indentation_level + 1);
+                println!("{tabs}}}")
+            }
+            Statement::ForDecl(decl, exp2, exp3, body) => {
+                print!("{tabs}FOR ({} = ...; ", decl.0,);
+
+                if let Some(exp) = exp2 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp3 {
+                    print!("{exp}");
+                }
+
+                println!(") {{");
+                body.pretty_print(indentation_level + 1);
+                println!("{tabs}}}")
+            }
         }
     }
 }
@@ -156,6 +207,12 @@ impl std::fmt::Display for Statement {
                 writeln!(f, "}}")?;
                 Ok(())
             }
+            Statement::For(..) => {
+                writeln!(f, "FOR todo")
+            }
+            Statement::ForDecl(..) => {
+                writeln!(f, "FORDecl todo")
+            }
             Statement::While(exp, stmt) => {
                 writeln!(f, "WHILE ({exp}) {{\n\t{stmt}\n}}")
             }
@@ -182,6 +239,8 @@ impl Statement {
                 }
             }
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
+            Statement::For(_, _, _, stmt) => stmt.has_return(),
+            Statement::ForDecl(_, _, _, stmt) => stmt.has_return(),
             Statement::While(_, stmt) => stmt.has_return(),
             Statement::DoWhile(stmt, _) => stmt.has_return(),
             Statement::Exp(_) => false,

@@ -81,6 +81,57 @@ impl Parser {
                 self.lexer.back();
                 Ok(Statement::Compound(self.parse_block_items()?))
             }
+            Some(Token::Keyword(Keywords::For)) => {
+                self.lexer.expect_next(&Token::OpenParen)?;
+                let mut decl = None;
+                let mut init_exp = None;
+                if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+                    let Some(Token::Identifier(id)) = self.lexer.peek() else {
+                        panic!("decl without identifier");
+                    };
+                    // XXX: can we just declare and not init a var in the init exp?
+                    decl = Some((id, Some(self.parse_l15_exp()?)));
+                    self.lexer.expect_next(&Token::Semicolon)?;
+                } else {
+                    if !self.lexer.advance_if_match(&Token::Semicolon) {
+                        let exp = self.parse_l15_exp()?;
+                        self.lexer.expect_next(&Token::Semicolon)?;
+                        init_exp = Some(exp);
+                    };
+                }
+
+                let controlling_exp = if self.lexer.advance_if_match(&Token::Semicolon) {
+                    None
+                } else {
+                    let exp = self.parse_l15_exp()?;
+                    self.lexer.expect_next(&Token::Semicolon)?;
+                    Some(exp)
+                };
+
+                let post_exp = if self.lexer.advance_if_match(&Token::CloseParen) {
+                    None
+                } else {
+                    let exp = self.parse_l15_exp()?;
+                    self.lexer.expect_next(&Token::CloseParen)?;
+                    Some(exp)
+                };
+
+                let body = self.parse_statement()?;
+                match decl {
+                    Some(d) => Ok(Statement::ForDecl(
+                        d,
+                        controlling_exp,
+                        post_exp,
+                        Box::new(body),
+                    )),
+                    None => Ok(Statement::For(
+                        init_exp,
+                        controlling_exp,
+                        post_exp,
+                        Box::new(body),
+                    )),
+                }
+            }
             Some(Token::Keyword(Keywords::While)) => {
                 self.lexer.expect_next(&Token::OpenParen)?;
                 let exp = self.parse_l15_exp()?;
@@ -88,8 +139,14 @@ impl Parser {
                 let body = self.parse_statement()?;
                 Ok(Statement::While(exp, Box::new(body)))
             }
-            Some(Token::Keyword(Keywords::Break)) => Ok(Statement::Break),
-            Some(Token::Keyword(Keywords::Continue)) => Ok(Statement::Continue),
+            Some(Token::Keyword(Keywords::Break)) => {
+                self.lexer.expect_next(&Token::Semicolon)?;
+                Ok(Statement::Break)
+            }
+            Some(Token::Keyword(Keywords::Continue)) => {
+                self.lexer.expect_next(&Token::Semicolon)?;
+                Ok(Statement::Continue)
+            }
             Some(Token::Keyword(Keywords::Do)) => {
                 let body = self.parse_statement()?;
                 self.lexer.expect_next(&Token::Keyword(Keywords::While))?;
@@ -99,6 +156,7 @@ impl Parser {
                 self.lexer.expect_next(&Token::Semicolon)?;
                 Ok(Statement::DoWhile(Box::new(body), exp))
             }
+            Some(Token::Semicolon) => Ok(Statement::Exp(None)),
             _ => {
                 self.lexer.back();
 
