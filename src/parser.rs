@@ -48,6 +48,8 @@ impl Parser {
             block_items.push(BlockItem::Stmt(Statement::Return(None)))
         }
 
+        assert!(self.lexer.peek().is_none());
+
         Ok(Function::Fun(identifier, block_items))
     }
 
@@ -69,17 +71,15 @@ impl Parser {
                     let else_stmt = self.parse_statement()?;
                     let if_stmt =
                         Statement::If(exp, Box::new(pred_stmt), Some(Box::new(else_stmt)));
-                    // self.lexer.expect_next(&Token::CloseBrace)?;
                     Ok(if_stmt)
                 } else {
                     let if_stmt = Statement::If(exp, Box::new(pred_stmt), None);
-                    // self.lexer.expect_next(&Token::CloseBrace)?;
                     Ok(if_stmt)
                 }
             }
             Some(Token::OpenBrace) => {
+                self.lexer.back();
                 let compound = Statement::Compound(self.parse_block_items()?);
-                // self.lexer.advance_if_match(&Token::CloseBrace);
                 Ok(compound)
             }
             _ => {
@@ -95,9 +95,10 @@ impl Parser {
     }
 
     fn parse_block_items(&mut self) -> RustCcResult<Vec<BlockItem>> {
+        self.lexer.expect_next(&Token::OpenBrace)?;
         let mut block_items = vec![];
-        while let Some(_) = self.lexer.peek() {
-            if self.lexer.advance_if_match(&Token::CloseBrace) {
+        while let Some(tok) = self.lexer.peek() {
+            if tok == Token::CloseBrace {
                 break;
             }
 
@@ -123,6 +124,8 @@ impl Parser {
             };
             block_items.push(block_item);
         }
+
+        self.lexer.expect_next(&Token::CloseBrace)?;
         Ok(block_items)
     }
 
@@ -172,9 +175,10 @@ impl Parser {
     }
 
     fn parse_l2_exp(&mut self) -> RustCcResult<Level2Exp> {
-        let tok = self.lexer.next_token().unwrap();
-        // let tok = self.lexer.next_token()
-        //    .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+        let tok = self
+            .lexer
+            .next_token()
+            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
 
         let l2_exp = match tok {
             Token::OpenParen => {
