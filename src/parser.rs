@@ -55,6 +55,7 @@ impl Parser {
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
         match self.lexer.next_token() {
+            // RETURN <exp> ";"
             Some(Token::Keyword(Keywords::Return)) => {
                 let exp = self.parse_l15_exp()?;
 
@@ -69,15 +70,19 @@ impl Parser {
 
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Else)) {
                     let else_stmt = self.parse_statement()?;
-                    let if_stmt =
-                        Statement::If(exp, Box::new(pred_stmt), Some(Box::new(else_stmt)));
-                    Ok(if_stmt)
+                    Ok(Statement::If(
+                        exp,
+                        Box::new(pred_stmt),
+                        Some(Box::new(else_stmt)),
+                    ))
                 } else {
-                    let if_stmt = Statement::If(exp, Box::new(pred_stmt), None);
-                    Ok(if_stmt)
+                    Ok(Statement::If(exp, Box::new(pred_stmt), None))
                 }
             }
             Some(Token::OpenBrace) => {
+                // Move lexer back so that parse_block_items() is the only thing enforcing
+                // bracket rules. Otherwise the responsibility for bracket parsing is distributed
+                // all over the place and it's a pain to debug if something goes wrong.
                 self.lexer.back();
                 Ok(Statement::Compound(self.parse_block_items()?))
             }
@@ -90,6 +95,7 @@ impl Parser {
                         panic!("decl without identifier");
                     };
                     // XXX: can we just declare and not init a var in the init exp?
+                    // I think that the Expression type doesn't do empty exps for now.
                     decl = Some((id, Some(self.parse_l15_exp()?)));
                     self.lexer.expect_next(&Token::Semicolon)?;
                 } else {
@@ -132,6 +138,7 @@ impl Parser {
                     )),
                 }
             }
+            // WHILE "(" <exp> ")" <statement>
             Some(Token::Keyword(Keywords::While)) => {
                 self.lexer.expect_next(&Token::OpenParen)?;
                 let exp = self.parse_l15_exp()?;
@@ -139,14 +146,17 @@ impl Parser {
                 let body = self.parse_statement()?;
                 Ok(Statement::While(exp, Box::new(body)))
             }
+            // BREAK ";"
             Some(Token::Keyword(Keywords::Break)) => {
                 self.lexer.expect_next(&Token::Semicolon)?;
                 Ok(Statement::Break)
             }
+            // CONTINUE ";"
             Some(Token::Keyword(Keywords::Continue)) => {
                 self.lexer.expect_next(&Token::Semicolon)?;
                 Ok(Statement::Continue)
             }
+            // DO <statement> WHILE "(" <exp> ")" ";"
             Some(Token::Keyword(Keywords::Do)) => {
                 let body = self.parse_statement()?;
                 self.lexer.expect_next(&Token::Keyword(Keywords::While))?;

@@ -75,6 +75,10 @@ pub trait AsmGenerator {
     fn write_jmp_label(&mut self, lbl: usize) {
         self.write_to_buffer(format!(".L{lbl}:"));
     }
+    fn get_break_stack(&self) -> &Vec<usize>;
+    fn get_break_stack_mut(&mut self) -> &mut Vec<usize>;
+    fn get_continue_stack(&self) -> &Vec<usize>;
+    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize>;
 
     fn cmp_primary_with_zero(&mut self) {
         self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
@@ -100,7 +104,6 @@ pub trait AsmGenerator {
 
     fn gen_var_decl_asm(&mut self, decl: Declaration) {
         let (id, exp_opt) = decl;
-        // println!("DECL {exp_opt:?}");
         self.increment_stack_ptr();
         let var_loc = self.stack_ptr();
         let sm = self.get_scoped_map_mut();
@@ -109,7 +112,6 @@ pub trait AsmGenerator {
                 sm.initialize_var(&id, var_loc)
                     .unwrap_or_else(|e| panic!("{e:?}"));
                 self.gen_l15_asm(exp);
-                // self.push_stack();
                 self.save_to_stack(var_loc);
             }
             None => {
@@ -117,7 +119,6 @@ pub trait AsmGenerator {
                     .unwrap_or_else(|e| panic!("{e:?}"));
                 self.mov_into_primary("999");
                 self.save_to_stack(var_loc);
-                // self.push_stack();
             }
         }
     }
@@ -132,10 +133,7 @@ pub trait AsmGenerator {
         for block_item in block_items {
             match block_item {
                 BlockItem::Stmt(s) => self.gen_stmt_asm(s),
-                // BlockItem::Declare((identifier, exp_opt)) => {
-                BlockItem::Declare(decl) => {
-                    self.gen_var_decl_asm(decl);
-                }
+                BlockItem::Declare(decl) => self.gen_var_decl_asm(decl),
             }
         }
 
@@ -144,8 +142,6 @@ pub trait AsmGenerator {
                 .get_scoped_map_mut()
                 .exit_scope()
                 .unwrap_or_else(|e| panic!("{e:?}"));
-
-            // println!("dealloc {variables_to_deallocate}");
 
             for _ in 0..variables_to_deallocate {
                 self.decrement_stack_ptr();
@@ -200,6 +196,9 @@ pub trait AsmGenerator {
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
+                self.get_continue_stack_mut().push(continue_label);
+                self.get_break_stack_mut().push(exit_label);
+
                 self.write_jmp_label(continue_label);
                 // Evaluate exp and store in w0
                 self.gen_l15_asm(exp);
@@ -218,6 +217,10 @@ pub trait AsmGenerator {
             }
             Statement::DoWhile(stmt, exp) => {
                 let continue_label = self.get_next_jmp_label();
+                let exit_label = self.get_next_jmp_label();
+
+                self.get_continue_stack_mut().push(continue_label);
+                self.get_break_stack_mut().push(exit_label);
 
                 // DO stmt
                 self.write_jmp_label(continue_label);
@@ -228,10 +231,14 @@ pub trait AsmGenerator {
 
                 self.cmp_primary_with_zero();
                 self.write_branch_inst(Cond::NotEquals, continue_label);
+                self.write_jmp_label(exit_label);
             }
             Statement::For(initial_exp, controlling_exp, post_exp, body) => {
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
+
+                self.get_continue_stack_mut().push(continue_label);
+                self.get_break_stack_mut().push(exit_label);
 
                 if let Some(exp) = initial_exp {
                     self.gen_l15_asm(exp);
@@ -261,12 +268,17 @@ pub trait AsmGenerator {
                 self.write_jmp_label(exit_label);
             }
             Statement::ForDecl(decl, controlling_exp, post_exp, body) => {
+                let start_label = self.get_next_jmp_label();
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
+                self.get_continue_stack_mut().push(continue_label);
+                self.get_break_stack_mut().push(exit_label);
+
                 self.gen_var_decl_asm(decl);
 
-                self.write_jmp_label(continue_label);
+                self.write_jmp_label(start_label);
+
                 // Empty controlling exps evaluate to true
                 match controlling_exp {
                     Some(exp) => self.gen_l15_asm(exp),
@@ -280,16 +292,25 @@ pub trait AsmGenerator {
                 // Exec stmt
                 self.gen_stmt_asm(*body);
 
+                self.write_jmp_label(continue_label);
+
                 // Eval post exp
                 if let Some(exp) = post_exp {
                     self.gen_l15_asm(exp)
                 }
 
-                self.write_branch_inst(Cond::Always, continue_label);
+                self.write_branch_inst(Cond::Always, start_label);
 
                 self.write_jmp_label(exit_label);
             }
-            _ => todo!("codegen for {stmt}"),
+            Statement::Break => {
+                let break_label = self.get_break_stack().last().unwrap();
+                self.write_branch_inst(Cond::Always, *break_label);
+            }
+            Statement::Continue => {
+                let continue_label = self.get_continue_stack().last().unwrap();
+                self.write_branch_inst(Cond::Always, *continue_label);
+            }
         }
     }
 

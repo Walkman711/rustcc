@@ -10,6 +10,8 @@ pub struct ArmGenerator {
     scoped_map: ScopedMap,
     buffer: Vec<String>,
     arch: Arch,
+    break_stack: Vec<usize>,
+    continue_stack: Vec<usize>,
 }
 
 impl Default for ArmGenerator {
@@ -20,6 +22,8 @@ impl Default for ArmGenerator {
             scoped_map: ScopedMap::default(),
             buffer: vec![],
             arch: Arch::ARM,
+            break_stack: vec![],
+            continue_stack: vec![],
         }
     }
 }
@@ -117,5 +121,21 @@ impl AsmGenerator for ArmGenerator {
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
         self.write_inst(&format!("b{} .L{lbl}", cond.for_arch(self.get_arch())));
+    }
+
+    fn get_break_stack(&self) -> &Vec<usize> {
+        &self.break_stack
+    }
+
+    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.break_stack
+    }
+
+    fn get_continue_stack(&self) -> &Vec<usize> {
+        &self.continue_stack
+    }
+
+    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.continue_stack
     }
 }

@@ -12,6 +12,8 @@ pub struct x86Generator {
     buffer: Vec<String>,
     arch: Arch,
     scoped_map: ScopedMap,
+    break_stack: Vec<usize>,
+    continue_stack: Vec<usize>,
 }
 
 impl Default for x86Generator {
@@ -22,6 +24,8 @@ impl Default for x86Generator {
             buffer: vec![],
             arch: Arch::x86,
             scoped_map: ScopedMap::default(),
+            break_stack: vec![],
+            continue_stack: vec![],
         }
     }
 }
@@ -123,5 +127,21 @@ impl AsmGenerator for x86Generator {
     fn write_branch_inst(&mut self, _cond: Cond, _lbl: usize) {
         self.write_inst("BRANCH INST")
         // self.write_inst(&format!("b{cond} .L{lbl}"));
+    }
+
+    fn get_break_stack(&self) -> &Vec<usize> {
+        &self.break_stack
+    }
+
+    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.break_stack
+    }
+
+    fn get_continue_stack(&self) -> &Vec<usize> {
+        &self.continue_stack
+    }
+
+    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.continue_stack
     }
 }
