@@ -88,6 +88,8 @@ pub trait AsmGenerator {
         self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
     }
 
+    fn gen_remainder_inst(&mut self);
+
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) {
         match prog {
             Program::Func(func) => match func {
@@ -441,7 +443,23 @@ pub trait AsmGenerator {
     gen_level_asm!(gen_l6_asm, Level6Exp, gen_l5_asm, logical_comparison);
     gen_level_asm!(gen_l5_asm, Level5Exp, gen_l4_asm, write_mnemonic);
     gen_level_asm!(gen_l4_asm, Level4Exp, gen_l3_asm, write_mnemonic);
-    gen_level_asm!(gen_l3_asm, Level3Exp, gen_l2_asm, write_mnemonic);
+    // gen_level_asm!(gen_l3_asm, Level3Exp, gen_l2_asm, write_mnemonic);
+
+    fn gen_l3_asm(&mut self, l3: Level3Exp) {
+        let (first_lower_level_exp, trailing_lower_level_exps) = l3.0;
+        self.gen_l2_asm(first_lower_level_exp);
+
+        for (op, lower_level_exp) in trailing_lower_level_exps {
+            self.push_stack();
+            self.gen_l2_asm(lower_level_exp);
+            self.pop_stack_into_backup();
+            match op {
+                Level3Op::Multiplication => self.write_mnemonic(Mnemonic::Multiply),
+                Level3Op::Division => self.write_mnemonic(Mnemonic::Divide),
+                Level3Op::Remainder => self.gen_remainder_inst(),
+            }
+        }
+    }
 
     fn gen_l2_asm(&mut self, l2: Level2Exp) {
         match l2 {

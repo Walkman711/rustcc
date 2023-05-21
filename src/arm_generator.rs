@@ -138,4 +138,16 @@ impl AsmGenerator for ArmGenerator {
     fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
         &mut self.continue_stack
     }
+
+    fn gen_remainder_inst(&mut self) {
+        // 3 % 2
+        // w0 3
+        // push
+        // w0 2
+        // w1 3
+        // w2 1
+        self.write_inst("sdiv w2, w1, w0");
+        self.write_inst("mul w0, w2, w0");
+        self.write_inst("sub w0, w1, w0")
+    }
 }

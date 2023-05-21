@@ -144,4 +144,8 @@ impl AsmGenerator for x86Generator {
     fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
         &mut self.continue_stack
     }
+
+    fn gen_remainder_inst(&mut self) {
+        todo!()
+    }
 }

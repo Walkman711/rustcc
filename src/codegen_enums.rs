@@ -19,6 +19,7 @@ pub enum Mnemonic {
     Divide,
     Neg,
     BitwiseNot,
+    Mod,
 }
 
 impl Mnemonic {
@@ -36,6 +37,7 @@ impl Mnemonic {
                 Mnemonic::Divide => "idiv",
                 Mnemonic::Neg => "neg",
                 Mnemonic::BitwiseNot => "not",
+                Mnemonic::Mod => todo!(),
             },
             Arch::ARM => match self {
                 Mnemonic::Or => "orr",
@@ -49,6 +51,7 @@ impl Mnemonic {
                 Mnemonic::Divide => "sdiv",
                 Mnemonic::Neg => "neg",
                 Mnemonic::BitwiseNot => "mvn",
+                Mnemonic::Mod => todo!(),
             },
         }
     }
@@ -95,7 +98,7 @@ impl From<Level3Op> for Mnemonic {
         match value {
             Level3Op::Multiplication => Mnemonic::Multiply,
             Level3Op::Division => Mnemonic::Divide,
-            Level3Op::Remainder => todo!(),
+            Level3Op::Remainder => Mnemonic::Mod,
         }
     }
 }
