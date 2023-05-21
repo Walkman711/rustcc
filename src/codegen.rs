@@ -5,7 +5,7 @@ use crate::{
     gen_level_asm,
     ops::*,
     parser_types::*,
-    utils::ScopedMap,
+    utils::{RustCcResult, ScopedMap},
 };
 
 pub trait AsmGenerator {
@@ -91,15 +91,24 @@ pub trait AsmGenerator {
     fn gen_remainder_inst(&mut self);
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) {
-        match prog {
-            Program::Func(func) => match func {
-                Function::Fun(identifier, block_items) => {
+        for function in prog.0 {
+            match function {
+                Function::Fun(identifier, params, block_items) => {
                     self.fn_prologue(&identifier);
+                    let mut var_loc = self.stack_ptr();
+                    let sm = self.get_scoped_map_mut();
+                    // TODO: this is blatantly broken, but i want to see if this gets us closer to
+                    // handling function declarations
+                    for param in params {
+                        sm.initialize_var(&param, var_loc).unwrap();
+                        // var_loc -= 4;
+                    }
+
                     self.gen_block_asm(block_items);
                     self.ret();
                 }
-            },
-        };
+            }
+        }
 
         self.write_to_file(asm_filename);
     }
@@ -243,13 +252,13 @@ pub trait AsmGenerator {
                 self.get_break_stack_mut().push(exit_label);
 
                 if let Some(exp) = initial_exp {
-                    self.gen_l15_asm(exp);
+                    self.gen_l15_asm(exp).unwrap();
                 }
 
                 self.write_jmp_label(continue_label);
                 // Empty controlling exps evaluate to true
                 match controlling_exp {
-                    Some(exp) => self.gen_l15_asm(exp),
+                    Some(exp) => self.gen_l15_asm(exp).unwrap(),
                     None => self.mov_into_primary("1"),
                 };
 
@@ -262,7 +271,7 @@ pub trait AsmGenerator {
 
                 // Eval post exp
                 if let Some(exp) = post_exp {
-                    self.gen_l15_asm(exp)
+                    self.gen_l15_asm(exp).unwrap();
                 }
 
                 self.write_branch_inst(Cond::Always, continue_label);
@@ -288,7 +297,7 @@ pub trait AsmGenerator {
 
                 // Empty controlling exps evaluate to true
                 match controlling_exp {
-                    Some(exp) => self.gen_l15_asm(exp),
+                    Some(exp) => self.gen_l15_asm(exp).unwrap(),
                     None => self.mov_into_primary("1"),
                 };
 
@@ -303,7 +312,7 @@ pub trait AsmGenerator {
 
                 // Eval post exp
                 if let Some(exp) = post_exp {
-                    self.gen_l15_asm(exp)
+                    self.gen_l15_asm(exp).unwrap();
                 }
 
                 self.write_branch_inst(Cond::Always, start_label);
@@ -331,7 +340,7 @@ pub trait AsmGenerator {
         }
     }
 
-    fn gen_l15_asm(&mut self, l15: Level15Exp) {
+    fn gen_l15_asm(&mut self, l15: Level15Exp) -> RustCcResult<()> {
         let (first_l14_exp, trailing_l14_exps) = l15.0;
         self.gen_l14_asm(first_l14_exp);
 
@@ -343,9 +352,11 @@ pub trait AsmGenerator {
                 Level15Op::Comma => todo!("codegen ,"),
             }
         }
+
+        Ok(())
     }
 
-    fn gen_l14_asm(&mut self, l14: Level14Exp) {
+    fn gen_l14_asm(&mut self, l14: Level14Exp) -> RustCcResult<()> {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
                 // println!("ASSIGN {identifier} = {l15_exp}");
@@ -354,16 +365,18 @@ pub trait AsmGenerator {
                 let var_loc = sm
                     .assign_var(&identifier)
                     .unwrap_or_else(|e| panic!("{e:?}"));
-                self.gen_l15_asm(*l15_exp);
+                self.gen_l15_asm(*l15_exp)?;
                 self.save_to_stack(var_loc);
             }
             Level14Exp::NonAssignment(l13_exp) => {
-                self.gen_l13_asm(l13_exp);
+                self.gen_l13_asm(l13_exp)?;
             }
         }
+
+        Ok(())
     }
 
-    fn gen_l13_asm(&mut self, l13: Level13Exp) {
+    fn gen_l13_asm(&mut self, l13: Level13Exp) -> RustCcResult<()> {
         match l13 {
             Level13Exp::Ternary(exp, pred_exp, else_exp) => {
                 let else_label = self.get_next_jmp_label();
@@ -386,11 +399,13 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
             }
-            Level13Exp::NoTernary(l12) => self.gen_l12_asm(l12),
+            Level13Exp::NoTernary(l12) => self.gen_l12_asm(l12)?,
         }
+
+        Ok(())
     }
 
-    fn gen_l12_asm(&mut self, l12: Level12Exp) {
+    fn gen_l12_asm(&mut self, l12: Level12Exp) -> RustCcResult<()> {
         let short_circuit_label = self.get_next_jmp_label();
         let exit_label = self.get_next_jmp_label();
 
@@ -418,22 +433,24 @@ pub trait AsmGenerator {
 
             self.write_jmp_label(exit_label);
         }
+
+        Ok(())
     }
 
-    fn gen_l11_asm(&mut self, l11: Level11Exp) {
+    fn gen_l11_asm(&mut self, l11: Level11Exp) -> RustCcResult<()> {
         let short_circuit_label = self.get_next_jmp_label();
         let success_label = self.get_next_jmp_label();
 
         let (first_l10_exp, trailing_l10_exps) = l11.0;
         let print_jmp_insts = !trailing_l10_exps.is_empty();
 
-        self.gen_l10_asm(first_l10_exp);
+        self.gen_l10_asm(first_l10_exp)?;
 
         for (_op, l10_exp) in trailing_l10_exps {
             self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::Equals, short_circuit_label);
 
-            self.gen_l10_asm(l10_exp);
+            self.gen_l10_asm(l10_exp)?;
         }
 
         if print_jmp_insts {
@@ -449,6 +466,8 @@ pub trait AsmGenerator {
 
             self.write_jmp_label(success_label);
         }
+
+        Ok(())
     }
 
     gen_level_asm!(gen_l10_asm, Level10Exp, gen_l9_asm, write_mnemonic);
@@ -459,13 +478,13 @@ pub trait AsmGenerator {
     gen_level_asm!(gen_l5_asm, Level5Exp, gen_l4_asm, write_mnemonic);
     gen_level_asm!(gen_l4_asm, Level4Exp, gen_l3_asm, write_mnemonic);
 
-    fn gen_l3_asm(&mut self, l3: Level3Exp) {
+    fn gen_l3_asm(&mut self, l3: Level3Exp) -> RustCcResult<()> {
         let (first_lower_level_exp, trailing_lower_level_exps) = l3.0;
-        self.gen_l2_asm(first_lower_level_exp);
+        self.gen_l2_asm(first_lower_level_exp)?;
 
         for (op, lower_level_exp) in trailing_lower_level_exps {
             self.push_stack();
-            self.gen_l2_asm(lower_level_exp);
+            self.gen_l2_asm(lower_level_exp)?;
             self.pop_stack_into_backup();
             match op {
                 Level3Op::Multiplication => self.write_mnemonic(Mnemonic::Multiply),
@@ -473,18 +492,20 @@ pub trait AsmGenerator {
                 Level3Op::Remainder => self.gen_remainder_inst(),
             }
         }
+
+        Ok(())
     }
 
-    fn gen_l2_asm(&mut self, l2: Level2Exp) {
+    fn gen_l2_asm(&mut self, l2: Level2Exp) -> RustCcResult<()> {
         match l2 {
             Level2Exp::Const(u) => self.mov_into_primary(&u.to_string()),
             Level2Exp::Var(identifier) => {
                 let sm = self.get_scoped_map_mut();
-                let var_details = sm.get_var(&identifier).unwrap_or_else(|e| panic!("{e:?}"));
+                let var_details = sm.get_var(&identifier)?;
                 self.load_from_stack(Self::PRIMARY_REGISTER, var_details.stack_offset);
             }
             Level2Exp::Unary(op, factor) => {
-                self.gen_l2_asm(*factor);
+                self.gen_l2_asm(*factor)?;
                 match op {
                     Level2Op::UnaryMinus => self.write_unary_inst(Mnemonic::Neg),
                     Level2Op::LogicalNot => self.logical_not(),
@@ -492,24 +513,35 @@ pub trait AsmGenerator {
                     _ => todo!("{op} is unimplemented for now"),
                 }
             }
-            Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp),
+            Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp)?,
+            Level2Exp::FunctionCall(fun_name, params) => {
+                for param in params {
+                    self.gen_l15_asm(param)?;
+                    self.push_stack();
+                }
+                self.write_inst(&format!("call _{fun_name}"));
+                // todo!()
+            }
         }
+        Ok(())
     }
 }
 
 #[macro_export]
 macro_rules! gen_level_asm {
     ($fn_name: ident, $t: ty, $next_fn: ident, $inst_fn: ident) => {
-        fn $fn_name(&mut self, exp: $t) {
+        fn $fn_name(&mut self, exp: $t) -> RustCcResult<()> {
             let (first_lower_level_exp, trailing_lower_level_exps) = exp.0;
-            self.$next_fn(first_lower_level_exp);
+            self.$next_fn(first_lower_level_exp)?;
 
             for (op, lower_level_exp) in trailing_lower_level_exps {
                 self.push_stack();
-                self.$next_fn(lower_level_exp);
+                self.$next_fn(lower_level_exp)?;
                 self.pop_stack_into_backup();
                 self.$inst_fn(op.into());
             }
+
+            Ok(())
         }
     };
 }

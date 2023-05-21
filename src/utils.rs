@@ -14,6 +14,8 @@ pub enum RustCcError {
     ParseError(#[from] ParseError),
     #[error("Scope Error: {0}")]
     ScopeError(#[from] ScopeError),
+    #[error("Codegen Error: {0}")]
+    CodegenError(#[from] CodegenError),
 }
 
 #[derive(Debug, Error)]
@@ -37,6 +39,9 @@ pub enum ScopeError {
     #[error("`{0}` is not declared in this scope")]
     Undeclared(String),
 }
+
+#[derive(Debug, Error)]
+pub enum CodegenError {}
 
 pub type RustCcResult<T> = Result<T, RustCcError>;
 

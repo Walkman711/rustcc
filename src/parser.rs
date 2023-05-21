@@ -20,8 +20,12 @@ impl Parser {
 
 impl Parser {
     pub fn parse(&mut self) -> RustCcResult<Program> {
-        let function = self.parse_fn()?;
-        Ok(Program::Func(function))
+        let mut functions = vec![];
+        while let Some(_) = self.lexer.peek() {
+            let function = self.parse_fn()?;
+            functions.push(function);
+        }
+        Ok(Program(functions))
     }
 
     fn parse_fn(&mut self) -> RustCcResult<Function> {
@@ -38,8 +42,18 @@ impl Parser {
                     Token::Identifier("any function name".to_string()), tok)));
         };
 
+        // println!("fn name: {identifier}");
+
+        let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
+        while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+            let Some(Token::Identifier(param)) = self.lexer.next_token() else {
+                panic!("bad param");
+            };
+            params.push(param);
+        }
         self.lexer.expect_next(&Token::CloseParen)?;
+        // println!("fn params: {params:?}");
 
         let mut block_items = self.parse_block_items()?;
 
@@ -48,9 +62,7 @@ impl Parser {
             block_items.push(BlockItem::Stmt(Statement::Return(None)))
         }
 
-        assert!(self.lexer.peek().is_none());
-
-        Ok(Function::Fun(identifier, block_items))
+        Ok(Function::Fun(identifier, params, block_items))
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
@@ -272,7 +284,24 @@ impl Parser {
                 f
             }
             Token::Integer(u) => Level2Exp::Const(u),
-            Token::Identifier(id) => Level2Exp::Var(id),
+            Token::Identifier(id) => {
+                if self.lexer.advance_if_match(&Token::OpenParen) {
+                    let mut params = vec![];
+                    while let Some(tok) = self.lexer.peek() {
+                        if tok == Token::CloseParen {
+                            break;
+                        }
+
+                        let exp = self.parse_l15_exp()?;
+                        params.push(exp);
+                        self.lexer.advance_if_match(&Token::Comma);
+                    }
+                    self.lexer.expect_next(&Token::CloseParen)?;
+                    Level2Exp::FunctionCall(id, params)
+                } else {
+                    Level2Exp::Var(id)
+                }
+            }
             Token::Plus => Level2Exp::Unary(Level2Op::UnaryPlus, Box::new(self.parse_l2_exp()?)),
             Token::Minus => Level2Exp::Unary(Level2Op::UnaryMinus, Box::new(self.parse_l2_exp()?)),
             Token::ExclamationPoint => {

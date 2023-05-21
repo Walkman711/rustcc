@@ -1,45 +1,46 @@
 use crate::{define_exp_level, ops::*};
 
-#[derive(Clone, Debug)]
-pub enum Program {
-    Func(Function),
-}
-
 pub trait PrettyPrinter {
     fn pretty_print(&self, indentation_level: usize);
 }
+
+pub struct Program(pub Vec<Function>);
 
 impl PrettyPrinter for Program {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         println!("{tabs}PROGRAM");
-        match self {
-            Program::Func(function) => {
-                function.pretty_print(indentation_level + 1);
-            }
+        for function in &self.0 {
+            function.pretty_print(indentation_level + 1);
         }
     }
 }
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Program::Func(function) => writeln!(f, "{function}"),
+        for function in &self.0 {
+            writeln!(f, "{function}")?;
         }
+        Ok(())
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum Function {
-    Fun(String, Vec<BlockItem>),
+    Fun(String, Vec<String>, Vec<BlockItem>),
 }
 
 impl PrettyPrinter for Function {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         match self {
-            Function::Fun(func_name, block_items) => {
-                println!("{tabs}FUNCTION: {func_name}()");
+            Function::Fun(func_name, params, block_items) => {
+                print!("{tabs}FUNCTION: {func_name}(");
+
+                for param in params {
+                    print!("{param}, ")
+                }
+                print!(")\n");
                 println!("{tabs}{{");
                 for block_item in block_items {
                     block_item.pretty_print(indentation_level + 1);
@@ -53,8 +54,8 @@ impl PrettyPrinter for Function {
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Function::Fun(func_name, block_items) => {
-                writeln!(f, "FUNCTION: {func_name}()")?;
+            Function::Fun(func_name, params, block_items) => {
+                writeln!(f, "FUNCTION: {func_name}({params:?})")?;
                 writeln!(f, "{{")?;
                 for block_item in block_items {
                     write!(f, "{block_item}")?;
@@ -336,6 +337,8 @@ impl std::fmt::Display for Level13Exp {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Level2Exp {
+    // TODO: this is wrong, it's level 1, but how to write that?
+    FunctionCall(String, Vec<Level15Exp>),
     Const(u64),
     Var(String),
     Unary(Level2Op, Box<Level2Exp>),
@@ -349,6 +352,14 @@ impl std::fmt::Display for Level2Exp {
             Level2Exp::Var(v) => write!(f, "{v}"),
             Level2Exp::Unary(op, exp) => write!(f, "{op} {exp}"),
             Level2Exp::ParenExp(exp) => write!(f, "{exp}"),
+            Level2Exp::FunctionCall(fun_name, args) => {
+                write!(f, "{fun_name} (")?;
+                for arg in args {
+                    write!(f, "{arg}, ")?;
+                }
+                write!(f, ")")?;
+                Ok(())
+            }
         }
     }
 }
