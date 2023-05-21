@@ -41,15 +41,11 @@ impl Parser {
         self.lexer.expect_next(&Token::OpenParen)?;
         self.lexer.expect_next(&Token::CloseParen)?;
 
-        let mut block_items = vec![];
-        while let Some(Token::OpenBrace) = self.lexer.peek() {
-            let mut curr_block = self.parse_block_items()?;
-            self.lexer.expect_next(&Token::CloseBrace)?;
-            block_items.append(&mut curr_block);
-        }
+        let mut block_items = self.parse_block_items()?;
 
-        if !block_items.iter().any(|bi| bi.has_return()) {
-            block_items.push(BlockItem::Stmt(Statement::Return(None)));
+        let need_to_add_return = !block_items.iter().any(|bi| bi.has_return());
+        if need_to_add_return {
+            block_items.push(BlockItem::Stmt(Statement::Return(None)))
         }
 
         Ok(Function::Fun(identifier, block_items))
@@ -71,16 +67,21 @@ impl Parser {
 
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Else)) {
                     let else_stmt = self.parse_statement()?;
-                    Ok(Statement::If(
-                        exp,
-                        Box::new(pred_stmt),
-                        Some(Box::new(else_stmt)),
-                    ))
+                    let if_stmt =
+                        Statement::If(exp, Box::new(pred_stmt), Some(Box::new(else_stmt)));
+                    // self.lexer.expect_next(&Token::CloseBrace)?;
+                    Ok(if_stmt)
                 } else {
-                    Ok(Statement::If(exp, Box::new(pred_stmt), None))
+                    let if_stmt = Statement::If(exp, Box::new(pred_stmt), None);
+                    // self.lexer.expect_next(&Token::CloseBrace)?;
+                    Ok(if_stmt)
                 }
             }
-            Some(Token::OpenBrace) => Ok(Statement::Compound(self.parse_block_items()?)),
+            Some(Token::OpenBrace) => {
+                let compound = Statement::Compound(self.parse_block_items()?);
+                // self.lexer.advance_if_match(&Token::CloseBrace);
+                Ok(compound)
+            }
             _ => {
                 self.lexer.back();
 
@@ -95,7 +96,11 @@ impl Parser {
 
     fn parse_block_items(&mut self) -> RustCcResult<Vec<BlockItem>> {
         let mut block_items = vec![];
-        while Some(Token::CloseBrace) != self.lexer.peek() {
+        while let Some(_) = self.lexer.peek() {
+            if self.lexer.advance_if_match(&Token::CloseBrace) {
+                break;
+            }
+
             let block_item = if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     panic!("assignment statment needs an identifier")
@@ -167,10 +172,9 @@ impl Parser {
     }
 
     fn parse_l2_exp(&mut self) -> RustCcResult<Level2Exp> {
-        let tok = self
-            .lexer
-            .next_token()
-            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+        let tok = self.lexer.next_token().unwrap();
+        // let tok = self.lexer.next_token()
+        //    .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
 
         let l2_exp = match tok {
             Token::OpenParen => {

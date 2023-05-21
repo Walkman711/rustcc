@@ -30,6 +30,8 @@ pub enum ParseError {
 pub enum ScopeError {
     #[error("Initialized `{0}` twice in the same scope")]
     InitializedTwiceInSameScope(String),
+    #[error("Declared `{0}` twice in the same scope")]
+    DeclaredTwiceInSameScope(String),
     #[error("`{0}` is not initialized in this scope")]
     Uninitialized(String),
     #[error("`{0}` is not declared in this scope")]
@@ -42,7 +44,8 @@ pub type RustCcResult<T> = Result<T, RustCcError>;
 pub enum VarState {
     InitializedInThisScope,
     InitializedInOuterScope,
-    Declared,
+    DeclaredInThisScope,
+    DeclaredInOuterScope,
 }
 
 #[derive(Clone, Debug)]
@@ -86,19 +89,31 @@ impl ScopedMap {
     }
 
     pub fn declare_var(&mut self, var: &str, stack_offset: usize) -> RustCcResult<()> {
-        self.var_maps.last_mut().unwrap().insert(
+        if let Some(VarDetails {
+            state: VarState::DeclaredInThisScope,
+            ..
+        }) = self.var_maps.last_mut().unwrap().insert(
             var.to_owned(),
             VarDetails {
-                state: VarState::Declared,
+                state: VarState::DeclaredInThisScope,
                 stack_offset,
             },
-        );
-        Ok(())
+        ) {
+            Err(RustCcError::ScopeError(
+                ScopeError::DeclaredTwiceInSameScope(var.to_owned()),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn assign_var(&mut self, var: &str) -> RustCcResult<usize> {
         let var_details = self.var_maps.last_mut().unwrap().get_mut(var).unwrap();
-        var_details.state = VarState::InitializedInThisScope;
+        match var_details.state {
+            VarState::DeclaredInThisScope => var_details.state = VarState::InitializedInThisScope,
+            VarState::DeclaredInOuterScope => var_details.state = VarState::InitializedInOuterScope,
+            _ => {}
+        }
         Ok(var_details.stack_offset)
     }
 
@@ -108,9 +123,9 @@ impl ScopedMap {
                 VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {
                     Ok(details.to_owned())
                 }
-                VarState::Declared => Err(RustCcError::ScopeError(ScopeError::Uninitialized(
-                    var.to_owned(),
-                ))),
+                VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => Err(
+                    RustCcError::ScopeError(ScopeError::Uninitialized(var.to_owned())),
+                ),
             }
         } else {
             Err(RustCcError::ScopeError(ScopeError::Undeclared(
@@ -123,23 +138,32 @@ impl ScopedMap {
         // println!("new scope: {:?}", self.var_maps.last().unwrap());
         let mut new_map = self.var_maps.last().unwrap().clone();
         for (_var, details) in &mut new_map {
-            if details.state == VarState::InitializedInThisScope {
-                details.state = VarState::InitializedInOuterScope;
+            match details.state {
+                VarState::InitializedInThisScope => {
+                    details.state = VarState::InitializedInOuterScope
+                }
+                VarState::DeclaredInThisScope => details.state = VarState::DeclaredInOuterScope,
+                _ => {}
             }
         }
+        // println!("NEW SCOPE: {new_map:?}");
         self.var_maps.push(new_map);
         Ok(())
     }
 
-    pub fn exit_scope(&mut self) -> RustCcResult<()> {
-        // println!("exit scope: {:?}", self.var_maps.last().unwrap());
+    pub fn exit_scope(&mut self) -> RustCcResult<usize> {
+        let mut num_initialized_in_scope = 0;
         match self.var_maps.pop() {
-            Some(_) => Ok(()),
+            Some(vm) => {
+                // println!("exit scope: {vm:?}");
+                for (_var, details) in vm {
+                    if details.state == VarState::InitializedInThisScope {
+                        num_initialized_in_scope += 1;
+                    }
+                }
+                Ok(num_initialized_in_scope)
+            }
             None => todo!("add an error for exiting scope when we've already exited all scopes"),
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.var_maps.last().unwrap().len()
     }
 }

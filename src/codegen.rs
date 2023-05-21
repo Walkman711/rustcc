@@ -110,20 +110,23 @@ pub trait AsmGenerator {
                 BlockItem::Stmt(s) => self.gen_stmt_asm(s),
                 BlockItem::Declare((identifier, exp_opt)) => {
                     // println!("DECL {exp_opt:?}");
-                    let var_loc = self.stack_ptr() + 4;
+                    self.increment_stack_ptr();
+                    let var_loc = self.stack_ptr();
                     let sm = self.get_scoped_map_mut();
                     match exp_opt {
                         Some(exp) => {
                             sm.initialize_var(&identifier, var_loc)
                                 .unwrap_or_else(|e| panic!("{e:?}"));
                             self.gen_l15_asm(exp);
-                            self.push_stack();
+                            // self.push_stack();
+                            self.save_to_stack(var_loc);
                         }
                         None => {
                             sm.declare_var(&identifier, var_loc)
                                 .unwrap_or_else(|e| panic!("{e:?}"));
                             self.mov_into_primary("999");
-                            self.push_stack();
+                            self.save_to_stack(var_loc);
+                            // self.push_stack();
                         }
                     }
                 }
@@ -131,20 +134,27 @@ pub trait AsmGenerator {
         }
 
         {
-            for _ in 0..self.get_scoped_map().len() {
-                self.decrement_stack_ptr();
-            }
-
-            self.get_scoped_map_mut()
+            let variables_to_deallocate = self
+                .get_scoped_map_mut()
                 .exit_scope()
                 .unwrap_or_else(|e| panic!("{e:?}"));
+
+            // println!("dealloc {variables_to_deallocate}");
+
+            for _ in 0..variables_to_deallocate {
+                self.decrement_stack_ptr();
+            }
         }
     }
 
     fn gen_stmt_asm(&mut self, stmt: Statement) {
         match stmt {
             Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => self.gen_l15_asm(exp),
+                Some(exp) => {
+                    // TODO: this is ugly, should be some way to stop generating ASM
+                    self.gen_l15_asm(exp);
+                    self.ret();
+                }
                 // C standard states that int fns without a return value return 0 by default
                 None => self.mov_into_primary("0"),
             },
