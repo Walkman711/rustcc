@@ -88,6 +88,8 @@ impl Parser {
             }
             Some(Token::Keyword(Keywords::For)) => {
                 self.lexer.expect_next(&Token::OpenParen)?;
+
+                // TODO: I really, really don't like this
                 let mut decl = None;
                 let mut init_exp = None;
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
@@ -98,12 +100,10 @@ impl Parser {
                     // I think that the Expression type doesn't do empty exps for now.
                     decl = Some((id, Some(self.parse_l15_exp()?)));
                     self.lexer.expect_next(&Token::Semicolon)?;
-                } else {
-                    if !self.lexer.advance_if_match(&Token::Semicolon) {
-                        let exp = self.parse_l15_exp()?;
-                        self.lexer.expect_next(&Token::Semicolon)?;
-                        init_exp = Some(exp);
-                    };
+                } else if !self.lexer.advance_if_match(&Token::Semicolon) {
+                    let exp = self.parse_l15_exp()?;
+                    self.lexer.expect_next(&Token::Semicolon)?;
+                    init_exp = Some(exp);
                 }
 
                 let controlling_exp = if self.lexer.advance_if_match(&Token::Semicolon) {

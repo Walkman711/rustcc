@@ -273,6 +273,11 @@ pub trait AsmGenerator {
                 let start_label = self.get_next_jmp_label();
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
+                {
+                    self.get_scoped_map_mut()
+                        .new_scope()
+                        .unwrap_or_else(|e| panic!("{e:?}"));
+                }
 
                 self.get_continue_stack_mut().push(continue_label);
                 self.get_break_stack_mut().push(exit_label);
@@ -304,6 +309,16 @@ pub trait AsmGenerator {
                 self.write_branch_inst(Cond::Always, start_label);
 
                 self.write_jmp_label(exit_label);
+                {
+                    let variables_to_deallocate = self
+                        .get_scoped_map_mut()
+                        .exit_scope()
+                        .unwrap_or_else(|e| panic!("{e:?}"));
+
+                    for _ in 0..variables_to_deallocate {
+                        self.decrement_stack_ptr();
+                    }
+                }
             }
             Statement::Break => {
                 let break_label = self.get_break_stack().last().unwrap();
@@ -443,7 +458,6 @@ pub trait AsmGenerator {
     gen_level_asm!(gen_l6_asm, Level6Exp, gen_l5_asm, logical_comparison);
     gen_level_asm!(gen_l5_asm, Level5Exp, gen_l4_asm, write_mnemonic);
     gen_level_asm!(gen_l4_asm, Level4Exp, gen_l3_asm, write_mnemonic);
-    // gen_level_asm!(gen_l3_asm, Level3Exp, gen_l2_asm, write_mnemonic);
 
     fn gen_l3_asm(&mut self, l3: Level3Exp) {
         let (first_lower_level_exp, trailing_lower_level_exps) = l3.0;
