@@ -26,43 +26,36 @@ impl std::fmt::Display for Program {
 }
 
 #[derive(Clone, Debug)]
-pub enum Function {
-    Fun(String, Vec<String>, Vec<BlockItem>),
-}
+pub struct Function(pub (String, Vec<String>, Vec<BlockItem>));
 
 impl PrettyPrinter for Function {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
-        match self {
-            Function::Fun(func_name, params, block_items) => {
-                print!("{tabs}FUNCTION: {func_name}(");
+        let (func_name, params, block_items) = &self.0;
 
-                for param in params {
-                    print!("{param}, ")
-                }
-                println!(")");
-                println!("{tabs}{{");
-                for block_item in block_items {
-                    block_item.pretty_print(indentation_level + 1);
-                }
-                println!("{tabs}}}");
-            }
+        print!("{tabs}FUNCTION: {func_name}(");
+
+        for param in params {
+            print!("{param}, ")
         }
+        println!(")");
+        println!("{tabs}{{");
+        for block_item in block_items {
+            block_item.pretty_print(indentation_level + 1);
+        }
+        println!("{tabs}}}");
     }
 }
 
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Function::Fun(func_name, params, block_items) => {
-                writeln!(f, "FUNCTION: {func_name}({params:?})")?;
-                writeln!(f, "{{")?;
-                for block_item in block_items {
-                    write!(f, "{block_item}")?;
-                }
-                writeln!(f, "}}")?;
-            }
+        let (func_name, params, block_items) = &self.0;
+        writeln!(f, "FUNCTION: {func_name}({params:?})")?;
+        writeln!(f, "{{")?;
+        for block_item in block_items {
+            write!(f, "{block_item}")?;
         }
+        writeln!(f, "}}")?;
         Ok(())
     }
 }

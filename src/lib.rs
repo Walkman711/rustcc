@@ -7,4 +7,4 @@ pub mod ops;
 pub mod parser;
 pub mod parser_types;
 pub mod utils;
-pub mod x86_generator;
+// pub mod x86_generator;

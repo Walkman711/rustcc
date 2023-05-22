@@ -60,11 +60,12 @@ impl AsmGenerator for x86Generator {
         self.write_to_buffer(format!("{identifier}:"));
     }
 
-    fn fn_prologue(&mut self, identifier: &str) {
-        self.write_fn_header(identifier);
-        self.write_inst("push  rbp");
-        self.write_inst("mov   rbp, rsp");
-        self.write_inst("sub   rsp, 16");
+    fn fn_prologue(&mut self, identifier: &str, num_params: usize) {
+        todo!()
+        // self.write_fn_header(identifier);
+        // self.write_inst("push  rbp");
+        // self.write_inst("mov   rbp, rsp");
+        // self.write_inst("sub   rsp, 16");
     }
 
     fn fn_epilogue(&mut self) {

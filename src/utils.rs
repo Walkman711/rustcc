@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::lexer_enums::Token;
+use crate::{lexer_enums::Token, parser_types};
 
 use thiserror::Error;
 
@@ -203,5 +203,28 @@ impl ScopedMap {
             }
             None => todo!("add an error for exiting scope when we've already exited all scopes"),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionContext {
+    pub function_name: String,
+    pub num_args: usize,
+    pub num_locals: usize,
+}
+
+impl From<&parser_types::Function> for FunctionContext {
+    fn from(value: &parser_types::Function) -> Self {
+        Self {
+            function_name: value.0 .0.to_owned(),
+            num_args: value.0 .1.len(),
+            num_locals: 0,
+        }
+    }
+}
+
+impl FunctionContext {
+    fn allocated_new_var(&mut self) {
+        self.num_locals += 1;
     }
 }

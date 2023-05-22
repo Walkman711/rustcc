@@ -1,7 +1,8 @@
 use crate::{
     codegen::AsmGenerator,
     codegen_enums::{Arch, Cond},
-    utils::ScopedMap,
+    parser_types::Function,
+    utils::{FunctionContext, ScopedMap},
 };
 
 pub struct ArmGenerator {
@@ -12,6 +13,7 @@ pub struct ArmGenerator {
     arch: Arch,
     break_stack: Vec<usize>,
     continue_stack: Vec<usize>,
+    fc: Option<FunctionContext>,
 }
 
 impl Default for ArmGenerator {
@@ -24,6 +26,7 @@ impl Default for ArmGenerator {
             arch: Arch::ARM,
             break_stack: vec![],
             continue_stack: vec![],
+            fc: None,
         }
     }
 }
@@ -60,14 +63,19 @@ impl AsmGenerator for ArmGenerator {
         self.write_to_buffer(format!("_{identifier}:"));
     }
 
-    fn fn_prologue(&mut self, identifier: &str) {
-        self.write_fn_header(identifier);
-        // self.write_inst("push lr");
+    fn fn_prologue(&mut self) {
+        let ctx = self.fc.clone().unwrap();
+        self.write_fn_header(&ctx.function_name);
+        // let stack_frame_size = 16 + (4 * ctx.num_args);
+        // // Save X30
+        // self.write_inst(&format!("sub   sp, sp, {stack_frame_size}"));
+        // self.write_inst("str   x30, [sp]");
     }
 
     fn fn_epilogue(&mut self) {
-        // self.write_inst("pop pc");
-        // self.write_inst(&format!("str  w0, [sp, {}]", self.sp));
+        // Load x30
+        // self.write_inst("ldr   x30, [sp]");
+        // self.write_inst("add   sp, sp, #16");
     }
 
     fn ret(&mut self) {
@@ -149,5 +157,13 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sdiv w2, w1, w0");
         self.write_inst("mul w0, w2, w0");
         self.write_inst("sub w0, w1, w0")
+    }
+
+    fn set_function_context(&mut self, function: &Function) {
+        self.fc = Some(FunctionContext::from(function));
+    }
+
+    fn get_function_context(&mut self) -> &mut Option<FunctionContext> {
+        &mut self.fc
     }
 }

@@ -5,7 +5,7 @@ use crate::{
     gen_level_asm,
     ops::*,
     parser_types::*,
-    utils::{CodegenError, RustCcError, RustCcResult, ScopedMap},
+    utils::{CodegenError, FunctionContext, RustCcError, RustCcResult, ScopedMap},
 };
 
 pub trait AsmGenerator {
@@ -49,7 +49,7 @@ pub trait AsmGenerator {
     fn get_arch(&self) -> Arch;
 
     fn write_fn_header(&mut self, identifier: &str);
-    fn fn_prologue(&mut self, identifier: &str);
+    fn fn_prologue(&mut self);
     fn fn_epilogue(&mut self);
     fn ret(&mut self);
 
@@ -89,26 +89,27 @@ pub trait AsmGenerator {
     }
 
     fn gen_remainder_inst(&mut self);
+    fn set_function_context(&mut self, function: &Function);
+    fn get_function_context(&mut self) -> &mut Option<FunctionContext>;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         for function in prog.0 {
-            match function {
-                Function::Fun(identifier, params, block_items) => {
-                    self.fn_prologue(&identifier);
+            self.set_function_context(&function);
+            let (identifier, params, block_items) = &function.0;
+            self.fn_prologue();
 
-                    // TODO: this is blatantly broken, but i wanted to see if the general idea is
-                    // working
-                    let var_loc = self.stack_ptr();
-                    let sm = self.get_scoped_map_mut();
-                    for param in params {
-                        sm.initialize_var(&param, var_loc)?;
-                        // var_loc -= 4;
-                    }
-
-                    self.gen_block_asm(block_items)?;
-                    self.ret();
-                }
+            // TODO: this is blatantly broken, but i wanted to see if the general idea is
+            // working
+            let var_loc = self.stack_ptr();
+            let sm = self.get_scoped_map_mut();
+            for param in params {
+                sm.initialize_var(&param, var_loc)?;
+                // var_loc -= 4;
             }
+
+            // PERF: don't clone this
+            self.gen_block_asm(block_items.to_owned())?;
+            // self.ret();
         }
 
         self.write_to_file(asm_filename);
@@ -520,8 +521,8 @@ pub trait AsmGenerator {
                     self.gen_l15_asm(param)?;
                     self.push_stack();
                 }
-                self.write_inst(&format!("call _{fun_name}"));
-                // todo!()
+                // FIX: only for ARM
+                self.write_inst(&format!("bl _{fun_name}"));
             }
         }
         Ok(())

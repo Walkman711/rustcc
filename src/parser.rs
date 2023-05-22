@@ -59,7 +59,7 @@ impl Parser {
             block_items.push(BlockItem::Stmt(Statement::Return(None)))
         }
 
-        Ok(Function::Fun(identifier, params, block_items))
+        Ok(Function((identifier, params, block_items)))
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {
