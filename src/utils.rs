@@ -38,10 +38,17 @@ pub enum ScopeError {
     Uninitialized(String),
     #[error("`{0}` is not declared in this scope")]
     Undeclared(String),
+    #[error("No longer in any scope")]
+    NoScope,
 }
 
 #[derive(Debug, Error)]
-pub enum CodegenError {}
+pub enum CodegenError {
+    #[error("Break statement is not enclosed in an iterating statement")]
+    UnenclosedBreak,
+    #[error("Continue statement is not enclosed in an iterating statement")]
+    UnenclosedContinue,
+}
 
 pub type RustCcResult<T> = Result<T, RustCcError>;
 
@@ -75,55 +82,80 @@ impl Default for ScopedMap {
 
 impl ScopedMap {
     pub fn initialize_var(&mut self, var: &str, stack_offset: usize) -> RustCcResult<()> {
+        let Some(last) = self.var_maps.last_mut() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        let details = VarDetails {
+            state: VarState::InitializedInThisScope,
+            stack_offset,
+        };
+
         if let Some(VarDetails {
             state: VarState::InitializedInThisScope,
             ..
-        }) = self.var_maps.last_mut().unwrap().insert(
-            var.to_owned(),
-            VarDetails {
-                state: VarState::InitializedInThisScope,
-                stack_offset,
-            },
-        ) {
+        }) = last.insert(var.to_owned(), details)
+        {
             Err(RustCcError::ScopeError(
                 ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-            ))
-        } else {
-            Ok(())
+            ))?;
         }
+
+        Ok(())
     }
 
     pub fn declare_var(&mut self, var: &str, stack_offset: usize) -> RustCcResult<()> {
+        let Some(last) = self.var_maps.last_mut() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        let details = VarDetails {
+            state: VarState::DeclaredInThisScope,
+            stack_offset,
+        };
+
         if let Some(VarDetails {
             state: VarState::DeclaredInThisScope,
             ..
-        }) = self.var_maps.last_mut().unwrap().insert(
-            var.to_owned(),
-            VarDetails {
-                state: VarState::DeclaredInThisScope,
-                stack_offset,
-            },
-        ) {
+        }) = last.insert(var.to_owned(), details)
+        {
             Err(RustCcError::ScopeError(
                 ScopeError::DeclaredTwiceInSameScope(var.to_owned()),
-            ))
-        } else {
-            Ok(())
+            ))?;
         }
+
+        Ok(())
     }
 
     pub fn assign_var(&mut self, var: &str) -> RustCcResult<usize> {
-        let var_details = self.var_maps.last_mut().unwrap().get_mut(var).unwrap();
-        match var_details.state {
-            VarState::DeclaredInThisScope => var_details.state = VarState::InitializedInThisScope,
-            VarState::DeclaredInOuterScope => var_details.state = VarState::InitializedInOuterScope,
-            _ => {}
+        let Some(last) = self.var_maps.last_mut() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        if let Some(var_details) = last.get_mut(var) {
+            match var_details.state {
+                VarState::DeclaredInThisScope => {
+                    var_details.state = VarState::InitializedInThisScope
+                }
+                VarState::DeclaredInOuterScope => {
+                    var_details.state = VarState::InitializedInOuterScope
+                }
+                _ => {}
+            }
+            Ok(var_details.stack_offset)
+        } else {
+            Err(RustCcError::ScopeError(ScopeError::Undeclared(
+                var.to_owned(),
+            )))
         }
-        Ok(var_details.stack_offset)
     }
 
     pub fn get_var(&mut self, var: &str) -> RustCcResult<VarDetails> {
-        if let Some(details) = self.var_maps.last().unwrap().get(var) {
+        let Some(last) = self.var_maps.last() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        if let Some(details) = last.get(var) {
             match details.state {
                 VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {
                     Ok(details.to_owned())
@@ -140,7 +172,11 @@ impl ScopedMap {
     }
 
     pub fn new_scope(&mut self) -> RustCcResult<()> {
-        let mut new_map = self.var_maps.last().unwrap().clone();
+        let Some(last) = self.var_maps.last() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        let mut new_map = last.clone();
         for details in new_map.values_mut() {
             match details.state {
                 VarState::InitializedInThisScope => {

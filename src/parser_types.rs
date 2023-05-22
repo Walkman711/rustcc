@@ -40,7 +40,7 @@ impl PrettyPrinter for Function {
                 for param in params {
                     print!("{param}, ")
                 }
-                print!(")\n");
+                println!(")");
                 println!("{tabs}{{");
                 for block_item in block_items {
                     block_item.pretty_print(indentation_level + 1);

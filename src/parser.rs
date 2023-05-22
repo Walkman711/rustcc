@@ -21,7 +21,7 @@ impl Parser {
 impl Parser {
     pub fn parse(&mut self) -> RustCcResult<Program> {
         let mut functions = vec![];
-        while let Some(_) = self.lexer.peek() {
+        while self.lexer.peek().is_some() {
             let function = self.parse_fn()?;
             functions.push(function);
         }
@@ -42,8 +42,6 @@ impl Parser {
                     Token::Identifier("any function name".to_string()), tok)));
         };
 
-        // println!("fn name: {identifier}");
-
         let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
         while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
@@ -53,7 +51,6 @@ impl Parser {
             params.push(param);
         }
         self.lexer.expect_next(&Token::CloseParen)?;
-        // println!("fn params: {params:?}");
 
         let mut block_items = self.parse_block_items()?;
 

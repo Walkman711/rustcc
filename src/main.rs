@@ -1,8 +1,9 @@
 use std::process::Command;
 
-use rustcc::{
-    arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser, parser_types::PrettyPrinter,
-};
+use rustcc::{arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser};
+
+#[allow(unused_imports)]
+use rustcc::parser_types::PrettyPrinter;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -24,7 +25,7 @@ fn main() -> anyhow::Result<()> {
 
     // Translate to assembly
     let mut arm_generator = ArmGenerator::default();
-    arm_generator.gen_asm(&asm_filename, parsed_program);
+    arm_generator.gen_asm(&asm_filename, parsed_program)?;
 
     // let mut x86_generator = x86Generator::default();
     // x86_generator.gen_asm(&asm_filename, parsed_program);
@@ -34,8 +35,7 @@ fn main() -> anyhow::Result<()> {
         .arg("-o")
         .arg(out_filename)
         .arg(asm_filename)
-        .output()
-        .unwrap();
+        .output()?;
 
     Ok(())
 }
