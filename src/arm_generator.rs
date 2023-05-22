@@ -113,13 +113,13 @@ impl AsmGenerator for ArmGenerator {
         // set lower byte of reg_a based on if cond is satisfied
         self.write_inst(&format!("cset w0, {}", cond.for_arch(self.get_arch())));
         // zero-pad reg_a since cset only sets the lower byte
-        self.write_inst("uxtb w0, w0");
+        self.write_inst("uxtb  w0, w0");
     }
 
     fn logical_not(&mut self) {
         self.cmp_primary_with_zero();
-        self.write_inst("cset w0, eq");
-        self.write_inst("uxtb w0, w0");
+        self.write_inst("cset  w0, eq");
+        self.write_inst("uxtb  w0, w0");
     }
 
     fn get_next_jmp_label(&mut self) -> usize {
@@ -154,9 +154,9 @@ impl AsmGenerator for ArmGenerator {
         // w0 2
         // w1 3
         // w2 1
-        self.write_inst("sdiv w2, w1, w0");
-        self.write_inst("mul w0, w2, w0");
-        self.write_inst("sub w0, w1, w0")
+        self.write_inst("sdiv  w2, w1, w0");
+        self.write_inst("mul   w0, w2, w0");
+        self.write_inst("sub   w0, w1, w0")
     }
 
     fn set_function_context(&mut self, function: &Function) {

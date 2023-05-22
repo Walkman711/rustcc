@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::{cmp::max, fs::File, io::Write};
 
 use crate::{
     codegen_enums::{Arch, Cond, Mnemonic},
@@ -65,6 +65,14 @@ pub trait AsmGenerator {
     fn push_stack(&mut self) {
         self.increment_stack_ptr();
         self.save_to_stack(self.stack_ptr());
+        let sp = self.stack_ptr();
+        self.get_function_context()
+            .as_mut()
+            .map(|fc| fc.max_stack_offset = max(fc.max_stack_offset, sp));
+        // println!(
+        //     "\nFC after pushing to stack {:?}",
+        //     self.get_function_context()
+        // );
     }
 
     fn logical_comparison(&mut self, cond: Cond);
@@ -95,7 +103,7 @@ pub trait AsmGenerator {
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         for function in prog.0 {
             self.set_function_context(&function);
-            let (identifier, params, block_items) = &function.0;
+            let (_identifier, params, block_items) = &function.0;
             self.fn_prologue();
 
             // TODO: this is blatantly broken, but i wanted to see if the general idea is
@@ -104,12 +112,10 @@ pub trait AsmGenerator {
             let sm = self.get_scoped_map_mut();
             for param in params {
                 sm.initialize_var(&param, var_loc)?;
-                // var_loc -= 4;
             }
 
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
-            // self.ret();
         }
 
         self.write_to_file(asm_filename);
@@ -119,19 +125,18 @@ pub trait AsmGenerator {
 
     fn gen_var_decl_asm(&mut self, decl: Declaration) -> RustCcResult<()> {
         let (id, exp_opt) = decl;
-        self.increment_stack_ptr();
         let var_loc = self.stack_ptr();
         let sm = self.get_scoped_map_mut();
         match exp_opt {
             Some(exp) => {
-                sm.initialize_var(&id, var_loc)?;
+                sm.initialize_var(&id, var_loc + 4)?;
                 self.gen_l15_asm(exp)?;
-                self.save_to_stack(var_loc);
+                self.push_stack();
             }
             None => {
-                sm.declare_var(&id, var_loc)?;
+                sm.declare_var(&id, var_loc + 4)?;
                 self.mov_into_primary("999");
-                self.save_to_stack(var_loc);
+                self.push_stack();
             }
         }
 

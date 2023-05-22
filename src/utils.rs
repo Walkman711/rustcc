@@ -210,7 +210,7 @@ impl ScopedMap {
 pub struct FunctionContext {
     pub function_name: String,
     pub num_args: usize,
-    pub num_locals: usize,
+    pub max_stack_offset: usize,
 }
 
 impl From<&parser_types::Function> for FunctionContext {
@@ -218,13 +218,18 @@ impl From<&parser_types::Function> for FunctionContext {
         Self {
             function_name: value.0 .0.to_owned(),
             num_args: value.0 .1.len(),
-            num_locals: 0,
+            max_stack_offset: 0,
         }
     }
 }
 
-impl FunctionContext {
-    fn allocated_new_var(&mut self) {
-        self.num_locals += 1;
-    }
-}
+// impl FunctionContext {
+//     pub fn allocated_new_var(&mut self) {
+//         self.num_locals += 1;
+//         self.max_stack_offset = std::cmp::max(self.max_stack_offset, self.num_locals * 4);
+//     }
+//
+//     pub fn deallocated_new_var(&mut self) {
+//         self.num_locals -= 1;
+//     }
+// }
