@@ -1,5 +1,5 @@
 use crate::{
-    codegen::AsmGenerator,
+    codegen::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
     parser_types::Function,
     utils::{FunctionContext, ScopedMap},
@@ -49,8 +49,8 @@ impl AsmGenerator for ArmGenerator {
         self.buffer.push(s);
     }
 
-    fn get_buffer(&self) -> &[String] {
-        &self.buffer
+    fn get_buffer(&mut self) -> &mut Vec<String> {
+        &mut self.buffer
     }
 
     fn get_arch(&self) -> Arch {
@@ -68,14 +68,14 @@ impl AsmGenerator for ArmGenerator {
         self.write_fn_header(&ctx.function_name);
         // let stack_frame_size = 16 + (4 * ctx.num_args);
         // // Save X30
-        // self.write_inst(&format!("sub   sp, sp, {stack_frame_size}"));
-        // self.write_inst("str   x30, [sp]");
+        self.write_inst("stp   x29, x30, [sp, -STACK_SIZE]!");
+        self.write_inst("mov   x29, sp");
     }
 
     fn fn_epilogue(&mut self) {
-        // Load x30
-        // self.write_inst("ldr   x30, [sp]");
-        // self.write_inst("add   sp, sp, #16");
+        let stack_offset = self.fc.as_ref().unwrap().get_stack_frame_size();
+
+        self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
     }
 
     fn ret(&mut self) {
@@ -96,11 +96,11 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn increment_stack_ptr(&mut self) {
-        self.sp += 4;
+        self.sp += INT_SIZE;
     }
 
     fn decrement_stack_ptr(&mut self) {
-        self.sp -= 4;
+        self.sp -= INT_SIZE;
     }
 
     fn logical_comparison(&mut self, cond: Cond) {

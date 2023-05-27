@@ -8,6 +8,8 @@ use crate::{
     utils::{CodegenError, FunctionContext, RustCcError, RustCcResult, ScopedMap},
 };
 
+pub const INT_SIZE: usize = 8;
+
 pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
@@ -18,7 +20,8 @@ pub trait AsmGenerator {
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
 
     fn write_to_buffer(&mut self, s: String);
-    fn get_buffer(&self) -> &[String];
+    // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
+    fn get_buffer(&mut self) -> &mut Vec<String>;
     fn write_to_file(&mut self, asm_filename: &str) {
         let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
         for line in self.get_buffer() {
@@ -112,10 +115,23 @@ pub trait AsmGenerator {
             let sm = self.get_scoped_map_mut();
             for param in params {
                 sm.initialize_var(&param, var_loc)?;
+                // var_loc -= 4;
             }
 
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
+
+            let stack_offset = self
+                .get_function_context()
+                .as_ref()
+                .unwrap()
+                .get_stack_frame_size();
+            for line in self.get_buffer() {
+                *line = line.replace("STACK_SIZE", &stack_offset.to_string());
+            }
+            // self.get_buffer()
+            //     .iter_mut()
+            //     .map(|line| line.replace("STACK_SIZE", &stack_offset.to_string()));
         }
 
         self.write_to_file(asm_filename);
@@ -129,12 +145,12 @@ pub trait AsmGenerator {
         let sm = self.get_scoped_map_mut();
         match exp_opt {
             Some(exp) => {
-                sm.initialize_var(&id, var_loc + 4)?;
+                sm.initialize_var(&id, var_loc + INT_SIZE)?;
                 self.gen_l15_asm(exp)?;
                 self.push_stack();
             }
             None => {
-                sm.declare_var(&id, var_loc + 4)?;
+                sm.declare_var(&id, var_loc + INT_SIZE)?;
                 self.mov_into_primary("999");
                 self.push_stack();
             }

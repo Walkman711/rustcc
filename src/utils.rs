@@ -223,6 +223,16 @@ impl From<&parser_types::Function> for FunctionContext {
     }
 }
 
+impl FunctionContext {
+    pub fn get_stack_frame_size(&self) -> usize {
+        let default_size = 16;
+        let arg_size = 4 * self.num_args;
+        let unaligned = default_size + arg_size + self.max_stack_offset;
+        let diff = unaligned % 16;
+        unaligned + diff
+    }
+}
+
 // impl FunctionContext {
 //     pub fn allocated_new_var(&mut self) {
 //         self.num_locals += 1;
