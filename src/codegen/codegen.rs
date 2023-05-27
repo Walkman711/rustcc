@@ -3,7 +3,11 @@ use std::{cmp::max, fs::File, io::Write};
 use crate::{
     gen_level_asm,
     parser::{ops::*, parser_types::*},
-    utils::{CodegenError, FunctionContext, RustCcError, RustCcResult, ScopedMap},
+    utils::{
+        error::{CodegenError, RustCcError, RustCcResult},
+        function_context::FunctionContext,
+        scoped_map::ScopedMap,
+    },
 };
 
 use super::codegen_enums::{Arch, Cond, Mnemonic};
@@ -114,7 +118,7 @@ pub trait AsmGenerator {
             let var_loc = self.stack_ptr();
             let sm = self.get_scoped_map_mut();
             for param in params {
-                sm.initialize_var(&param, var_loc)?;
+                sm.initialize_var(param, var_loc)?;
                 // var_loc -= 4;
             }
 

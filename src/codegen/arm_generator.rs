@@ -5,7 +5,7 @@ use super::{
 
 use crate::{
     parser::parser_types::Function,
-    utils::{FunctionContext, ScopedMap},
+    utils::{function_context::FunctionContext, scoped_map::ScopedMap},
 };
 
 pub struct ArmGenerator {

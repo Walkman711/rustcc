@@ -1,4 +1,4 @@
-use crate::utils::{ParseError, RustCcError, RustCcResult};
+use crate::utils::error::{ParseError, RustCcError, RustCcResult};
 
 use super::lexer_enums::{Keywords, Token};
 

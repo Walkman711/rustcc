@@ -4,7 +4,7 @@ use crate::{
         lexer_enums::{Keywords, Token},
     },
     parse_level,
-    utils::{ParseError, RustCcError, RustCcResult},
+    utils::error::{ParseError, RustCcError, RustCcResult},
 };
 
 use super::{ops::*, parser_types::*};

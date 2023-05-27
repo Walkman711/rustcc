@@ -1,6 +1,6 @@
 use crate::{
     lexer::lexer_enums::Token,
-    utils::{ParseError, RustCcError},
+    utils::error::{ParseError, RustCcError},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::Display)]
