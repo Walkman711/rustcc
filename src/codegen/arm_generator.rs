@@ -5,18 +5,17 @@ use super::{
 
 use crate::{
     parsing::parser_types::Function,
-    utils::{function_context::FunctionContext, scoped_map::ScopedMap},
+    utils::{context::Context, scoped_map::ScopedMap},
 };
 
 pub struct ArmGenerator {
     sp: usize,
     curr_jmp_label: usize,
     scoped_map: ScopedMap,
-    buffer: Vec<String>,
     arch: Arch,
     break_stack: Vec<usize>,
     continue_stack: Vec<usize>,
-    fc: Option<FunctionContext>,
+    fc: Vec<Context>,
 }
 
 impl Default for ArmGenerator {
@@ -25,11 +24,10 @@ impl Default for ArmGenerator {
             sp: 0,
             curr_jmp_label: 0,
             scoped_map: ScopedMap::default(),
-            buffer: vec![],
             arch: Arch::ARM,
             break_stack: vec![],
             continue_stack: vec![],
-            fc: None,
+            fc: vec![Context::default()],
         }
     }
 }
@@ -48,31 +46,22 @@ impl AsmGenerator for ArmGenerator {
         &mut self.scoped_map
     }
 
-    fn write_to_buffer(&mut self, s: String) {
-        self.buffer.push(s);
-    }
-
-    fn get_buffer(&mut self) -> &mut Vec<String> {
-        &mut self.buffer
-    }
-
     fn get_arch(&self) -> Arch {
         self.arch
     }
 
-    fn write_fn_header(&mut self, identifier: &str) {
-        self.write_to_buffer(format!(".global _{identifier}"));
-        self.write_to_buffer(".align 2".to_string());
-        self.write_to_buffer(format!("_{identifier}:"));
-    }
-
     fn fn_prologue(&mut self) {
-        let ctx = self.fc.clone().unwrap();
-        self.write_fn_header(&ctx.function_name);
-        // let stack_frame_size = 16 + (4 * ctx.num_args);
-        // // Save X30
-        // self.write_inst("stp   x29, x30, [sp, -STACK_SIZE]!");
-        // self.write_inst("mov   x29, sp");
+        let ctx = self.curr_function_context_mut();
+
+        ctx.prologue.push(format!(".global _{}", ctx.function_name));
+        ctx.prologue.push(".align 2".to_string());
+        ctx.prologue.push(format!("_{}:", ctx.function_name));
+
+        // ctx.prologue.push(format!(
+        //     "stp   x29, x30, [sp, -{}]!",
+        //     ctx.get_stack_frame_size()
+        // ));
+        // ctx.prologue.push("mov   x29, sp".to_string());
     }
 
     fn fn_epilogue(&mut self) {
@@ -161,11 +150,17 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sub   w0, w1, w0")
     }
 
-    fn set_function_context(&mut self, function: &Function) {
-        self.fc = Some(FunctionContext::from(function));
+    fn new_function_context(&mut self, function: &Function) {
+        self.fc.push(Context::from(function));
     }
 
-    fn get_function_context(&mut self) -> &mut Option<FunctionContext> {
-        &mut self.fc
+    fn curr_function_context(&self) -> &Context {
+        self.fc.last().expect("Will always have a global context.")
+    }
+
+    fn curr_function_context_mut(&mut self) -> &mut Context {
+        self.fc
+            .last_mut()
+            .expect("Will always have a global context.")
     }
 }

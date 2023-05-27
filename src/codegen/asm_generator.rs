@@ -4,8 +4,8 @@ use crate::{
     gen_level_asm,
     parsing::{ops::*, parser_types::*},
     utils::{
+        context::Context,
         error::{CodegenError, RustCcError, RustCcResult},
-        function_context::FunctionContext,
         scoped_map::ScopedMap,
     },
 };
@@ -23,14 +23,20 @@ pub trait AsmGenerator {
     fn get_scoped_map(&self) -> &ScopedMap;
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
 
-    fn write_to_buffer(&mut self, s: String);
     // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
-    fn get_buffer(&mut self) -> &mut Vec<String>;
+    fn write_to_buffer(&mut self, s: String) {
+        self.curr_function_context_mut().buffer.push(s);
+    }
+
     fn write_to_file(&mut self, asm_filename: &str) {
         let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
-        for line in self.get_buffer() {
-            writeln!(asm_file, "{line}").expect("writeln! failed to write instruction to file.");
-        }
+        // TODO: this is a hack for now, will fold into context
+        self.fn_prologue();
+        self.curr_function_context_mut()
+            .write_to_file(&mut asm_file);
+        // for line in &self.curr_function_context().buffer {
+        //     writeln!(asm_file, "{line}").expect("writeln! failed to write instruction to file.");
+        // }
     }
 
     fn write_inst(&mut self, inst: &str) {
@@ -55,7 +61,6 @@ pub trait AsmGenerator {
 
     fn get_arch(&self) -> Arch;
 
-    fn write_fn_header(&mut self, identifier: &str);
     fn fn_prologue(&mut self);
     fn fn_epilogue(&mut self);
     fn ret(&mut self);
@@ -73,9 +78,8 @@ pub trait AsmGenerator {
         self.increment_stack_ptr();
         self.save_to_stack(self.stack_ptr());
         let sp = self.stack_ptr();
-        self.get_function_context()
-            .as_mut()
-            .map(|fc| fc.max_stack_offset = max(fc.max_stack_offset, sp));
+        let fc = self.curr_function_context_mut();
+        fc.max_stack_offset = max(fc.max_stack_offset, sp);
         // println!(
         //     "\nFC after pushing to stack {:?}",
         //     self.get_function_context()
@@ -104,14 +108,14 @@ pub trait AsmGenerator {
     }
 
     fn gen_remainder_inst(&mut self);
-    fn set_function_context(&mut self, function: &Function);
-    fn get_function_context(&mut self) -> &mut Option<FunctionContext>;
+    fn new_function_context(&mut self, function: &Function);
+    fn curr_function_context(&self) -> &Context;
+    fn curr_function_context_mut(&mut self) -> &mut Context;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         for function in prog.0 {
-            self.set_function_context(&function);
+            self.new_function_context(&function);
             let (_identifier, params, block_items) = &function.0;
-            self.fn_prologue();
 
             // TODO: this is blatantly broken, but i wanted to see if the general idea is
             // working
@@ -125,12 +129,8 @@ pub trait AsmGenerator {
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
 
-            let stack_offset = self
-                .get_function_context()
-                .as_ref()
-                .unwrap()
-                .get_stack_frame_size();
-            for line in self.get_buffer() {
+            let stack_offset = self.curr_function_context_mut().get_stack_frame_size();
+            for line in &mut self.curr_function_context_mut().buffer {
                 *line = line.replace("STACK_SIZE", &stack_offset.to_string());
             }
             // self.get_buffer()
