@@ -1,4 +1,4 @@
-use crate::lexer::lexer_enums::Token;
+use crate::lexing::lexer_enums::Token;
 
 use thiserror::Error;
 

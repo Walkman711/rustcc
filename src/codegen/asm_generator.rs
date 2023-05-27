@@ -2,7 +2,7 @@ use std::{cmp::max, fs::File, io::Write};
 
 use crate::{
     gen_level_asm,
-    parser::{ops::*, parser_types::*},
+    parsing::{ops::*, parser_types::*},
     utils::{
         error::{CodegenError, RustCcError, RustCcResult},
         function_context::FunctionContext,

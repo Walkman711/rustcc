@@ -1,10 +1,10 @@
 use super::{
-    codegen::{AsmGenerator, INT_SIZE},
+    asm_generator::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
 };
 
 use crate::{
-    parser::parser_types::Function,
+    parsing::parser_types::Function,
     utils::{function_context::FunctionContext, scoped_map::ScopedMap},
 };
 

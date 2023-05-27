@@ -1,5 +1,5 @@
 use crate::{
-    lexer::lexer_enums::Token,
+    lexing::lexer_enums::Token,
     utils::error::{ParseError, RustCcError},
 };
 

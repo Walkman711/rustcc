@@ -1,5 +1,5 @@
 use crate::{
-    lexer::{
+    lexing::{
         lexer::Lexer,
         lexer_enums::{Keywords, Token},
     },
