@@ -51,8 +51,8 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn fn_epilogue(&mut self) {
-        // let stack_offset = self.fc.as_ref().unwrap().get_stack_frame_size();
-        // self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
+        let stack_offset = self.curr_function_context().get_stack_frame_size();
+        self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
     }
 
     fn ret(&mut self) {

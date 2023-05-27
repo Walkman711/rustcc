@@ -58,17 +58,23 @@ impl Context {
                 self.prologue.push(".align 2".to_string());
                 self.prologue.push(format!("_{}:", self.function_name));
 
-                // self.prologue.push(format!(
-                //     "stp   x29, x30, [sp, -{}]!",
-                //     self.get_stack_frame_size()
-                // ));
-                // self.prologue.push("mov   x29, sp".to_string());
+                self.prologue.push(format!(
+                    "\tstp   x29, x30, [sp, -{}]!",
+                    self.get_stack_frame_size()
+                ));
+                self.prologue.push("\tmov   x29, sp".to_string());
             }
         }
     }
 
     // TODO:
     pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) {
+        // HACK: going to make a proper global context struct and program context (global + vec of
+        // function contexts) in stage 10
+        if self.function_name == "GLOBAL_CONTEXT" {
+            return;
+        }
+
         self.fn_prologue(arch);
         for line in &self.prologue {
             writeln!(f, "{line}").expect("writeln! failed to write fn header to file.");
@@ -77,24 +83,18 @@ impl Context {
         for line in &self.insts {
             match line {
                 Instruction::NoOffset(inst) => {
-                    writeln!(f, "{inst}").expect("writeln! failed to write inst to file")
+                    writeln!(f, "\t{inst}").expect("writeln! failed to write inst to file")
                 }
                 Instruction::Address(inst, offset) => {
-                    writeln!(f, "{inst}, [sp, {}]", self.max_stack_offset - offset)
-                        .expect("writeln! failed to write inst to file")
+                    writeln!(
+                        f,
+                        "\t{inst}, [sp, {}]",
+                        self.get_stack_frame_size() - offset
+                    )
+                    // writeln!(f, "\t{inst}, [sp, {}]", offset)
+                    .expect("writeln! failed to write inst to file")
                 }
             }
         }
     }
 }
-
-// impl Context {
-//     pub fn allocated_new_var(&mut self) {
-//         self.num_locals += 1;
-//         self.max_stack_offset = std::cmp::max(self.max_stack_offset, self.num_locals * 4);
-//     }
-//
-//     pub fn deallocated_new_var(&mut self) {
-//         self.num_locals -= 1;
-//     }
-// }
