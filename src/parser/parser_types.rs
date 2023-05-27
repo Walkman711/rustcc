@@ -1,4 +1,5 @@
-use crate::{define_exp_level, ops::*};
+use super::ops::*;
+use crate::define_exp_level;
 
 pub trait PrettyPrinter {
     fn pretty_print(&self, indentation_level: usize);

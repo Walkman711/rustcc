@@ -1,11 +1,13 @@
 use crate::{
-    lexer::Lexer,
-    lexer_enums::{Keywords, Token},
-    ops::*,
+    lexer::{
+        lexer::Lexer,
+        lexer_enums::{Keywords, Token},
+    },
     parse_level,
-    parser_types::*,
     utils::{ParseError, RustCcError, RustCcResult},
 };
+
+use super::{ops::*, parser_types::*};
 
 pub struct Parser {
     lexer: Lexer,

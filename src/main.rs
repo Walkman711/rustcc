@@ -1,9 +1,12 @@
 use std::process::Command;
 
-use rustcc::{arm_generator::ArmGenerator, codegen::AsmGenerator, parser::Parser};
+use rustcc::{
+    codegen::{arm_generator::ArmGenerator, codegen::AsmGenerator},
+    parser::parser::Parser,
+};
 
 #[allow(unused_imports)]
-use rustcc::parser_types::PrettyPrinter;
+use rustcc::parser::parser_types::PrettyPrinter;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();

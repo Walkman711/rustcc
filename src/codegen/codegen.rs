@@ -1,12 +1,12 @@
 use std::{cmp::max, fs::File, io::Write};
 
 use crate::{
-    codegen_enums::{Arch, Cond, Mnemonic},
     gen_level_asm,
-    ops::*,
-    parser_types::*,
+    parser::{ops::*, parser_types::*},
     utils::{CodegenError, FunctionContext, RustCcError, RustCcResult, ScopedMap},
 };
+
+use super::codegen_enums::{Arch, Cond, Mnemonic};
 
 pub const INT_SIZE: usize = 8;
 

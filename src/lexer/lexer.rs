@@ -1,7 +1,6 @@
-use crate::{
-    lexer_enums::{Keywords, Token},
-    utils::{ParseError, RustCcError, RustCcResult},
-};
+use crate::utils::{ParseError, RustCcError, RustCcResult};
+
+use super::lexer_enums::{Keywords, Token};
 
 #[derive(Clone, Debug)]
 pub struct Lexer {

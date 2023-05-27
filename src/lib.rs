@@ -1,10 +1,4 @@
-pub mod arm_generator;
 pub mod codegen;
-pub mod codegen_enums;
 pub mod lexer;
-pub mod lexer_enums;
-pub mod ops;
 pub mod parser;
-pub mod parser_types;
 pub mod utils;
-// pub mod x86_generator;

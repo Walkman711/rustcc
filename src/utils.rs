@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::{lexer_enums::Token, parser_types};
+use crate::{lexer::lexer_enums::Token, parser::parser_types};
 
 use thiserror::Error;
 

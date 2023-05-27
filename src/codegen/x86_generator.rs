@@ -1,9 +1,10 @@
 #![allow(non_camel_case_types)]
 
-use crate::{
+use crate::utils::ScopedMap;
+
+use super::{
     codegen::AsmGenerator,
     codegen_enums::{Arch, Cond},
-    utils::ScopedMap,
 };
 
 pub struct x86Generator {

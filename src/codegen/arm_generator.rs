@@ -1,7 +1,10 @@
-use crate::{
+use super::{
     codegen::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
-    parser_types::Function,
+};
+
+use crate::{
+    parser::parser_types::Function,
     utils::{FunctionContext, ScopedMap},
 };
 
@@ -68,14 +71,13 @@ impl AsmGenerator for ArmGenerator {
         self.write_fn_header(&ctx.function_name);
         // let stack_frame_size = 16 + (4 * ctx.num_args);
         // // Save X30
-        self.write_inst("stp   x29, x30, [sp, -STACK_SIZE]!");
-        self.write_inst("mov   x29, sp");
+        // self.write_inst("stp   x29, x30, [sp, -STACK_SIZE]!");
+        // self.write_inst("mov   x29, sp");
     }
 
     fn fn_epilogue(&mut self) {
-        let stack_offset = self.fc.as_ref().unwrap().get_stack_frame_size();
-
-        self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
+        // let stack_offset = self.fc.as_ref().unwrap().get_stack_frame_size();
+        // self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
     }
 
     fn ret(&mut self) {
