@@ -50,20 +50,6 @@ impl AsmGenerator for ArmGenerator {
         self.arch
     }
 
-    fn fn_prologue(&mut self) {
-        let ctx = self.curr_function_context_mut();
-
-        ctx.prologue.push(format!(".global _{}", ctx.function_name));
-        ctx.prologue.push(".align 2".to_string());
-        ctx.prologue.push(format!("_{}:", ctx.function_name));
-
-        // ctx.prologue.push(format!(
-        //     "stp   x29, x30, [sp, -{}]!",
-        //     ctx.get_stack_frame_size()
-        // ));
-        // ctx.prologue.push("mov   x29, sp".to_string());
-    }
-
     fn fn_epilogue(&mut self) {
         // let stack_offset = self.fc.as_ref().unwrap().get_stack_frame_size();
         // self.write_inst(&format!("ldp   x29, x30, [sp], {stack_offset}"));
@@ -75,11 +61,14 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
+        self.write_address_inst(&format!("str   w0"), stack_offset);
+        // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
+        // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
     }
 
     fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
-        self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
+        self.write_address_inst(&format!("ldr   {reg}"), stack_offset);
+        // self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
     }
 
     fn stack_ptr(&self) -> usize {
@@ -152,6 +141,10 @@ impl AsmGenerator for ArmGenerator {
 
     fn new_function_context(&mut self, function: &Function) {
         self.fc.push(Context::from(function));
+    }
+
+    fn function_contexts_mut(&mut self) -> &mut [Context] {
+        &mut self.fc
     }
 
     fn curr_function_context(&self) -> &Context {

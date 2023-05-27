@@ -4,7 +4,7 @@ use crate::{
     gen_level_asm,
     parsing::{ops::*, parser_types::*},
     utils::{
-        context::Context,
+        context::{Context, Instruction},
         error::{CodegenError, RustCcError, RustCcResult},
         scoped_map::ScopedMap,
     },
@@ -24,23 +24,25 @@ pub trait AsmGenerator {
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
 
     // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
-    fn write_to_buffer(&mut self, s: String) {
-        self.curr_function_context_mut().buffer.push(s);
+    fn write_to_buffer(&mut self, inst: Instruction) {
+        self.curr_function_context_mut().insts.push(inst);
     }
 
     fn write_to_file(&mut self, asm_filename: &str) {
         let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
+        let arch = self.get_arch();
         // TODO: this is a hack for now, will fold into context
-        self.fn_prologue();
-        self.curr_function_context_mut()
-            .write_to_file(&mut asm_file);
-        // for line in &self.curr_function_context().buffer {
-        //     writeln!(asm_file, "{line}").expect("writeln! failed to write instruction to file.");
-        // }
+        for ctx in self.function_contexts_mut() {
+            ctx.write_to_file(&mut asm_file, arch);
+        }
     }
 
     fn write_inst(&mut self, inst: &str) {
-        self.write_to_buffer(format!("\t{inst}"));
+        self.write_to_buffer(Instruction::NoOffset(inst.to_owned()));
+    }
+
+    fn write_address_inst(&mut self, inst: &str, offset: usize) {
+        self.write_to_buffer(Instruction::Address(inst.to_owned(), offset));
     }
 
     fn write_mnemonic(&mut self, mnemonic: Mnemonic) {
@@ -61,7 +63,6 @@ pub trait AsmGenerator {
 
     fn get_arch(&self) -> Arch;
 
-    fn fn_prologue(&mut self);
     fn fn_epilogue(&mut self);
     fn ret(&mut self);
 
@@ -92,7 +93,7 @@ pub trait AsmGenerator {
     fn get_next_jmp_label(&mut self) -> usize;
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
     fn write_jmp_label(&mut self, lbl: usize) {
-        self.write_to_buffer(format!(".L{lbl}:"));
+        self.write_to_buffer(Instruction::NoOffset(format!(".L{lbl}:")));
     }
     fn get_break_stack(&self) -> &Vec<usize>;
     fn get_break_stack_mut(&mut self) -> &mut Vec<usize>;
@@ -108,6 +109,7 @@ pub trait AsmGenerator {
     }
 
     fn gen_remainder_inst(&mut self);
+    fn function_contexts_mut(&mut self) -> &mut [Context];
     fn new_function_context(&mut self, function: &Function);
     fn curr_function_context(&self) -> &Context;
     fn curr_function_context_mut(&mut self) -> &mut Context;
@@ -129,10 +131,10 @@ pub trait AsmGenerator {
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
 
-            let stack_offset = self.curr_function_context_mut().get_stack_frame_size();
-            for line in &mut self.curr_function_context_mut().buffer {
-                *line = line.replace("STACK_SIZE", &stack_offset.to_string());
-            }
+            // let stack_offset = self.curr_function_context_mut().get_stack_frame_size();
+            // for line in &mut self.curr_function_context_mut().insts {
+            //     *line = line.replace("STACK_SIZE", &stack_offset.to_string());
+            // }
             // self.get_buffer()
             //     .iter_mut()
             //     .map(|line| line.replace("STACK_SIZE", &stack_offset.to_string()));
