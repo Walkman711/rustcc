@@ -1,11 +1,12 @@
 use super::{
     asm_generator::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
+    context::Context,
 };
 
 use crate::{
     parsing::parser_types::Function,
-    utils::{context::Context, scoped_map::ScopedMap},
+    utils::scoped_map::{ScopedMap, VarLoc},
 };
 
 pub struct ArmGenerator {
@@ -61,13 +62,13 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_address_inst(&format!("str   w0"), stack_offset);
+        self.write_address_inst(&format!("str   w0"), VarLoc::CurrFrame(stack_offset));
         // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
         // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
     }
 
-    fn load_from_stack(&mut self, reg: &str, stack_offset: usize) {
-        self.write_address_inst(&format!("ldr   {reg}"), stack_offset);
+    fn load_from_stack(&mut self, reg: &str, loc: VarLoc) {
+        self.write_address_inst(&format!("ldr   {reg}"), loc);
         // self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
     }
 

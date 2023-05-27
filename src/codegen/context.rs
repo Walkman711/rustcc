@@ -1,10 +1,10 @@
-use crate::{codegen::codegen_enums::Arch, parsing::parser_types};
+use crate::{codegen::codegen_enums::Arch, parsing::parser_types, utils::scoped_map::VarLoc};
 use std::io::Write;
 
 #[derive(Clone, Debug)]
 pub enum Instruction {
     NoOffset(String),
-    Address(String, usize),
+    Address(String, VarLoc),
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +45,7 @@ impl Context {
         let default_size = 16;
         let arg_size = 4 * self.num_args;
         let unaligned = default_size + arg_size + self.max_stack_offset;
-        let diff = unaligned % 16;
+        let diff = 16 - (unaligned % 16);
         unaligned + diff
     }
 
@@ -85,14 +85,14 @@ impl Context {
                 Instruction::NoOffset(inst) => {
                     writeln!(f, "\t{inst}").expect("writeln! failed to write inst to file")
                 }
-                Instruction::Address(inst, offset) => {
-                    writeln!(
-                        f,
-                        "\t{inst}, [sp, {}]",
-                        self.get_stack_frame_size() - offset
-                    )
-                    // writeln!(f, "\t{inst}, [sp, {}]", offset)
-                    .expect("writeln! failed to write inst to file")
+                Instruction::Address(inst, loc) => {
+                    let addend = match loc {
+                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                    };
+                    writeln!(f, "\t{inst}, [sp, {addend}]",)
+                        // writeln!(f, "\t{inst}, [sp, {}]", offset)
+                        .expect("writeln! failed to write inst to file")
                 }
             }
         }

@@ -10,15 +10,21 @@ enum VarState {
     DeclaredInOuterScope,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum VarLoc {
+    CurrFrame(usize),
+    PrevFrame(usize),
+}
+
 #[derive(Clone, Debug)]
 pub struct VarDetails {
     state: VarState,
-    pub stack_offset: usize,
+    pub loc: VarLoc,
 }
 
 #[derive(Clone, Debug)]
 pub struct ScopedMap {
-    // var_name -> stack_offset
+    // var_name -> loc
     var_maps: Vec<HashMap<String, VarDetails>>,
 }
 
@@ -31,14 +37,14 @@ impl Default for ScopedMap {
 }
 
 impl ScopedMap {
-    pub fn initialize_var(&mut self, var: &str, stack_offset: usize) -> RustCcResult<()> {
+    pub fn initialize_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
 
         let details = VarDetails {
             state: VarState::InitializedInThisScope,
-            stack_offset,
+            loc,
         };
 
         if let Some(VarDetails {
@@ -54,14 +60,14 @@ impl ScopedMap {
         Ok(())
     }
 
-    pub fn declare_var(&mut self, var: &str, stack_offset: usize) -> RustCcResult<()> {
+    pub fn declare_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
 
         let details = VarDetails {
             state: VarState::DeclaredInThisScope,
-            stack_offset,
+            loc,
         };
 
         if let Some(VarDetails {
@@ -77,7 +83,7 @@ impl ScopedMap {
         Ok(())
     }
 
-    pub fn assign_var(&mut self, var: &str) -> RustCcResult<usize> {
+    pub fn assign_var(&mut self, var: &str) -> RustCcResult<VarLoc> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
@@ -92,7 +98,7 @@ impl ScopedMap {
                 }
                 _ => {}
             }
-            Ok(var_details.stack_offset)
+            Ok(var_details.loc)
         } else {
             Err(RustCcError::ScopeError(ScopeError::Undeclared(
                 var.to_owned(),

@@ -1,16 +1,18 @@
-use std::{cmp::max, fs::File, io::Write};
+use std::{cmp::max, fs::File};
 
 use crate::{
     gen_level_asm,
     parsing::{ops::*, parser_types::*},
     utils::{
-        context::{Context, Instruction},
         error::{CodegenError, RustCcError, RustCcResult},
-        scoped_map::ScopedMap,
+        scoped_map::{ScopedMap, VarLoc},
     },
 };
 
-use super::codegen_enums::{Arch, Cond, Mnemonic};
+use super::{
+    codegen_enums::{Arch, Cond, Mnemonic},
+    context::{Context, Instruction},
+};
 
 pub const INT_SIZE: usize = 8;
 
@@ -41,8 +43,8 @@ pub trait AsmGenerator {
         self.write_to_buffer(Instruction::NoOffset(inst.to_owned()));
     }
 
-    fn write_address_inst(&mut self, inst: &str, offset: usize) {
-        self.write_to_buffer(Instruction::Address(inst.to_owned(), offset));
+    fn write_address_inst(&mut self, inst: &str, loc: VarLoc) {
+        self.write_to_buffer(Instruction::Address(inst.to_owned(), loc));
     }
 
     fn write_mnemonic(&mut self, mnemonic: Mnemonic) {
@@ -70,9 +72,9 @@ pub trait AsmGenerator {
     fn increment_stack_ptr(&mut self);
     fn decrement_stack_ptr(&mut self);
     fn save_to_stack(&mut self, stack_offset: usize);
-    fn load_from_stack(&mut self, reg: &str, stack_offset: usize);
+    fn load_from_stack(&mut self, reg: &str, loc: VarLoc);
     fn pop_stack_into_backup(&mut self) {
-        self.load_from_stack(Self::BACKUP_REGISTER, self.stack_ptr());
+        self.load_from_stack(Self::BACKUP_REGISTER, VarLoc::CurrFrame(self.stack_ptr()));
         self.decrement_stack_ptr();
     }
     fn push_stack(&mut self) {
@@ -116,16 +118,19 @@ pub trait AsmGenerator {
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         for function in prog.0 {
+            let prev_frame_size = self.curr_function_context().get_stack_frame_size();
             self.new_function_context(&function);
             let (_identifier, params, block_items) = &function.0;
 
             // TODO: this is blatantly broken, but i wanted to see if the general idea is
             // working
-            let var_loc = self.stack_ptr();
+            let mut var_loc = INT_SIZE;
             let sm = self.get_scoped_map_mut();
+            // HACK: subtract this value from the stack frame of the callee function
+            // TODO: replace with an enum for var's stack frame
             for param in params {
-                sm.initialize_var(param, var_loc)?;
-                // var_loc -= 4;
+                sm.initialize_var(param, VarLoc::PrevFrame(prev_frame_size - var_loc))?;
+                var_loc += INT_SIZE;
             }
 
             // PERF: don't clone this
@@ -151,12 +156,12 @@ pub trait AsmGenerator {
         let sm = self.get_scoped_map_mut();
         match exp_opt {
             Some(exp) => {
-                sm.initialize_var(&id, var_loc + INT_SIZE)?;
+                sm.initialize_var(&id, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.gen_l15_asm(exp)?;
                 self.push_stack();
             }
             None => {
-                sm.declare_var(&id, var_loc + INT_SIZE)?;
+                sm.declare_var(&id, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.mov_into_primary("999");
                 self.push_stack();
             }
@@ -395,7 +400,10 @@ pub trait AsmGenerator {
                 let sm = self.get_scoped_map_mut();
                 let var_loc = sm.assign_var(&identifier)?;
                 self.gen_l15_asm(*l15_exp)?;
-                self.save_to_stack(var_loc);
+                match var_loc {
+                    VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
+                    VarLoc::PrevFrame(_) => panic!("tried to assign to a var in a prev frame"),
+                }
             }
             Level14Exp::NonAssignment(l13_exp) => {
                 self.gen_l13_asm(l13_exp)?;
@@ -531,7 +539,7 @@ pub trait AsmGenerator {
             Level2Exp::Var(identifier) => {
                 let sm = self.get_scoped_map_mut();
                 let var_details = sm.get_var(&identifier)?;
-                self.load_from_stack(Self::PRIMARY_REGISTER, var_details.stack_offset);
+                self.load_from_stack(Self::PRIMARY_REGISTER, var_details.loc);
             }
             Level2Exp::Unary(op, factor) => {
                 self.gen_l2_asm(*factor)?;
