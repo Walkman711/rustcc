@@ -78,9 +78,15 @@ impl Context {
 
     // TODO:
     pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) {
-        // HACK: going to make a proper global context struct and program context (global + vec of
-        // function contexts) in stage 10
+        // // HACK: going to make a proper global context struct and program context (global + vec of
+        // // function contexts) in stage 10
         if self.function_name == "GLOBAL_CONTEXT" {
+            for line in &self.insts {
+                if let Instruction::NoOffset(inst) = line {
+                    writeln!(f, "{inst}").expect("writeln! failed to write fn header to file.");
+                }
+            }
+            writeln!(f).unwrap();
             return;
         }
 
@@ -105,6 +111,7 @@ impl Context {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
                             VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
                             VarLoc::Register(_reg) => unreachable!("checked above"),
+                            VarLoc::Global => 0,
                         };
                         writeln!(f, "\t{inst}, [sp, {addend}]",)
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)

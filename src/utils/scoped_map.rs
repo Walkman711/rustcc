@@ -16,6 +16,7 @@ pub enum VarLoc {
     CurrFrame(usize),
     PrevFrame(usize),
     Register(usize),
+    Global,
 }
 
 #[derive(Clone, Debug)]

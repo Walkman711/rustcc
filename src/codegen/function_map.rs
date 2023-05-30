@@ -23,7 +23,7 @@ impl TryFrom<&Program> for FunctionMap {
         let mut fn_info: HashMap<String, (FunctionType, usize)> = HashMap::new();
         for top_level_item in &prog.0 {
             match top_level_item {
-                TopLevelItem::Var(_) => todo!("top level item in function map"),
+                TopLevelItem::Var(_) => {} // todo!("top level item in function map"),
                 TopLevelItem::Fun(function) => match function {
                     Function::Definition(name, args, _) => {
                         if let Some((prev_type, num_args)) =

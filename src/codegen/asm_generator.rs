@@ -115,38 +115,57 @@ pub trait AsmGenerator {
     fn curr_function_context_mut(&mut self) -> &mut Context;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
+        for top_level_item in &prog.0 {
+            if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
+                self.get_scoped_map_mut()
+                    .initialize_var(id, VarLoc::Global)?;
+                self.write_inst(".section __DATA,__data");
+                self.write_inst(".align 2");
+                self.write_inst(&format!(".global _{id}"));
+                self.write_inst(&format!("_{id}"));
+                self.write_inst(&format!("\t.long {val}"));
+            }
+        }
+
+        for top_level_item in &prog.0 {
+            if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
+                todo!();
+            }
+        }
+
         for top_level_item in prog.0 {
-            match top_level_item {
-                TopLevelItem::Fun(ref function) => match function {
-                    Function::Declaration(_, _) => continue,
-                    Function::Definition(_id, params, block_items) => {
-                        self.new_function_context(&function);
+            let TopLevelItem::Fun(ref function) = top_level_item else {
+                continue;
+            };
 
-                        self.get_scoped_map_mut().new_scope()?;
+            match function {
+                Function::Declaration(_, _) => continue,
+                Function::Definition(_id, params, block_items) => {
+                    self.new_function_context(&function);
 
-                        let mut var_loc = self.stack_ptr() + INT_SIZE;
+                    self.get_scoped_map_mut().new_scope()?;
 
-                        for reg in 0..params.len() {
-                            // mov arg from register into primary
-                            self.mov_into_primary(&format!("w{reg}"));
+                    let mut var_loc = self.stack_ptr() + INT_SIZE;
 
-                            // Add param to the scope map
-                            let sm = self.get_scoped_map_mut();
-                            sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
-                            var_loc += INT_SIZE;
+                    for reg in 0..params.len() {
+                        // mov arg from register into primary
+                        self.mov_into_primary(&format!("w{reg}"));
 
-                            // save arg onto stack
-                            self.push_stack();
-                        }
+                        // Add param to the scope map
+                        let sm = self.get_scoped_map_mut();
+                        sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                        var_loc += INT_SIZE;
 
-                        // PERF: don't clone this
-                        self.gen_block_asm(block_items.to_owned())?;
-
-                        // TODO: do i need to do anything with the size of the scope?
-                        let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
+                        // save arg onto stack
+                        self.push_stack();
                     }
-                },
-                TopLevelItem::Var(_) => todo!(),
+
+                    // PERF: don't clone this
+                    self.gen_block_asm(block_items.to_owned())?;
+
+                    // TODO: do i need to do anything with the size of the scope?
+                    let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
+                }
             }
         }
 
@@ -413,6 +432,7 @@ pub trait AsmGenerator {
                         panic!("tried to assign to a var in a prev stack frame")
                     }
                     VarLoc::Register(_) => panic!("tried to assign to a var in register"),
+                    VarLoc::Global => todo!("assign to global in fn"),
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {
