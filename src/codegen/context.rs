@@ -67,10 +67,10 @@ impl Context {
                 self.prologue.push(".align 2".to_string());
                 self.prologue.push(format!("_{}:", self.function_name));
 
-                self.prologue.push(format!(
-                    "\tstp   x29, x30, [sp, -{}]!",
-                    self.get_stack_frame_size()
-                ));
+                let stack_offset = self.get_stack_frame_size();
+                self.prologue
+                    .push(format!("\tsub   sp, sp, {stack_offset}"));
+                self.prologue.push(format!("\tstp   x29, x30, [sp, -16]!",));
                 self.prologue.push("\tmov   x29, sp".to_string());
             }
         }

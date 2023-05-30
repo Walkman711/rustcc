@@ -130,10 +130,9 @@ pub trait AsmGenerator {
                 // mov arg from register into primary
                 self.mov_into_primary(&format!("w{reg}"));
 
-                // initialize var in current scope
+                // Add param to the scope map
                 let sm = self.get_scoped_map_mut();
                 sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
-                // sm.initialize_var(&params[reg], VarLoc::CurrFrame(var_loc))?;
                 var_loc += INT_SIZE;
 
                 // save arg onto stack
@@ -565,16 +564,16 @@ pub trait AsmGenerator {
                     // in w8-w15 until we generate all the expressions
                     let tmp_reg = reg + 8;
                     self.gen_l15_asm(param.to_owned())?;
-                    self.write_inst(&format!("mov w{tmp_reg}, w0"));
+                    self.write_inst(&format!("mov   w{tmp_reg}, w0"));
                 }
 
                 for reg in 0..params.len() {
                     let tmp_reg = reg + 8;
-                    self.write_inst(&format!("mov w{reg}, w{tmp_reg}"));
+                    self.write_inst(&format!("mov   w{reg}, w{tmp_reg}"));
                 }
 
                 // FIX: only for ARM
-                self.write_inst(&format!("bl _{fn_name}"));
+                self.write_inst(&format!("bl    _{fn_name}"));
             }
         }
         Ok(())
