@@ -234,15 +234,19 @@ pub trait AsmGenerator {
 
     fn gen_stmt_asm(&mut self, stmt: Statement) -> RustCcResult<()> {
         match stmt {
-            Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => {
-                    // TODO: this is ugly, should be some way to stop generating ASM
-                    self.gen_l15_asm(exp)?;
-                    self.ret();
+            Statement::Return(exp_opt) => {
+                match exp_opt {
+                    Some(exp) => {
+                        // TODO: this is ugly, should be some way to stop generating ASM
+                        self.gen_l15_asm(exp)?;
+                    }
+                    // C standard states that int fns without a return value return 0 by default
+                    None => {
+                        self.mov_into_primary("0");
+                    }
                 }
-                // C standard states that int fns without a return value return 0 by default
-                None => self.mov_into_primary("0"),
-            },
+                self.ret();
+            }
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
                     self.gen_l15_asm(exp)?;
