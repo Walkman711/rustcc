@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     // parsed_program.pretty_print(0);
 
     // Translate to assembly
-    let mut arm_generator = ArmGenerator::default();
+    let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;
     arm_generator.gen_asm(&asm_filename, parsed_program)?;
 
     // let mut x86_generator = x86Generator::default();

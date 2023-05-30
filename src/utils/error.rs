@@ -10,6 +10,8 @@ pub enum RustCcError {
     ParseError(#[from] ParseError),
     #[error("Scope Error: {0}")]
     ScopeError(#[from] ScopeError),
+    #[error("Function Error: {0}")]
+    FunctionError(#[from] FunctionError),
     #[error("Codegen Error: {0}")]
     CodegenError(#[from] CodegenError),
 }
@@ -28,6 +30,8 @@ pub enum ParseError {
 pub enum ScopeError {
     #[error("Initialized `{0}` twice in the same scope")]
     InitializedTwiceInSameScope(String),
+    #[error("Tried to use `{0}` as a variable name in a function, but it's already being used as a param name")]
+    ReusedParamName(String),
     #[error("Declared `{0}` twice in the same scope")]
     DeclaredTwiceInSameScope(String),
     #[error("`{0}` is not initialized in this scope")]
@@ -36,6 +40,16 @@ pub enum ScopeError {
     Undeclared(String),
     #[error("No longer in any scope")]
     NoScope,
+}
+
+#[derive(Debug, Error)]
+pub enum FunctionError {
+    #[error("Expected {0} arguments for function call, but passed in {1}")]
+    ArgumentMismatch(usize, usize),
+    #[error("Defined function {0} multiple times in program")]
+    MultipleDefinitions(String),
+    #[error("There is no declaration or definition for {0}")]
+    UndeclaredFunction(String),
 }
 
 #[derive(Debug, Error)]

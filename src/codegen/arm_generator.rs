@@ -2,11 +2,15 @@ use super::{
     asm_generator::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
     context::Context,
+    function_map::FunctionMap,
 };
 
 use crate::{
-    parsing::parser_types::Function,
-    utils::scoped_map::{ScopedMap, VarLoc},
+    parsing::parser_types::{Function, Program},
+    utils::{
+        error::RustCcError,
+        scoped_map::{ScopedMap, VarLoc},
+    },
 };
 
 pub struct ArmGenerator {
@@ -17,11 +21,16 @@ pub struct ArmGenerator {
     break_stack: Vec<usize>,
     continue_stack: Vec<usize>,
     fc: Vec<Context>,
+    fn_map: FunctionMap,
 }
 
-impl Default for ArmGenerator {
-    fn default() -> Self {
-        Self {
+impl TryFrom<&Program> for ArmGenerator {
+    type Error = RustCcError;
+
+    fn try_from(value: &Program) -> Result<Self, Self::Error> {
+        let fn_map = FunctionMap::try_from(value)?;
+
+        Ok(Self {
             sp: 0,
             curr_jmp_label: 0,
             scoped_map: ScopedMap::default(),
@@ -29,7 +38,8 @@ impl Default for ArmGenerator {
             break_stack: vec![],
             continue_stack: vec![],
             fc: vec![Context::default()],
-        }
+            fn_map,
+        })
     }
 }
 
@@ -38,6 +48,10 @@ impl AsmGenerator for ArmGenerator {
     const BACKUP_REGISTER: &'static str = "w1";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
     const UNARY_ARGS: &'static str = "w0, w0";
+
+    fn get_fn_map(&self) -> &FunctionMap {
+        &self.fn_map
+    }
 
     fn get_scoped_map(&self) -> &ScopedMap {
         &self.scoped_map

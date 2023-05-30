@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashMap, fs::File};
+use std::{cmp::max, fs::File};
 
 use crate::{
     gen_level_asm,
@@ -12,6 +12,7 @@ use crate::{
 use super::{
     codegen_enums::{Arch, Cond, Mnemonic},
     context::{Context, Instruction},
+    function_map::FunctionMap,
 };
 
 pub const INT_SIZE: usize = 8;
@@ -24,6 +25,7 @@ pub trait AsmGenerator {
 
     fn get_scoped_map(&self) -> &ScopedMap;
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
+    fn get_fn_map(&self) -> &FunctionMap;
 
     // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
     fn write_to_buffer(&mut self, inst: Instruction) {
@@ -83,10 +85,6 @@ pub trait AsmGenerator {
         let sp = self.stack_ptr();
         let fc = self.curr_function_context_mut();
         fc.max_stack_offset = max(fc.max_stack_offset, sp);
-        // println!(
-        //     "\nFC after pushing to stack {:?}",
-        //     self.get_function_context()
-        // );
     }
 
     fn logical_comparison(&mut self, cond: Cond);
@@ -117,46 +115,6 @@ pub trait AsmGenerator {
     fn curr_function_context_mut(&mut self) -> &mut Context;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
-        // TODO: pull into validation fn
-        let mut fun_map: HashMap<String, (bool, usize)> = HashMap::new();
-        pub const DEFINED: bool = true;
-        for function in &prog.0 {
-            match function {
-                Function::Definition(name, args, _) => {
-                    if let Some((already_defined, num_args)) =
-                        fun_map.insert(name.to_owned(), (DEFINED, args.len()))
-                    {
-                        if already_defined {
-                            panic!("defined fn twice, add better error");
-                        }
-
-                        if num_args != args.len() {
-                            panic!("different number of args")
-                        }
-
-                        if num_args > 8 {
-                            todo!("Pass extra parameters on the stack.")
-                        }
-                    } else {
-                        fun_map.insert(name.to_owned(), (DEFINED, args.len()));
-                    }
-                }
-                Function::Declaration(name, args) => {
-                    if let Some((_already_declared, num_args)) = fun_map.get(name) {
-                        if *num_args != args.len() {
-                            panic!("different number of args")
-                        }
-
-                        if *num_args > 8 {
-                            todo!("Pass extra parameters on the stack.")
-                        }
-                    } else {
-                        fun_map.insert(name.to_owned(), (!DEFINED, args.len()));
-                    }
-                }
-            }
-        }
-
         for function in prog.0 {
             let Function::Definition(_id, ref params, block_items) = &function else {
                 continue;
@@ -171,9 +129,11 @@ pub trait AsmGenerator {
             for reg in 0..params.len() {
                 // mov arg from register into primary
                 self.mov_into_primary(&format!("w{reg}"));
+
                 // initialize var in current scope
                 let sm = self.get_scoped_map_mut();
-                sm.initialize_var(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                // sm.initialize_var(&params[reg], VarLoc::CurrFrame(var_loc))?;
                 var_loc += INT_SIZE;
 
                 // save arg onto stack
@@ -438,8 +398,6 @@ pub trait AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) -> RustCcResult<()> {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
-                // println!("ASSIGN {identifier} = {l15_exp}");
-                // let var_loc = self.stack_ptr();
                 let sm = self.get_scoped_map_mut();
                 let var_loc = sm.assign_var(&identifier)?;
                 self.gen_l15_asm(*l15_exp)?;
@@ -597,7 +555,8 @@ pub trait AsmGenerator {
                 }
             }
             Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp)?,
-            Level2Exp::FunctionCall(fun_name, params) => {
+            Level2Exp::FunctionCall(fn_name, params) => {
+                self.get_fn_map().validate_fn_call(&fn_name, params.len())?;
                 for (reg, param) in params.iter().enumerate() {
                     // HACK: we can only pass 8 args, so just store the args to be passed in w0-w7
                     // in w8-w15 until we generate all the expressions
@@ -612,7 +571,7 @@ pub trait AsmGenerator {
                 }
 
                 // FIX: only for ARM
-                self.write_inst(&format!("bl _{fun_name}"));
+                self.write_inst(&format!("bl _{fn_name}"));
             }
         }
         Ok(())

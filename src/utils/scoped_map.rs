@@ -72,8 +72,12 @@ impl ScopedMap {
 
         if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
             match state {
-                VarState::Param | VarState::InitializedInThisScope => {
-                    panic!("why am i initializing\n{last:?}");
+                VarState::Param => {
+                    Err(RustCcError::ScopeError(ScopeError::ReusedParamName(
+                        var.to_owned(),
+                    )))?;
+                }
+                VarState::InitializedInThisScope => {
                     Err(RustCcError::ScopeError(
                         ScopeError::InitializedTwiceInSameScope(var.to_owned()),
                     ))?;
