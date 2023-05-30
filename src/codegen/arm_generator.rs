@@ -82,12 +82,20 @@ impl AsmGenerator for ArmGenerator {
     }
 
     // TODO: change name to load_var()
-    fn load_from_stack(&mut self, reg_to_load_into: &str, loc: VarLoc) {
+    fn load_var(&mut self, reg_to_load_into: &str, loc: VarLoc) {
         // println!("load from stack {reg_to_load_into} <- {loc:?}");
-        if let VarLoc::Register(reg_to_load_from) = loc {
-            self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
-        } else {
-            self.write_address_inst(&format!("ldr   {reg_to_load_into}"), loc)
+        match loc {
+            VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
+                self.write_address_inst(&format!("ldr   {reg_to_load_into}"), loc)
+            }
+            VarLoc::Register(reg_to_load_from) => {
+                self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
+            }
+            VarLoc::Global(id) => {
+                self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
+                self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
+                self.write_inst("mov   w0, w8");
+            }
         }
     }
 

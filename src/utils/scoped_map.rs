@@ -11,12 +11,12 @@ enum VarState {
     DeclaredInOuterScope,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum VarLoc {
     CurrFrame(usize),
     PrevFrame(usize),
     Register(usize),
-    Global,
+    Global(String),
 }
 
 #[derive(Clone, Debug)]
@@ -133,7 +133,7 @@ impl ScopedMap {
                 }
                 VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {}
             }
-            Ok(var_details.loc)
+            Ok(var_details.loc.clone())
         } else {
             Err(RustCcError::ScopeError(ScopeError::Undeclared(
                 var.to_owned(),

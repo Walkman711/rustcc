@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
 
     // dbg!(&parsed_program);
     // println!("{parsed_program}");
-    parsed_program.pretty_print(0);
+    // parsed_program.pretty_print(0);
 
     // Translate to assembly
     let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;

@@ -74,9 +74,9 @@ pub trait AsmGenerator {
     fn increment_stack_ptr(&mut self);
     fn decrement_stack_ptr(&mut self);
     fn save_to_stack(&mut self, stack_offset: usize);
-    fn load_from_stack(&mut self, reg: &str, loc: VarLoc);
+    fn load_var(&mut self, reg: &str, loc: VarLoc);
     fn pop_stack_into_backup(&mut self) {
-        self.load_from_stack(Self::BACKUP_REGISTER, VarLoc::CurrFrame(self.stack_ptr()));
+        self.load_var(Self::BACKUP_REGISTER, VarLoc::CurrFrame(self.stack_ptr()));
         self.decrement_stack_ptr();
     }
     fn push_stack(&mut self) {
@@ -118,11 +118,11 @@ pub trait AsmGenerator {
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
                 self.get_scoped_map_mut()
-                    .initialize_var(id, VarLoc::Global)?;
+                    .initialize_var(id, VarLoc::Global(id.to_owned()))?;
                 self.write_inst(".section __DATA,__data");
-                self.write_inst(".align 2");
+                self.write_inst(".p2align 2");
                 self.write_inst(&format!(".global _{id}"));
-                self.write_inst(&format!("_{id}"));
+                self.write_inst(&format!("_{id}:"));
                 self.write_inst(&format!("\t.long {val}"));
             }
         }
@@ -432,7 +432,7 @@ pub trait AsmGenerator {
                         panic!("tried to assign to a var in a prev stack frame")
                     }
                     VarLoc::Register(_) => panic!("tried to assign to a var in register"),
-                    VarLoc::Global => todo!("assign to global in fn"),
+                    VarLoc::Global(..) => todo!("impl assign to global in fn"),
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {
@@ -569,7 +569,7 @@ pub trait AsmGenerator {
             Level2Exp::Var(identifier) => {
                 let sm = self.get_scoped_map_mut();
                 let var_details = sm.get_var(&identifier)?;
-                self.load_from_stack(Self::PRIMARY_REGISTER, var_details.loc);
+                self.load_var(Self::PRIMARY_REGISTER, var_details.loc);
             }
             Level2Exp::Unary(op, factor) => {
                 self.gen_l2_asm(*factor)?;

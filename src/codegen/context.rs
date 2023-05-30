@@ -63,6 +63,8 @@ impl Context {
             Arch::x86 => todo!(),
             Arch::ARM => {
                 self.prologue
+                    .push(".section    __TEXT,__text,regular,pure_instructions".to_string());
+                self.prologue
                     .push(format!(".global _{}", self.function_name));
                 self.prologue.push(".align 2".to_string());
                 self.prologue.push(format!("_{}:", self.function_name));
@@ -111,7 +113,7 @@ impl Context {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
                             VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
                             VarLoc::Register(_reg) => unreachable!("checked above"),
-                            VarLoc::Global => 0,
+                            VarLoc::Global(_) => 0,
                         };
                         writeln!(f, "\t{inst}, [sp, {addend}]",)
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)
