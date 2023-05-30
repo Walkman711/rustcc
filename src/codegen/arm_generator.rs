@@ -105,12 +105,12 @@ impl AsmGenerator for ArmGenerator {
     fn logical_comparison(&mut self, cond: Cond) {
         // Compare registers
         self.write_inst(&format!(
-            "cmp  {}, {}",
+            "cmp   {}, {}",
             Self::BACKUP_REGISTER,
             Self::PRIMARY_REGISTER
         ));
         // set lower byte of reg_a based on if cond is satisfied
-        self.write_inst(&format!("cset w0, {}", cond.for_arch(self.get_arch())));
+        self.write_inst(&format!("cset  w0, {}", cond.for_arch(self.get_arch())));
         // zero-pad reg_a since cset only sets the lower byte
         self.write_inst("uxtb  w0, w0");
     }

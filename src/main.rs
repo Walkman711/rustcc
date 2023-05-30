@@ -30,9 +30,6 @@ fn main() -> anyhow::Result<()> {
     let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;
     arm_generator.gen_asm(&asm_filename, parsed_program)?;
 
-    // let mut x86_generator = x86Generator::default();
-    // x86_generator.gen_asm(&asm_filename, parsed_program);
-
     // Build
     Command::new("gcc")
         .arg("-o")

@@ -142,6 +142,9 @@ pub trait AsmGenerator {
 
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
+
+            // TODO: do i need to do anything with the size of the scope?
+            let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
         }
 
         self.write_to_file(asm_filename);
