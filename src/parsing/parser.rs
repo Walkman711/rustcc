@@ -231,7 +231,25 @@ impl Parser {
         Ok(block_items)
     }
 
-    parse_level!(parse_l15_exp, Level15Exp, Level15Op, parse_l14_exp);
+    fn parse_l15_exp(&mut self) -> RustCcResult<Level15Exp> {
+        let first_exp = self.parse_l14_exp()?;
+        let trailing_exps = vec![];
+        // TODO: actually handle commas. This is causing issues with parsing expressions for
+        // function calls.
+        // while let Some(tok) = self.lexer.next_token() {
+        //     if let Ok(op) = Level15Op::try_from(tok) {
+        //         let trailing_exp = self.parse_l14_exp()?;
+        //         trailing_exps.push((op, trailing_exp));
+        //     } else {
+        //         self.lexer.back();
+        //         break;
+        //     }
+        // }
+        let ret = Level15Exp((first_exp, trailing_exps));
+        Ok(ret)
+    }
+
+    // parse_level!(parse_l15_exp, Level15Exp, Level15Op, parse_l14_exp);
     parse_level!(parse_l12_exp, Level12Exp, Level12Op, parse_l11_exp);
     parse_level!(parse_l11_exp, Level11Exp, Level11Op, parse_l10_exp);
     parse_level!(parse_l10_exp, Level10Exp, Level10Op, parse_l9_exp);

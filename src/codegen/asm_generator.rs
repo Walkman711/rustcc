@@ -168,27 +168,16 @@ pub trait AsmGenerator {
 
             let mut var_loc = self.stack_ptr() + INT_SIZE;
 
-            // BORROW CHECKER: this is ugly due to issues with scoping. I think it can be cleaned
-            // up if we figure out a better setup for the scope map
-            // save primary
-            if params.len() >= 1 {
+            for reg in 0..params.len() {
+                // mov arg from register into primary
+                self.mov_into_primary(&format!("w{reg}"));
+                // initialize var in current scope
                 let sm = self.get_scoped_map_mut();
-                sm.initialize_var(&params[0], VarLoc::CurrFrame(var_loc))?;
-                self.push_stack();
-            }
-
-            // save secondary
-            if params.len() >= 2 {
-                self.mov_into_primary(Self::BACKUP_REGISTER);
-                let sm = self.get_scoped_map_mut();
+                sm.initialize_var(&params[reg], VarLoc::CurrFrame(var_loc))?;
                 var_loc += INT_SIZE;
-                sm.initialize_var(&params[1], VarLoc::CurrFrame(var_loc))?;
-                self.push_stack();
-            }
 
-            for reg in 2..params.len() {
-                let sm = self.get_scoped_map_mut();
-                sm.new_param(&params[reg], VarLoc::Register(reg))?;
+                // save arg onto stack
+                self.push_stack();
             }
 
             // PERF: don't clone this
@@ -605,10 +594,19 @@ pub trait AsmGenerator {
             }
             Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp)?,
             Level2Exp::FunctionCall(fun_name, params) => {
-                for param in params {
-                    self.gen_l15_asm(param)?;
-                    self.push_stack();
+                for (reg, param) in params.iter().enumerate() {
+                    // HACK: we can only pass 8 args, so just store the args to be passed in w0-w7
+                    // in w8-w15 until we generate all the expressions
+                    let tmp_reg = reg + 8;
+                    self.gen_l15_asm(param.to_owned())?;
+                    self.write_inst(&format!("mov w{tmp_reg}, w0"));
                 }
+
+                for reg in 0..params.len() {
+                    let tmp_reg = reg + 8;
+                    self.write_inst(&format!("mov w{reg}, w{tmp_reg}"));
+                }
+
                 // FIX: only for ARM
                 self.write_inst(&format!("bl _{fun_name}"));
             }
