@@ -115,35 +115,39 @@ pub trait AsmGenerator {
     fn curr_function_context_mut(&mut self) -> &mut Context;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
-        for function in prog.0 {
-            let Function::Definition(_id, ref params, block_items) = &function else {
-                continue;
-            };
+        for top_level_item in prog.0 {
+            match top_level_item {
+                TopLevelItem::Fun(ref function) => match function {
+                    Function::Declaration(_, _) => continue,
+                    Function::Definition(_id, params, block_items) => {
+                        self.new_function_context(&function);
 
-            self.new_function_context(&function);
+                        self.get_scoped_map_mut().new_scope()?;
 
-            self.get_scoped_map_mut().new_scope()?;
+                        let mut var_loc = self.stack_ptr() + INT_SIZE;
 
-            let mut var_loc = self.stack_ptr() + INT_SIZE;
+                        for reg in 0..params.len() {
+                            // mov arg from register into primary
+                            self.mov_into_primary(&format!("w{reg}"));
 
-            for reg in 0..params.len() {
-                // mov arg from register into primary
-                self.mov_into_primary(&format!("w{reg}"));
+                            // Add param to the scope map
+                            let sm = self.get_scoped_map_mut();
+                            sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                            var_loc += INT_SIZE;
 
-                // Add param to the scope map
-                let sm = self.get_scoped_map_mut();
-                sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
-                var_loc += INT_SIZE;
+                            // save arg onto stack
+                            self.push_stack();
+                        }
 
-                // save arg onto stack
-                self.push_stack();
+                        // PERF: don't clone this
+                        self.gen_block_asm(block_items.to_owned())?;
+
+                        // TODO: do i need to do anything with the size of the scope?
+                        let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
+                    }
+                },
+                TopLevelItem::Var(_) => todo!(),
             }
-
-            // PERF: don't clone this
-            self.gen_block_asm(block_items.to_owned())?;
-
-            // TODO: do i need to do anything with the size of the scope?
-            let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
         }
 
         self.write_to_file(asm_filename);

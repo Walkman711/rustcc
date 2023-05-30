@@ -22,15 +22,15 @@ impl Parser {
 
 impl Parser {
     pub fn parse(&mut self) -> RustCcResult<Program> {
-        let mut functions = vec![];
+        let mut top_level_items = vec![];
         while self.lexer.peek().is_some() {
-            let function = self.parse_fn()?;
-            functions.push(function);
+            let tli = self.parse_top_level_item()?;
+            top_level_items.push(tli);
         }
-        Ok(Program(functions))
+        Ok(Program(top_level_items))
     }
 
-    fn parse_fn(&mut self) -> RustCcResult<Function> {
+    fn parse_top_level_item(&mut self) -> RustCcResult<TopLevelItem> {
         self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
 
         let tok = self
@@ -44,6 +44,36 @@ impl Parser {
                     Token::Identifier("any function name".to_string()), tok)));
         };
 
+        // DRY: could add a fn like get_next_token_expect_some??
+        let tok = self
+            .lexer
+            .next_token()
+            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+
+        match tok {
+            Token::SingleEquals => {
+                if let Some(Token::Integer(i)) = self.lexer.next_token() {
+                    self.lexer.expect_next(&Token::Semicolon)?;
+                    Ok(TopLevelItem::Var(GlobalVar::Definition(
+                        identifier, i as i64,
+                    )))
+                } else {
+                    Err(RustCcError::ParseError(ParseError::ExpectedToken(
+                        Token::Integer(100),
+                        tok,
+                    )))
+                }
+            }
+            Token::Semicolon => Ok(TopLevelItem::Var(GlobalVar::Declaration(identifier))),
+            _ => {
+                self.lexer.back();
+                let function = self.parse_fn(identifier)?;
+                Ok(TopLevelItem::Fun(function))
+            }
+        }
+    }
+
+    fn parse_fn(&mut self, identifier: String) -> RustCcResult<Function> {
         let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
         while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
@@ -54,7 +84,6 @@ impl Parser {
             self.lexer.advance_if_match(&Token::Comma);
         }
         self.lexer.expect_next(&Token::CloseParen)?;
-        // println!("{params:?}");
 
         if self.lexer.advance_if_match(&Token::Semicolon) {
             Ok(Function::Declaration(identifier, params))

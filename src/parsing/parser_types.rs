@@ -6,24 +6,72 @@ pub trait PrettyPrinter {
 }
 
 #[derive(Debug)]
-pub struct Program(pub Vec<Function>);
+pub struct Program(pub Vec<TopLevelItem>);
 
 impl PrettyPrinter for Program {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         println!("{tabs}PROGRAM");
-        for function in &self.0 {
-            function.pretty_print(indentation_level + 1);
+        for top_level_item in &self.0 {
+            top_level_item.pretty_print(indentation_level + 1);
         }
     }
 }
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for function in &self.0 {
-            writeln!(f, "{function}")?;
+        for top_level_item in &self.0 {
+            writeln!(f, "{top_level_item}")?;
         }
         Ok(())
+    }
+}
+#[derive(Clone, Debug)]
+pub enum GlobalVar {
+    Declaration(String),
+    Definition(String, i64),
+}
+
+impl PrettyPrinter for GlobalVar {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        match self {
+            GlobalVar::Declaration(id) => println!("{tabs}GLOBAL DECLARATION: {id}"),
+            GlobalVar::Definition(id, val) => println!("{tabs}GLOBAL DEFINITION: {id} = {val}"),
+        }
+    }
+}
+
+impl std::fmt::Display for GlobalVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GlobalVar::Declaration(id) => writeln!(f, "GLOBAL DECLARATION: {id}"),
+            GlobalVar::Definition(id, val) => writeln!(f, "GLOBAL DEFINITION: {id} = {val}"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum TopLevelItem {
+    Fun(Function),
+    Var(GlobalVar),
+}
+
+impl PrettyPrinter for TopLevelItem {
+    fn pretty_print(&self, indentation_level: usize) {
+        match self {
+            TopLevelItem::Fun(fun) => fun.pretty_print(indentation_level),
+            TopLevelItem::Var(var) => var.pretty_print(indentation_level),
+        }
+    }
+}
+
+impl std::fmt::Display for TopLevelItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TopLevelItem::Fun(fun) => writeln!(f, "{fun}"),
+            TopLevelItem::Var(var) => writeln!(f, "{var}"),
+        }
     }
 }
 
@@ -38,7 +86,7 @@ impl PrettyPrinter for Function {
         let tabs = "\t".repeat(indentation_level);
         match self {
             Function::Definition(func_name, params, block_items) => {
-                print!("{tabs}FUNCTION: {func_name}(");
+                print!("{tabs}FUNCTION DEFINITION: {func_name}(");
 
                 for param in params {
                     print!("{param}, ")
