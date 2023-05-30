@@ -16,7 +16,7 @@ impl TryFrom<&str> for Lexer {
 
         let chars_to_expand = vec![
             ';', '-', '!', '~', '(', ')', '{', '}', '&', '|', '<', '=', '>', '?', ':', '%', '*',
-            '+',
+            '+', ',',
         ];
         let mut expanded_program = program.to_string();
         for c in chars_to_expand {

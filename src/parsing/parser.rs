@@ -51,17 +51,23 @@ impl Parser {
                 panic!("bad param");
             };
             params.push(param);
+            self.lexer.advance_if_match(&Token::Comma);
         }
         self.lexer.expect_next(&Token::CloseParen)?;
+        // println!("{params:?}");
 
-        let mut block_items = self.parse_block_items()?;
+        if self.lexer.advance_if_match(&Token::Semicolon) {
+            Ok(Function::Declaration(identifier, params))
+        } else {
+            let mut block_items = self.parse_block_items()?;
 
-        let need_to_add_return = !block_items.iter().any(|bi| bi.has_return());
-        if need_to_add_return {
-            block_items.push(BlockItem::Stmt(Statement::Return(None)))
+            let need_to_add_return = !block_items.iter().any(|bi| bi.has_return());
+            if need_to_add_return {
+                block_items.push(BlockItem::Stmt(Statement::Return(None)))
+            }
+
+            Ok(Function::Definition(identifier, params, block_items))
         }
-
-        Ok(Function((identifier, params, block_items)))
     }
 
     fn parse_statement(&mut self) -> RustCcResult<Statement> {

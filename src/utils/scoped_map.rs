@@ -4,6 +4,7 @@ use super::error::{RustCcError, RustCcResult, ScopeError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum VarState {
+    Param,
     InitializedInThisScope,
     InitializedInOuterScope,
     DeclaredInThisScope,
@@ -14,6 +15,7 @@ enum VarState {
 pub enum VarLoc {
     CurrFrame(usize),
     PrevFrame(usize),
+    Register(usize),
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +39,27 @@ impl Default for ScopedMap {
 }
 
 impl ScopedMap {
+    pub fn new_param(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
+        let Some(last) = self.var_maps.last_mut() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        let details = VarDetails {
+            state: VarState::Param,
+            loc,
+        };
+
+        if let Some(VarDetails {
+            state: VarState::Param,
+            ..
+        }) = last.insert(var.to_owned(), details)
+        {
+            panic!("can't use same param name twice in a function");
+        }
+
+        Ok(())
+    }
+
     pub fn initialize_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
@@ -47,14 +70,18 @@ impl ScopedMap {
             loc,
         };
 
-        if let Some(VarDetails {
-            state: VarState::InitializedInThisScope,
-            ..
-        }) = last.insert(var.to_owned(), details)
-        {
-            Err(RustCcError::ScopeError(
-                ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-            ))?;
+        if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
+            match state {
+                VarState::Param | VarState::InitializedInThisScope => {
+                    panic!("why am i initializing\n{last:?}");
+                    Err(RustCcError::ScopeError(
+                        ScopeError::InitializedTwiceInSameScope(var.to_owned()),
+                    ))?;
+                }
+                VarState::InitializedInOuterScope
+                | VarState::DeclaredInThisScope
+                | VarState::DeclaredInOuterScope => {}
+            }
         }
 
         Ok(())
@@ -90,13 +117,16 @@ impl ScopedMap {
 
         if let Some(var_details) = last.get_mut(var) {
             match var_details.state {
+                VarState::Param => {
+                    panic!("Can't assign to a parameter. TODO: make an actual error");
+                }
                 VarState::DeclaredInThisScope => {
                     var_details.state = VarState::InitializedInThisScope
                 }
                 VarState::DeclaredInOuterScope => {
                     var_details.state = VarState::InitializedInOuterScope
                 }
-                _ => {}
+                VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {}
             }
             Ok(var_details.loc)
         } else {
@@ -113,9 +143,9 @@ impl ScopedMap {
 
         if let Some(details) = last.get(var) {
             match details.state {
-                VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {
-                    Ok(details.to_owned())
-                }
+                VarState::Param
+                | VarState::InitializedInThisScope
+                | VarState::InitializedInOuterScope => Ok(details.to_owned()),
                 VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => Err(
                     RustCcError::ScopeError(ScopeError::Uninitialized(var.to_owned())),
                 ),

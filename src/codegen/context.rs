@@ -1,4 +1,8 @@
-use crate::{codegen::codegen_enums::Arch, parsing::parser_types, utils::scoped_map::VarLoc};
+use crate::{
+    codegen::codegen_enums::Arch,
+    parsing::parser_types::{self, Function},
+    utils::scoped_map::VarLoc,
+};
 use std::io::Write;
 
 #[derive(Clone, Debug)]
@@ -29,10 +33,15 @@ impl Default for Context {
 }
 
 impl From<&parser_types::Function> for Context {
-    fn from(value: &parser_types::Function) -> Self {
+    fn from(function: &parser_types::Function) -> Self {
+        let (function_name, num_args) = match function {
+            Function::Definition(function_name, args, _) => (function_name.to_owned(), args.len()),
+            Function::Declaration(function_name, args) => (function_name.to_owned(), args.len()),
+        };
+
         Self {
-            function_name: value.0 .0.to_owned(),
-            num_args: value.0 .1.len(),
+            function_name,
+            num_args,
             max_stack_offset: 0,
             insts: vec![],
             prologue: vec![],
@@ -86,13 +95,21 @@ impl Context {
                     writeln!(f, "\t{inst}").expect("writeln! failed to write inst to file")
                 }
                 Instruction::Address(inst, loc) => {
-                    let addend = match loc {
-                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
-                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
-                    };
-                    writeln!(f, "\t{inst}, [sp, {addend}]",)
-                        // writeln!(f, "\t{inst}, [sp, {}]", offset)
-                        .expect("writeln! failed to write inst to file")
+                    if let VarLoc::Register(reg) = loc {
+                        // writeln!(f, "ldr??").unwrap();
+                        writeln!(f, "\t{inst}, w{reg}",)
+                            // writeln!(f, "\t{inst}, [sp, {}]", offset)
+                            .expect("writeln! failed to write inst to file")
+                    } else {
+                        let addend = match loc {
+                            VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                            VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                            VarLoc::Register(_reg) => unreachable!("checked above"),
+                        };
+                        writeln!(f, "\t{inst}, [sp, {addend}]",)
+                            // writeln!(f, "\t{inst}, [sp, {}]", offset)
+                            .expect("writeln! failed to write inst to file")
+                    }
                 }
             }
         }

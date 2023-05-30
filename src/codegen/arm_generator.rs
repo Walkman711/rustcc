@@ -62,14 +62,18 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
+        // println!("store to stack {stack_offset}");
         self.write_address_inst(&format!("str   w0"), VarLoc::CurrFrame(stack_offset));
-        // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
-        // self.write_inst(&format!("str   w0, [sp, {stack_offset}]"));
     }
 
-    fn load_from_stack(&mut self, reg: &str, loc: VarLoc) {
-        self.write_address_inst(&format!("ldr   {reg}"), loc);
-        // self.write_inst(&format!("ldr   {reg}, [sp, {stack_offset}]"));
+    // TODO: change name to load_var()
+    fn load_from_stack(&mut self, reg_to_load_into: &str, loc: VarLoc) {
+        // println!("load from stack {reg_to_load_into} <- {loc:?}");
+        if let VarLoc::Register(reg_to_load_from) = loc {
+            self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
+        } else {
+            self.write_address_inst(&format!("ldr   {reg_to_load_into}"), loc)
+        }
     }
 
     fn stack_ptr(&self) -> usize {

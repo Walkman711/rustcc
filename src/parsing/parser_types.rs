@@ -5,6 +5,7 @@ pub trait PrettyPrinter {
     fn pretty_print(&self, indentation_level: usize);
 }
 
+#[derive(Debug)]
 pub struct Program(pub Vec<Function>);
 
 impl PrettyPrinter for Program {
@@ -27,36 +28,65 @@ impl std::fmt::Display for Program {
 }
 
 #[derive(Clone, Debug)]
-pub struct Function(pub (String, Vec<String>, Vec<BlockItem>));
+pub enum Function {
+    Definition(String, Vec<String>, Vec<BlockItem>),
+    Declaration(String, Vec<String>),
+}
 
 impl PrettyPrinter for Function {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
-        let (func_name, params, block_items) = &self.0;
+        match self {
+            Function::Definition(func_name, params, block_items) => {
+                print!("{tabs}FUNCTION: {func_name}(");
 
-        print!("{tabs}FUNCTION: {func_name}(");
+                for param in params {
+                    print!("{param}, ")
+                }
+                println!(")");
+                println!("{tabs}{{");
+                for block_item in block_items {
+                    block_item.pretty_print(indentation_level + 1);
+                }
+                println!("{tabs}}}");
+            }
+            Function::Declaration(func_name, params) => {
+                print!("{tabs}FUNCTION DECLARATION: {func_name}(");
 
-        for param in params {
-            print!("{param}, ")
+                for param in params {
+                    print!("{param}, ")
+                }
+                println!(");");
+            }
         }
-        println!(")");
-        println!("{tabs}{{");
-        for block_item in block_items {
-            block_item.pretty_print(indentation_level + 1);
-        }
-        println!("{tabs}}}");
     }
 }
 
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (func_name, params, block_items) = &self.0;
-        writeln!(f, "FUNCTION: {func_name}({params:?})")?;
-        writeln!(f, "{{")?;
-        for block_item in block_items {
-            write!(f, "{block_item}")?;
+        match self {
+            Function::Definition(func_name, params, block_items) => {
+                write!(f, "FUNCTION: {func_name}(")?;
+
+                for param in params {
+                    write!(f, "{param}, ")?;
+                }
+                writeln!(f, ")")?;
+                writeln!(f, "{{")?;
+                for block_item in block_items {
+                    writeln!(f, "{block_item}")?;
+                }
+                writeln!(f, "}}")?;
+            }
+            Function::Declaration(func_name, params) => {
+                write!(f, "FUNCTION DECLARATION: {func_name}(")?;
+
+                for param in params {
+                    write!(f, "{param}, ")?;
+                }
+                writeln!(f, ");")?;
+            }
         }
-        writeln!(f, "}}")?;
         Ok(())
     }
 }
@@ -347,7 +377,7 @@ impl std::fmt::Display for Level2Exp {
             Level2Exp::Unary(op, exp) => write!(f, "{op} {exp}"),
             Level2Exp::ParenExp(exp) => write!(f, "{exp}"),
             Level2Exp::FunctionCall(fun_name, args) => {
-                write!(f, "{fun_name} (")?;
+                write!(f, "{fun_name}(")?;
                 for arg in args {
                     write!(f, "{arg}, ")?;
                 }
@@ -370,7 +400,7 @@ macro_rules! define_exp_level {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.0 .0)?;
                 for (op, exp) in &self.0 .1 {
-                    write!(f, "{op} {exp}")?;
+                    write!(f, " {op} {exp}")?;
                 }
                 Ok(())
             }

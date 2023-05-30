@@ -1,4 +1,4 @@
-use std::{cmp::max, fs::File};
+use std::{cmp::max, collections::HashMap, fs::File};
 
 use crate::{
     gen_level_asm,
@@ -117,32 +117,82 @@ pub trait AsmGenerator {
     fn curr_function_context_mut(&mut self) -> &mut Context;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
-        for function in prog.0 {
-            let prev_frame_size = self.curr_function_context().get_stack_frame_size();
-            self.new_function_context(&function);
-            let (_identifier, params, block_items) = &function.0;
+        // TODO: pull into validation fn
+        let mut fun_map: HashMap<String, (bool, usize)> = HashMap::new();
+        pub const DEFINED: bool = true;
+        for function in &prog.0 {
+            match function {
+                Function::Definition(name, args, _) => {
+                    if let Some((already_defined, num_args)) =
+                        fun_map.insert(name.to_owned(), (DEFINED, args.len()))
+                    {
+                        if already_defined {
+                            panic!("defined fn twice, add better error");
+                        }
 
-            // TODO: this is blatantly broken, but i wanted to see if the general idea is
-            // working
-            let mut var_loc = INT_SIZE;
-            let sm = self.get_scoped_map_mut();
-            // HACK: subtract this value from the stack frame of the callee function
-            // TODO: replace with an enum for var's stack frame
-            for param in params {
-                sm.initialize_var(param, VarLoc::PrevFrame(prev_frame_size - var_loc))?;
+                        if num_args != args.len() {
+                            panic!("different number of args")
+                        }
+
+                        if num_args > 8 {
+                            todo!("Pass extra parameters on the stack.")
+                        }
+                    } else {
+                        fun_map.insert(name.to_owned(), (DEFINED, args.len()));
+                    }
+                }
+                Function::Declaration(name, args) => {
+                    if let Some((_already_declared, num_args)) = fun_map.get(name) {
+                        if *num_args != args.len() {
+                            panic!("different number of args")
+                        }
+
+                        if *num_args > 8 {
+                            todo!("Pass extra parameters on the stack.")
+                        }
+                    } else {
+                        fun_map.insert(name.to_owned(), (!DEFINED, args.len()));
+                    }
+                }
+            }
+        }
+
+        for function in prog.0 {
+            let Function::Definition(_id, ref params, block_items) = &function else {
+                continue;
+            };
+
+            self.new_function_context(&function);
+
+            self.get_scoped_map_mut().new_scope()?;
+
+            let mut var_loc = self.stack_ptr() + INT_SIZE;
+
+            // BORROW CHECKER: this is ugly due to issues with scoping. I think it can be cleaned
+            // up if we figure out a better setup for the scope map
+            // save primary
+            if params.len() >= 1 {
+                let sm = self.get_scoped_map_mut();
+                sm.initialize_var(&params[0], VarLoc::CurrFrame(var_loc))?;
+                self.push_stack();
+            }
+
+            // save secondary
+            if params.len() >= 2 {
+                self.mov_into_primary(Self::BACKUP_REGISTER);
+                let sm = self.get_scoped_map_mut();
                 var_loc += INT_SIZE;
+                sm.initialize_var(&params[1], VarLoc::CurrFrame(var_loc))?;
+                self.push_stack();
+            }
+
+            for reg in 2..params.len() {
+                let sm = self.get_scoped_map_mut();
+                sm.new_param(&params[reg], VarLoc::Register(reg))?;
             }
 
             // PERF: don't clone this
             self.gen_block_asm(block_items.to_owned())?;
-
-            // let stack_offset = self.curr_function_context_mut().get_stack_frame_size();
-            // for line in &mut self.curr_function_context_mut().insts {
-            //     *line = line.replace("STACK_SIZE", &stack_offset.to_string());
-            // }
-            // self.get_buffer()
-            //     .iter_mut()
-            //     .map(|line| line.replace("STACK_SIZE", &stack_offset.to_string()));
         }
 
         self.write_to_file(asm_filename);
@@ -402,7 +452,10 @@ pub trait AsmGenerator {
                 self.gen_l15_asm(*l15_exp)?;
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
-                    VarLoc::PrevFrame(_) => panic!("tried to assign to a var in a prev frame"),
+                    VarLoc::PrevFrame(_) => {
+                        panic!("tried to assign to a var in a prev stack frame")
+                    }
+                    VarLoc::Register(_) => panic!("tried to assign to a var in register"),
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {
