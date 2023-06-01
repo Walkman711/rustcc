@@ -129,7 +129,9 @@ pub trait AsmGenerator {
 
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
-                todo!();
+                self.get_scoped_map_mut()
+                    .initialize_var(id, VarLoc::Global(id.to_owned()))?;
+                self.write_inst(&format!("\t.comm {id},4,2"));
             }
         }
 
@@ -207,7 +209,8 @@ pub trait AsmGenerator {
         }
 
         {
-            let variables_to_deallocate = self.get_scoped_map_mut().exit_scope()?;
+            let (variables_to_deallocate, globals_to_save) =
+                self.get_scoped_map_mut().exit_scope()?;
 
             for _ in 0..variables_to_deallocate {
                 self.decrement_stack_ptr();
@@ -378,7 +381,8 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
                 {
-                    let variables_to_deallocate = self.get_scoped_map_mut().exit_scope()?;
+                    let (variables_to_deallocate, globals_to_save) =
+                        self.get_scoped_map_mut().exit_scope()?;
 
                     for _ in 0..variables_to_deallocate {
                         self.decrement_stack_ptr();
@@ -423,8 +427,9 @@ pub trait AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) -> RustCcResult<()> {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
+                let sp = self.stack_ptr();
                 let sm = self.get_scoped_map_mut();
-                let var_loc = sm.assign_var(&identifier)?;
+                let var_loc = sm.assign_var(&identifier, sp)?;
                 self.gen_l15_asm(*l15_exp)?;
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
@@ -432,7 +437,8 @@ pub trait AsmGenerator {
                         panic!("tried to assign to a var in a prev stack frame")
                     }
                     VarLoc::Register(_) => panic!("tried to assign to a var in register"),
-                    VarLoc::Global(..) => todo!("impl assign to global in fn"),
+                    // TODO: make x8 a constant somewhere
+                    VarLoc::Global(..) => self.write_inst("mov   w0, [x8]"),
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {

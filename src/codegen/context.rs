@@ -113,7 +113,7 @@ impl Context {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
                             VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
                             VarLoc::Register(_reg) => unreachable!("checked above"),
-                            VarLoc::Global(_) => 0,
+                            VarLoc::Global(_) => 10000,
                         };
                         writeln!(f, "\t{inst}, [sp, {addend}]",)
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)

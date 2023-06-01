@@ -95,6 +95,9 @@ impl AsmGenerator for ArmGenerator {
                 self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
                 self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
                 self.write_inst("mov   w0, w8");
+                let sp = self.stack_ptr();
+                // self.push_stack();
+                // self.scoped_map.store_global_var_locally(&id, sp).unwrap();
             }
         }
     }
