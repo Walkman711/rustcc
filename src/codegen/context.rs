@@ -12,6 +12,7 @@ pub enum Instruction {
 }
 
 #[derive(Clone, Debug)]
+// TODO: un pub these
 pub struct Context {
     pub function_name: String,
     pub num_args: usize,
@@ -19,6 +20,9 @@ pub struct Context {
     pub insts: Vec<Instruction>,
     pub prologue: Vec<String>,
     pub scoped_map: ScopedMap,
+    pub break_stack: Vec<usize>,
+    pub continue_stack: Vec<usize>,
+    pub curr_jmp_label: usize,
 }
 
 impl Default for Context {
@@ -30,6 +34,9 @@ impl Default for Context {
             insts: vec![],
             prologue: vec![],
             scoped_map: ScopedMap::default(),
+            break_stack: vec![],
+            continue_stack: vec![],
+            curr_jmp_label: 0,
         }
     }
 }
@@ -48,6 +55,9 @@ impl From<&parser_types::Function> for Context {
             insts: vec![],
             prologue: vec![],
             scoped_map: ScopedMap::default(),
+            break_stack: vec![],
+            continue_stack: vec![],
+            curr_jmp_label: 0,
         }
     }
 }
@@ -59,6 +69,11 @@ impl Context {
         let unaligned = default_size + arg_size + self.max_stack_offset;
         let diff = 16 - (unaligned % 16);
         unaligned + diff
+    }
+
+    pub fn get_next_jmp_label(&mut self) -> usize {
+        self.curr_jmp_label += 1;
+        self.curr_jmp_label
     }
 
     fn fn_prologue(&mut self, arch: Arch) {

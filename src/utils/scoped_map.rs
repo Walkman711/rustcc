@@ -140,7 +140,6 @@ impl ScopedMap {
 
             Ok(var_details.loc.clone())
         } else {
-            println!("here");
             Err(RustCcError::ScopeError(ScopeError::Undeclared(
                 var.to_owned(),
             )))

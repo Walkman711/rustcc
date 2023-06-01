@@ -12,10 +12,6 @@ use crate::{
 
 pub struct ArmGenerator {
     sp: usize,
-    curr_jmp_label: usize,
-    arch: Arch,
-    break_stack: Vec<usize>,
-    continue_stack: Vec<usize>,
     fn_map: FunctionMap,
     global_context: GlobalContext,
 }
@@ -28,10 +24,6 @@ impl TryFrom<&Program> for ArmGenerator {
 
         Ok(Self {
             sp: 0,
-            curr_jmp_label: 0,
-            arch: Arch::ARM,
-            break_stack: vec![],
-            continue_stack: vec![],
             fn_map,
             global_context: GlobalContext::default(),
         })
@@ -49,7 +41,7 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn get_arch(&self) -> Arch {
-        self.arch
+        Arch::ARM
     }
 
     fn fn_epilogue(&mut self) {
@@ -123,29 +115,8 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("uxtb  w0, w0");
     }
 
-    fn get_next_jmp_label(&mut self) -> usize {
-        self.curr_jmp_label += 1;
-        self.curr_jmp_label
-    }
-
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
         self.write_inst(&format!("b{} .L{lbl}", cond.for_arch(self.get_arch())));
-    }
-
-    fn get_break_stack(&self) -> &Vec<usize> {
-        &self.break_stack
-    }
-
-    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.break_stack
-    }
-
-    fn get_continue_stack(&self) -> &Vec<usize> {
-        &self.continue_stack
-    }
-
-    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.continue_stack
     }
 
     fn gen_remainder_inst(&mut self) {

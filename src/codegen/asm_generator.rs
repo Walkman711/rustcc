@@ -93,15 +93,30 @@ pub trait AsmGenerator {
     fn logical_comparison(&mut self, cond: Cond);
     fn logical_not(&mut self);
 
-    fn get_next_jmp_label(&mut self) -> usize;
+    fn get_next_jmp_label(&mut self) -> usize {
+        self.curr_function_context_mut().get_next_jmp_label()
+    }
+
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
     fn write_jmp_label(&mut self, lbl: usize) {
         self.write_to_buffer(Instruction::NoOffset(format!(".L{lbl}:")));
     }
-    fn get_break_stack(&self) -> &Vec<usize>;
-    fn get_break_stack_mut(&mut self) -> &mut Vec<usize>;
-    fn get_continue_stack(&self) -> &Vec<usize>;
-    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize>;
+
+    fn get_break_stack(&self) -> &Vec<usize> {
+        &self.curr_function_context().break_stack
+    }
+
+    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.curr_function_context_mut().break_stack
+    }
+
+    fn get_continue_stack(&self) -> &Vec<usize> {
+        &self.curr_function_context().continue_stack
+    }
+
+    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.curr_function_context_mut().continue_stack
+    }
 
     fn cmp_primary_with_zero(&mut self) {
         self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
@@ -116,6 +131,7 @@ pub trait AsmGenerator {
     fn curr_function_context(&self) -> &Context {
         self.global_context().curr_function_context()
     }
+
     fn curr_function_context_mut(&mut self) -> &mut Context {
         self.global_context_mut().curr_function_context_mut()
     }
