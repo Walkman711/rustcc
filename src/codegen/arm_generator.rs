@@ -1,27 +1,23 @@
 use super::{
     asm_generator::{AsmGenerator, INT_SIZE},
     codegen_enums::{Arch, Cond},
-    context::Context,
+    context::GlobalContext,
     function_map::FunctionMap,
 };
 
 use crate::{
-    parsing::parser_types::{Function, Program},
-    utils::{
-        error::RustCcError,
-        scoped_map::{ScopedMap, VarLoc},
-    },
+    parsing::parser_types::Program,
+    utils::{error::RustCcError, scoped_map::VarLoc},
 };
 
 pub struct ArmGenerator {
     sp: usize,
     curr_jmp_label: usize,
-    scoped_map: ScopedMap,
     arch: Arch,
     break_stack: Vec<usize>,
     continue_stack: Vec<usize>,
-    fc: Vec<Context>,
     fn_map: FunctionMap,
+    global_context: GlobalContext,
 }
 
 impl TryFrom<&Program> for ArmGenerator {
@@ -33,12 +29,11 @@ impl TryFrom<&Program> for ArmGenerator {
         Ok(Self {
             sp: 0,
             curr_jmp_label: 0,
-            scoped_map: ScopedMap::default(),
             arch: Arch::ARM,
             break_stack: vec![],
             continue_stack: vec![],
-            fc: vec![Context::default()],
             fn_map,
+            global_context: GlobalContext::default(),
         })
     }
 }
@@ -51,14 +46,6 @@ impl AsmGenerator for ArmGenerator {
 
     fn get_fn_map(&self) -> &FunctionMap {
         &self.fn_map
-    }
-
-    fn get_scoped_map(&self) -> &ScopedMap {
-        &self.scoped_map
-    }
-
-    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
-        &mut self.scoped_map
     }
 
     fn get_arch(&self) -> Arch {
@@ -173,21 +160,11 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sub   w0, w1, w0")
     }
 
-    fn new_function_context(&mut self, function: &Function) {
-        self.fc.push(Context::from(function));
+    fn global_context(&self) -> &GlobalContext {
+        &self.global_context
     }
 
-    fn function_contexts_mut(&mut self) -> &mut [Context] {
-        &mut self.fc
-    }
-
-    fn curr_function_context(&self) -> &Context {
-        self.fc.last().expect("Will always have a global context.")
-    }
-
-    fn curr_function_context_mut(&mut self) -> &mut Context {
-        self.fc
-            .last_mut()
-            .expect("Will always have a global context.")
+    fn global_context_mut(&mut self) -> &mut GlobalContext {
+        &mut self.global_context
     }
 }

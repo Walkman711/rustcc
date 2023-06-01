@@ -140,6 +140,7 @@ impl ScopedMap {
 
             Ok(var_details.loc.clone())
         } else {
+            println!("here");
             Err(RustCcError::ScopeError(ScopeError::Undeclared(
                 var.to_owned(),
             )))
@@ -220,5 +221,21 @@ impl ScopedMap {
             }
             None => todo!("add an error for exiting scope when we've already exited all scopes"),
         }
+    }
+
+    // PERF: remove clones?
+    pub fn get_globals(&self) -> RustCcResult<Vec<(String, VarDetails)>> {
+        let Some(last) = self.var_maps.last() else {
+            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+        };
+
+        let mut globals = vec![];
+        for (id, details) in last {
+            if let VarLoc::Global(..) = &details.loc {
+                globals.push((id.to_owned(), details.to_owned()));
+            }
+        }
+
+        Ok(globals)
     }
 }

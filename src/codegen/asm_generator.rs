@@ -11,7 +11,7 @@ use crate::{
 
 use super::{
     codegen_enums::{Arch, Cond, Mnemonic},
-    context::{Context, Instruction},
+    context::{Context, GlobalContext, Instruction},
     function_map::FunctionMap,
 };
 
@@ -23,8 +23,14 @@ pub trait AsmGenerator {
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
 
-    fn get_scoped_map(&self) -> &ScopedMap;
-    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap;
+    fn get_scoped_map(&self) -> &ScopedMap {
+        &self.curr_function_context().scoped_map
+    }
+
+    fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
+        &mut self.curr_function_context_mut().scoped_map
+    }
+
     fn get_fn_map(&self) -> &FunctionMap;
 
     // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
@@ -35,10 +41,7 @@ pub trait AsmGenerator {
     fn write_to_file(&mut self, asm_filename: &str) {
         let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
         let arch = self.get_arch();
-        // TODO: this is a hack for now, will fold into context
-        for ctx in self.function_contexts_mut() {
-            ctx.write_to_file(&mut asm_file, arch);
-        }
+        self.global_context_mut().write_to_file(&mut asm_file, arch);
     }
 
     fn write_inst(&mut self, inst: &str) {
@@ -109,15 +112,21 @@ pub trait AsmGenerator {
     }
 
     fn gen_remainder_inst(&mut self);
-    fn function_contexts_mut(&mut self) -> &mut [Context];
-    fn new_function_context(&mut self, function: &Function);
-    fn curr_function_context(&self) -> &Context;
-    fn curr_function_context_mut(&mut self) -> &mut Context;
+
+    fn curr_function_context(&self) -> &Context {
+        self.global_context().curr_function_context()
+    }
+    fn curr_function_context_mut(&mut self) -> &mut Context {
+        self.global_context_mut().curr_function_context_mut()
+    }
+    fn global_context(&self) -> &GlobalContext;
+    fn global_context_mut(&mut self) -> &mut GlobalContext;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
-                self.get_scoped_map_mut()
+                self.global_context_mut()
+                    .scoped_map
                     .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
                 self.write_inst(".section __DATA,__data");
                 self.write_inst(".p2align 2");
@@ -129,7 +138,9 @@ pub trait AsmGenerator {
 
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
-                self.get_scoped_map_mut()
+                // FIX: need to have a global context
+                self.global_context_mut()
+                    .scoped_map
                     .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
                 self.write_inst(&format!("\t.comm {id},4,2"));
             }
@@ -143,7 +154,7 @@ pub trait AsmGenerator {
             match function {
                 Function::Declaration(_, _) => continue,
                 Function::Definition(_id, params, block_items) => {
-                    self.new_function_context(&function);
+                    self.global_context_mut().new_function_context(function);
 
                     self.get_scoped_map_mut().new_scope()?;
 

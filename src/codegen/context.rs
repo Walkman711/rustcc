@@ -1,9 +1,9 @@
 use crate::{
     codegen::codegen_enums::Arch,
     parsing::parser_types::{self, Function},
-    utils::scoped_map::VarLoc,
+    utils::scoped_map::{ScopedMap, VarLoc},
 };
-use std::io::Write;
+use std::{fs::File, io::Write};
 
 #[derive(Clone, Debug)]
 pub enum Instruction {
@@ -18,6 +18,7 @@ pub struct Context {
     pub max_stack_offset: usize,
     pub insts: Vec<Instruction>,
     pub prologue: Vec<String>,
+    pub scoped_map: ScopedMap,
 }
 
 impl Default for Context {
@@ -28,6 +29,7 @@ impl Default for Context {
             max_stack_offset: 0,
             insts: vec![],
             prologue: vec![],
+            scoped_map: ScopedMap::default(),
         }
     }
 }
@@ -45,6 +47,7 @@ impl From<&parser_types::Function> for Context {
             max_stack_offset: 0,
             insts: vec![],
             prologue: vec![],
+            scoped_map: ScopedMap::default(),
         }
     }
 }
@@ -74,8 +77,17 @@ impl Context {
                     .push(format!("\tsub   sp, sp, {stack_offset}"));
                 self.prologue.push(format!("\tstp   x29, x30, [sp, -16]!",));
                 self.prologue.push("\tmov   x29, sp".to_string());
+
                 // TODO: load globals in at prologue time?
                 // NOTE: requires moving scope map in here
+                for (id, details) in self.scoped_map.get_globals().unwrap() {
+                    if let VarLoc::Global(_, Some(offset)) = details.loc {
+                        self.prologue.push(format!("adrp  x8, _{id}@PAGE"));
+                        self.prologue.push(format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
+                        self.prologue.push("mov   w0, w8".to_string());
+                        self.prologue.push(format!("str   w0, [sp, {offset}]"));
+                    }
+                }
             }
         }
     }
@@ -123,6 +135,46 @@ impl Context {
                     }
                 }
             }
+        }
+    }
+}
+
+// TODO: add function map?
+pub struct GlobalContext {
+    pub scoped_map: ScopedMap,
+    pub function_contexts: Vec<Context>,
+}
+
+impl Default for GlobalContext {
+    fn default() -> Self {
+        Self {
+            scoped_map: ScopedMap::default(),
+            function_contexts: vec![],
+        }
+    }
+}
+
+impl GlobalContext {
+    pub fn new_function_context(&mut self, function: &parser_types::Function) {
+        let ctx = Context::from(function);
+        self.function_contexts.push(ctx);
+    }
+
+    pub fn curr_function_context(&self) -> &Context {
+        self.function_contexts
+            .last()
+            .expect("Will always have a global context.")
+    }
+
+    pub fn curr_function_context_mut(&mut self) -> &mut Context {
+        self.function_contexts
+            .last_mut()
+            .expect("Will always have a global context.")
+    }
+
+    pub fn write_to_file(&mut self, asm_file: &mut File, arch: Arch) {
+        for ctx in &mut self.function_contexts {
+            ctx.write_to_file(asm_file, arch);
         }
     }
 }
