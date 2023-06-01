@@ -118,7 +118,7 @@ pub trait AsmGenerator {
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
                 self.get_scoped_map_mut()
-                    .initialize_var(id, VarLoc::Global(id.to_owned()))?;
+                    .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
                 self.write_inst(".section __DATA,__data");
                 self.write_inst(".p2align 2");
                 self.write_inst(&format!(".global _{id}"));
@@ -130,7 +130,7 @@ pub trait AsmGenerator {
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
                 self.get_scoped_map_mut()
-                    .initialize_var(id, VarLoc::Global(id.to_owned()))?;
+                    .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
                 self.write_inst(&format!("\t.comm {id},4,2"));
             }
         }
@@ -211,6 +211,11 @@ pub trait AsmGenerator {
         {
             let (variables_to_deallocate, globals_to_save) =
                 self.get_scoped_map_mut().exit_scope()?;
+
+            for (id, offset) in globals_to_save {
+                self.write_inst(&format!("ldr   w0, [sp, {offset}]"));
+                self.write_inst(&format!("str w0, [x9]"));
+            }
 
             for _ in 0..variables_to_deallocate {
                 self.decrement_stack_ptr();
@@ -384,6 +389,11 @@ pub trait AsmGenerator {
                     let (variables_to_deallocate, globals_to_save) =
                         self.get_scoped_map_mut().exit_scope()?;
 
+                    for (id, offset) in globals_to_save {
+                        self.write_inst(&format!("ldr   w0, [sp, {offset}]"));
+                        self.write_inst(&format!("str w0, [x8]"));
+                    }
+
                     for _ in 0..variables_to_deallocate {
                         self.decrement_stack_ptr();
                     }
@@ -438,7 +448,10 @@ pub trait AsmGenerator {
                     }
                     VarLoc::Register(_) => panic!("tried to assign to a var in register"),
                     // TODO: make x8 a constant somewhere
-                    VarLoc::Global(..) => self.write_inst("mov   w0, [x8]"),
+                    // FIX: doesn't work with more than one global
+                    // TODO:
+                    VarLoc::Global(_, None) => self.write_inst("mov   w0, [x8]"),
+                    VarLoc::Global(_, Some(offset)) => self.save_to_stack(offset),
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {

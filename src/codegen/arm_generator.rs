@@ -91,13 +91,16 @@ impl AsmGenerator for ArmGenerator {
             VarLoc::Register(reg_to_load_from) => {
                 self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
             }
-            VarLoc::Global(id) => {
+            VarLoc::Global(id, None) => {
                 self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
                 self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
                 self.write_inst("mov   w0, w8");
-                let sp = self.stack_ptr();
+                // let sp = self.stack_ptr();
                 // self.push_stack();
                 // self.scoped_map.store_global_var_locally(&id, sp).unwrap();
+            }
+            VarLoc::Global(_id, Some(offset)) => {
+                self.write_inst(&format!("ldr   {reg_to_load_into} [sp, {offset}"))
             }
         }
     }

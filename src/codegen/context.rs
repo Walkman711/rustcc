@@ -74,6 +74,8 @@ impl Context {
                     .push(format!("\tsub   sp, sp, {stack_offset}"));
                 self.prologue.push(format!("\tstp   x29, x30, [sp, -16]!",));
                 self.prologue.push("\tmov   x29, sp".to_string());
+                // TODO: load globals in at prologue time?
+                // NOTE: requires moving scope map in here
             }
         }
     }
@@ -113,7 +115,7 @@ impl Context {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
                             VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
                             VarLoc::Register(_reg) => unreachable!("checked above"),
-                            VarLoc::Global(_) => 10000,
+                            VarLoc::Global(_, _) => 10000,
                         };
                         writeln!(f, "\t{inst}, [sp, {addend}]",)
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)

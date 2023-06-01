@@ -16,7 +16,7 @@ pub enum VarLoc {
     CurrFrame(usize),
     PrevFrame(usize),
     Register(usize),
-    Global(String),
+    Global(String, Option<usize>),
 }
 
 #[derive(Clone, Debug)]
@@ -134,9 +134,9 @@ impl ScopedMap {
                 VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {}
             }
 
-            // if let VarLoc::Global(..) = var_details.loc {
-            //     var_details.loc = VarLoc::CurrFrame(offset);
-            // }
+            if let VarLoc::Global(id, None) = &var_details.loc {
+                var_details.loc = VarLoc::Global(id.to_owned(), Some(offset));
+            }
 
             Ok(var_details.loc.clone())
         } else {
@@ -186,23 +186,23 @@ impl ScopedMap {
         Ok(())
     }
 
-    fn store_global_var_locally(&mut self, identifier: &str, offset: usize) -> RustCcResult<()> {
-        let Some(last) = self.var_maps.last_mut() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
-        };
+    // fn store_global_var_locally(&mut self, identifier: &str, offset: usize) -> RustCcResult<()> {
+    //     let Some(last) = self.var_maps.last_mut() else {
+    //         return Err(RustCcError::ScopeError(ScopeError::NoScope));
+    //     };
 
-        if let Some(var_details) = last.get_mut(identifier) {
-            let VarLoc::Global(..) = var_details.loc else {
-                panic!("var loc isn't global");
-            };
-            var_details.loc = VarLoc::CurrFrame(offset);
-            return Ok(());
-        }
+    //     if let Some(var_details) = last.get_mut(identifier) {
+    //         let VarLoc::Global(..) = var_details.loc else {
+    //             panic!("var loc isn't global");
+    //         };
+    //         var_details.loc = VarLoc::CurrFrame(offset);
+    //         return Ok(());
+    //     }
 
-        panic!("add a better error here for if the global var doesn't exist")
-    }
+    //     panic!("add a better error here for if the global var doesn't exist")
+    // }
 
-    pub fn exit_scope(&mut self) -> RustCcResult<(usize, Vec<String>)> {
+    pub fn exit_scope(&mut self) -> RustCcResult<(usize, Vec<(String, usize)>)> {
         let mut num_initialized_in_scope = 0;
         match self.var_maps.pop() {
             Some(vm) => {
@@ -212,8 +212,8 @@ impl ScopedMap {
                         num_initialized_in_scope += 1;
                     }
 
-                    if let VarLoc::Global(id) = details.loc {
-                        globals.push(id);
+                    if let VarLoc::Global(id, Some(offset)) = details.loc {
+                        globals.push((id, offset));
                     }
                 }
                 Ok((num_initialized_in_scope, globals))
