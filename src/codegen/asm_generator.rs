@@ -38,7 +38,6 @@ pub trait AsmGenerator {
 
     fn get_fn_map(&self) -> &FunctionMap;
 
-    // HACK: trying to see if we can just replace an arbitrary string to set stack offsets
     fn write_to_buffer(&mut self, inst: Instruction) {
         self.curr_function_context_mut().insts.push(inst);
     }
@@ -263,21 +262,8 @@ pub trait AsmGenerator {
         }
 
         {
-            let (variables_to_deallocate, globals_to_save) =
+            let (variables_to_deallocate, _globals_to_save) =
                 self.get_scoped_map_mut().exit_scope()?;
-
-            // DRY: make fn, also, where to store??
-            for global_loc in globals_to_save {
-                self.write_address_inst(
-                    &format!("ldr   {}", Self::GLOBAL_VAR_REGISTER),
-                    global_loc,
-                );
-                self.write_inst(&format!(
-                    "str   {}, [{}]",
-                    Self::PRIMARY_REGISTER,
-                    Self::GLOBAL_VAR_REGISTER
-                ));
-            }
 
             for _ in 0..variables_to_deallocate {
                 self.decrement_stack_ptr();
@@ -511,11 +497,7 @@ pub trait AsmGenerator {
                         ));
                     }
                     VarLoc::Global(id, offset) => {
-                        let page = if self.curr_function_context().function_name == "main" {
-                            "PAGE"
-                        } else {
-                            "GOTPAGE"
-                        };
+                        let page = self.curr_function_context().get_page_access();
                         self.write_inst(&format!(
                             "adrp  {}, _{id}@{page}",
                             Self::GLOBAL_VAR_REGISTER

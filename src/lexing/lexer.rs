@@ -183,6 +183,11 @@ impl Lexer {
         tok.map(|t| t.to_owned())
     }
 
+    pub fn next_token_fallible(&mut self) -> RustCcResult<Token> {
+        self.next_token()
+            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))
+    }
+
     pub fn peek(&self) -> Option<Token> {
         let tok = self.tokens.get(self.curr_idx);
         tok.map(|t| t.to_owned())

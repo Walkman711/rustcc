@@ -80,12 +80,7 @@ impl AsmGenerator for ArmGenerator {
                 self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
             }
             VarLoc::Global(id, offset) => {
-                // DRY: pull out
-                let page = if self.curr_function_context().function_name == "main" {
-                    "PAGE"
-                } else {
-                    "GOTPAGE"
-                };
+                let page = self.curr_function_context().get_page_access();
                 self.write_inst(&format!(
                     "adrp  {}, _{id}@{page}",
                     Self::GLOBAL_VAR_REGISTER

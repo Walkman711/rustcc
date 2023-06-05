@@ -117,6 +117,14 @@ impl Context {
 
         Ok(())
     }
+
+    pub fn get_page_access(&self) -> String {
+        if self.function_name == "main" {
+            "PAGE".to_string()
+        } else {
+            "GOTPAGE".to_string()
+        }
+    }
 }
 
 // TODO: add function map?

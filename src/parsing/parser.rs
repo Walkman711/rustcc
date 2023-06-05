@@ -33,10 +33,7 @@ impl Parser {
     fn parse_top_level_item(&mut self) -> RustCcResult<TopLevelItem> {
         self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
 
-        let tok = self
-            .lexer
-            .next_token()
-            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+        let tok = self.lexer.next_token_fallible()?;
 
         let Token::Identifier(identifier) = tok else {
             return Err(RustCcError::ParseError(
@@ -44,11 +41,7 @@ impl Parser {
                     Token::Identifier("any function name".to_string()), tok)));
         };
 
-        // DRY: could add a fn like get_next_token_expect_some??
-        let tok = self
-            .lexer
-            .next_token()
-            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+        let tok = self.lexer.next_token_fallible()?;
 
         match tok {
             Token::SingleEquals => {
@@ -324,10 +317,7 @@ impl Parser {
     }
 
     fn parse_l2_exp(&mut self) -> RustCcResult<Level2Exp> {
-        let tok = self
-            .lexer
-            .next_token()
-            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
+        let tok = self.lexer.next_token_fallible()?;
 
         match tok {
             Token::OpenParen => {
