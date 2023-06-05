@@ -35,16 +35,15 @@ impl TryFrom<&Program> for FunctionMap {
                             fn_info.insert(name.to_owned(), (FunctionType::Definition, args.len()))
                         {
                             if prev_type == FunctionType::Definition {
-                                Err(RustCcError::FunctionError(
-                                    FunctionError::MultipleDefinitions(name.to_owned()),
-                                ))?;
+                                return Err(
+                                    FunctionError::MultipleDefinitions(name.to_owned()).into()
+                                );
                             }
 
                             if num_args != args.len() {
-                                Err(RustCcError::FunctionError(FunctionError::ArgumentMismatch(
-                                    args.len(),
-                                    num_args,
-                                )))?;
+                                return Err(
+                                    FunctionError::ArgumentMismatch(args.len(), num_args).into()
+                                );
                             }
 
                             if num_args > 8 {
@@ -57,10 +56,9 @@ impl TryFrom<&Program> for FunctionMap {
                     Function::Declaration(name, args) => {
                         if let Some((_already_declared, num_args)) = fn_info.get(name) {
                             if *num_args != args.len() {
-                                Err(RustCcError::FunctionError(FunctionError::ArgumentMismatch(
-                                    args.len(),
-                                    *num_args,
-                                )))?;
+                                return Err(
+                                    FunctionError::ArgumentMismatch(args.len(), *num_args).into()
+                                );
                             }
 
                             if *num_args > 8 {
@@ -77,9 +75,9 @@ impl TryFrom<&Program> for FunctionMap {
 
         for id in global_names {
             if fn_info.contains_key(id) {
-                return Err(RustCcError::CodegenError(
-                    CodegenError::ReusedIdentifierForFunctionAndGlobal(id.to_owned()),
-                ));
+                return Err(
+                    CodegenError::ReusedIdentifierForFunctionAndGlobal(id.to_owned()).into(),
+                );
             }
         }
 
@@ -93,15 +91,13 @@ impl FunctionMap {
             if num_args_in_call == *num_args_in_definition {
                 Ok(())
             } else {
-                Err(RustCcError::FunctionError(FunctionError::ArgumentMismatch(
-                    *num_args_in_definition,
-                    num_args_in_call,
-                )))
+                Err(
+                    FunctionError::ArgumentMismatch(*num_args_in_definition, num_args_in_call)
+                        .into(),
+                )
             }
         } else {
-            Err(RustCcError::FunctionError(
-                FunctionError::UndeclaredFunction(fn_name.to_owned()),
-            ))
+            Err(FunctionError::UndeclaredFunction(fn_name.to_owned()).into())
         }
     }
 }

@@ -185,7 +185,7 @@ impl Lexer {
 
     pub fn next_token_fallible(&mut self) -> RustCcResult<Token> {
         self.next_token()
-            .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))
+            .ok_or(ParseError::UnexpectedTokenEnd.into())
     }
 
     pub fn peek(&self) -> Option<Token> {
@@ -203,13 +203,10 @@ impl Lexer {
                 if actual == expected {
                     Ok(())
                 } else {
-                    Err(RustCcError::ParseError(ParseError::ExpectedToken(
-                        expected.to_owned(),
-                        actual.to_owned(),
-                    )))
+                    Err(ParseError::ExpectedToken(expected.to_owned(), actual.to_owned()).into())
                 }
             }
-            None => Err(RustCcError::ParseError(ParseError::UnexpectedTokenEnd)),
+            None => Err(ParseError::UnexpectedTokenEnd.into()),
         }
     }
 

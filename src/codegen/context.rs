@@ -142,11 +142,11 @@ impl GlobalContext {
         self.function_contexts.push(ctx);
     }
 
-    pub fn curr_function_context(&self) -> &Context {
+    pub fn curr_ctx(&self) -> &Context {
         self.function_contexts.last().expect(GLOBAL_EXPECT)
     }
 
-    pub fn curr_function_context_mut(&mut self) -> &mut Context {
+    pub fn curr_ctx_mut(&mut self) -> &mut Context {
         self.function_contexts.last_mut().expect(GLOBAL_EXPECT)
     }
 

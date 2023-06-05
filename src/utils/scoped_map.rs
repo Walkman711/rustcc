@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::error::{RustCcError, RustCcResult, ScopeError};
+use super::error::{RustCcResult, ScopeError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum VarState {
@@ -30,21 +30,17 @@ impl VarState {
 
     pub fn validate_initialization(&self, new_state: VarState, var: &str) -> RustCcResult<()> {
         match self {
-            VarState::Param => Err(RustCcError::ScopeError(
-                ScopeError::ReusedParamNameInFunction(var.to_owned()),
-            )),
+            VarState::Param => Err(ScopeError::ReusedParamNameInFunction(var.to_owned()).into()),
             VarState::GlobalInitialized => {
                 if new_state == VarState::GlobalInitialized {
-                    Err(RustCcError::ScopeError(
-                        ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-                    ))
+                    Err(ScopeError::InitializedTwiceInSameScope(var.to_owned()).into())
                 } else {
                     Ok(())
                 }
             }
-            VarState::InitializedInThisScope => Err(RustCcError::ScopeError(
-                ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-            )),
+            VarState::InitializedInThisScope => {
+                Err(ScopeError::InitializedTwiceInSameScope(var.to_owned()).into())
+            }
             VarState::InitializedInOuterScope
             | VarState::DeclaredInThisScope
             | VarState::DeclaredInOuterScope
@@ -95,7 +91,7 @@ impl Default for ScopedMap {
 impl ScopedMap {
     pub fn new_param(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         let details = VarDetails {
@@ -108,9 +104,7 @@ impl ScopedMap {
             ..
         }) = last.insert(var.to_owned(), details)
         {
-            return Err(RustCcError::ScopeError(
-                ScopeError::ReusedParamNameInFunctionPrototype(var.to_owned()),
-            ));
+            return Err(ScopeError::ReusedParamNameInFunctionPrototype(var.to_owned()).into());
         }
 
         Ok(())
@@ -118,7 +112,7 @@ impl ScopedMap {
 
     pub fn initialize_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         let new_state = if let VarLoc::Global(..) = loc {
@@ -141,7 +135,7 @@ impl ScopedMap {
 
     pub fn declare_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         let state = if let VarLoc::Global(..) = loc {
@@ -157,17 +151,15 @@ impl ScopedMap {
             ..
         }) = last.insert(var.to_owned(), details)
         {
-            Err(RustCcError::ScopeError(
-                ScopeError::DeclaredTwiceInSameScope(var.to_owned()),
-            ))?;
+            return Err(ScopeError::DeclaredTwiceInSameScope(var.to_owned()).into());
         }
 
         Ok(())
     }
 
-    pub fn assign_var(&mut self, var: &str, _offset: usize) -> RustCcResult<VarLoc> {
+    pub fn assign_var(&mut self, var: &str) -> RustCcResult<VarLoc> {
         let Some(last) = self.var_maps.last_mut() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         if let Some(var_details) = last.get_mut(var) {
@@ -187,35 +179,29 @@ impl ScopedMap {
 
             Ok(var_details.loc.clone())
         } else {
-            Err(RustCcError::ScopeError(ScopeError::Undeclared(
-                var.to_owned(),
-            )))
+            Err(ScopeError::Undeclared(var.to_owned()).into())
         }
     }
 
     pub fn get_var(&mut self, var: &str) -> RustCcResult<VarDetails> {
         let Some(last) = self.var_maps.last() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         if let Some(details) = last.get(var) {
             if details.state.has_value() {
                 Ok(details.to_owned())
             } else {
-                Err(RustCcError::ScopeError(ScopeError::Uninitialized(
-                    var.to_owned(),
-                )))
+                Err(ScopeError::Uninitialized(var.to_owned()).into())
             }
         } else {
-            Err(RustCcError::ScopeError(ScopeError::Undeclared(
-                var.to_owned(),
-            )))
+            Err(ScopeError::Undeclared(var.to_owned()).into())
         }
     }
 
     pub fn new_scope(&mut self) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
+            return Err(ScopeError::NoScope.into());
         };
 
         let mut new_map = last.clone();
@@ -226,39 +212,18 @@ impl ScopedMap {
         Ok(())
     }
 
-    pub fn exit_scope(&mut self) -> RustCcResult<(usize, Vec<VarLoc>)> {
+    pub fn exit_scope(&mut self) -> RustCcResult<usize> {
         let mut num_initialized_in_scope = 0;
         match self.var_maps.pop() {
             Some(vm) => {
-                let mut globals = vec![];
                 for (_var, details) in vm {
                     if details.state == VarState::InitializedInThisScope {
                         num_initialized_in_scope += 1;
                     }
-
-                    if let VarLoc::Global(..) = details.loc {
-                        globals.push(details.loc);
-                    }
                 }
-                Ok((num_initialized_in_scope, globals))
+                Ok(num_initialized_in_scope)
             }
             None => todo!("add an error for exiting scope when we've already exited all scopes"),
         }
-    }
-
-    // PERF: remove clones?
-    pub fn get_globals(&self) -> RustCcResult<Vec<(String, VarDetails)>> {
-        let Some(last) = self.var_maps.last() else {
-            return Err(RustCcError::ScopeError(ScopeError::NoScope));
-        };
-
-        let mut globals = vec![];
-        for (id, details) in last {
-            if let VarLoc::Global(..) = &details.loc {
-                globals.push((id.to_owned(), details.to_owned()));
-            }
-        }
-
-        Ok(globals)
     }
 }

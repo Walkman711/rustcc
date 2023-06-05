@@ -48,7 +48,7 @@ impl AsmGenerator for ArmGenerator {
 
     fn fn_epilogue(&mut self) {
         self.write_inst("ldp   x29, x30, [sp], 16");
-        let stack_offset = self.curr_function_context().get_stack_frame_size();
+        let stack_offset = self.curr_ctx().get_stack_frame_size();
         self.write_inst(&format!("add   sp, sp, {stack_offset}"));
     }
 
@@ -80,7 +80,7 @@ impl AsmGenerator for ArmGenerator {
                 self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
             }
             VarLoc::Global(id, offset) => {
-                let page = self.curr_function_context().get_page_access();
+                let page = self.curr_ctx().get_page_access();
                 self.write_inst(&format!(
                     "adrp  {}, _{id}@{page}",
                     Self::GLOBAL_VAR_REGISTER
@@ -126,7 +126,7 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst(&format!(
             "b{} .L{lbl}_{}",
             cond.for_arch(self.get_arch()),
-            self.curr_function_context().function_name
+            self.curr_ctx().function_name
         ));
     }
 

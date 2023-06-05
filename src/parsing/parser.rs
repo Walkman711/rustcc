@@ -4,7 +4,7 @@ use crate::{
         lexer_enums::{Keywords, Token},
     },
     parse_level,
-    utils::error::{ParseError, RustCcError, RustCcResult},
+    utils::error::{ParseError, RustCcResult},
 };
 
 use super::{ops::*, parser_types::*};
@@ -36,9 +36,9 @@ impl Parser {
         let tok = self.lexer.next_token_fallible()?;
 
         let Token::Identifier(identifier) = tok else {
-            return Err(RustCcError::ParseError(
+            return Err(
                 ParseError::ExpectedToken(
-                    Token::Identifier("any function name".to_string()), tok)));
+                    Token::Identifier("any function name".to_string()), tok).into());
         };
 
         let tok = self.lexer.next_token_fallible()?;
@@ -51,10 +51,7 @@ impl Parser {
                         identifier, i as i64,
                     )))
                 } else {
-                    Err(RustCcError::ParseError(ParseError::ExpectedToken(
-                        Token::Integer(100),
-                        tok,
-                    )))
+                    Err(ParseError::ExpectedToken(Token::Integer(100), tok).into())
                 }
             }
             Token::Semicolon => Ok(TopLevelItem::Var(GlobalVar::Declaration(identifier))),
@@ -71,7 +68,7 @@ impl Parser {
         self.lexer.expect_next(&Token::OpenParen)?;
         while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
             let Some(Token::Identifier(param)) = self.lexer.next_token() else {
-                return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
+                return Err(ParseError::MalformedDeclaration.into());
             };
             params.push(param);
             self.lexer.advance_if_match(&Token::Comma);
@@ -133,7 +130,7 @@ impl Parser {
                 let mut init_exp = None;
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
                     let Some(Token::Identifier(id)) = self.lexer.peek() else {
-                        return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
+                        return Err(ParseError::MalformedDeclaration.into());
                     };
                     // XXX: can we just declare and not init a var in the init exp?
                     // I think that the Expression type doesn't do empty exps for now.
@@ -228,7 +225,7 @@ impl Parser {
 
             let block_item = if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
-                    return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
+                    return Err(ParseError::MalformedDeclaration.into());
                 };
 
                 // Declaration vs initialization
@@ -360,9 +357,7 @@ impl Parser {
                 Level2Op::BitwiseNot,
                 Box::new(self.parse_l2_exp()?),
             )),
-            t => Err(RustCcError::ParseError(
-                ParseError::UnexpectedBottomLevelToken(t),
-            )),
+            t => Err(ParseError::UnexpectedBottomLevelToken(t).into()),
         }
     }
 }

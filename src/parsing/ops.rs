@@ -14,7 +14,7 @@ impl TryFrom<Token> for Level15Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::Comma => Ok(Self::Comma),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -50,7 +50,7 @@ impl TryFrom<Token> for Level14Op {
             Token::BitwiseAndEquals => Ok(Self::AssignmentByBitwiseAnd),
             Token::BitwiseXorEquals => Ok(Self::AssignmentByBitwiseXor),
             Token::BitwiseOrEquals => Ok(Self::AssignmentByBitwiseOr),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -66,7 +66,7 @@ impl TryFrom<Token> for Level13Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::QuestionMark => Ok(Self::TernaryConditional),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -82,7 +82,7 @@ impl TryFrom<Token> for Level12Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::LogicalOr => Ok(Self::LogicalOr),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -98,7 +98,7 @@ impl TryFrom<Token> for Level11Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::LogicalAnd => Ok(Self::LogicalAnd),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -114,7 +114,7 @@ impl TryFrom<Token> for Level10Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::BitwiseOr => Ok(Self::BitwiseOr),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -130,7 +130,7 @@ impl TryFrom<Token> for Level9Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::BitwiseXor => Ok(Self::BitwiseXor),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -146,7 +146,7 @@ impl TryFrom<Token> for Level8Op {
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         match value {
             Token::SingleAnd => Ok(Self::BitwiseAnd),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -164,7 +164,7 @@ impl TryFrom<Token> for Level7Op {
         match value {
             Token::DoubleEquals => Ok(Self::Equals),
             Token::NotEquals => Ok(Self::NotEquals),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -186,7 +186,7 @@ impl TryFrom<Token> for Level6Op {
             Token::LessThanEquals => Ok(Self::LessThanEquals),
             Token::GreaterThan => Ok(Self::GreaterThan),
             Token::GreaterThanEquals => Ok(Self::GreaterThanEquals),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -204,7 +204,7 @@ impl TryFrom<Token> for Level5Op {
         match value {
             Token::BitwiseLeftShift => Ok(Self::BitwiseLeftShift),
             Token::BitwiseRightShift => Ok(Self::BitwiseRightShift),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -222,7 +222,7 @@ impl TryFrom<Token> for Level4Op {
         match value {
             Token::Plus => Ok(Self::Addition),
             Token::Minus => Ok(Self::Subtraction),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }
@@ -242,7 +242,7 @@ impl TryFrom<Token> for Level3Op {
             Token::Star => Ok(Self::Multiplication),
             Token::Slash => Ok(Self::Division),
             Token::PercentSign => Ok(Self::Remainder),
-            _ => Err(RustCcError::ParseError(ParseError::PeekFailed)),
+            _ => Err(ParseError::PeekFailed.into()),
         }
     }
 }

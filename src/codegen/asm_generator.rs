@@ -8,7 +8,7 @@ use crate::{
     gen_level_asm,
     parsing::{ops::*, parser_types::*},
     utils::{
-        error::{CodegenError, RustCcError, RustCcResult},
+        error::{CodegenError, RustCcResult},
         scoped_map::{ScopedMap, VarLoc},
     },
 };
@@ -29,17 +29,17 @@ pub trait AsmGenerator {
     const UNARY_ARGS: &'static str;
 
     fn get_scoped_map(&self) -> &ScopedMap {
-        &self.curr_function_context().scoped_map
+        &self.curr_ctx().scoped_map
     }
 
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
-        &mut self.curr_function_context_mut().scoped_map
+        &mut self.curr_ctx_mut().scoped_map
     }
 
     fn get_fn_map(&self) -> &FunctionMap;
 
     fn write_to_buffer(&mut self, inst: Instruction) {
-        self.curr_function_context_mut().insts.push(inst);
+        self.curr_ctx_mut().insts.push(inst);
     }
 
     fn write_to_file(&mut self, asm_filename: &str) -> RustCcResult<()> {
@@ -92,7 +92,7 @@ pub trait AsmGenerator {
         self.increment_stack_ptr();
         self.save_to_stack(self.stack_ptr());
         let sp = self.stack_ptr();
-        let fc = self.curr_function_context_mut();
+        let fc = self.curr_ctx_mut();
         fc.max_stack_offset = max(fc.max_stack_offset, sp);
     }
 
@@ -100,31 +100,31 @@ pub trait AsmGenerator {
     fn logical_not(&mut self);
 
     fn get_next_jmp_label(&mut self) -> usize {
-        self.curr_function_context_mut().get_next_jmp_label()
+        self.curr_ctx_mut().get_next_jmp_label()
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
     fn write_jmp_label(&mut self, lbl: usize) {
         self.write_to_buffer(Instruction::NoOffset(format!(
             ".L{lbl}_{}:",
-            self.curr_function_context().function_name
+            self.curr_ctx().function_name
         )));
     }
 
     fn get_break_stack(&self) -> &Vec<usize> {
-        &self.curr_function_context().break_stack
+        &self.curr_ctx().break_stack
     }
 
     fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.curr_function_context_mut().break_stack
+        &mut self.curr_ctx_mut().break_stack
     }
 
     fn get_continue_stack(&self) -> &Vec<usize> {
-        &self.curr_function_context().continue_stack
+        &self.curr_ctx().continue_stack
     }
 
     fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.curr_function_context_mut().continue_stack
+        &mut self.curr_ctx_mut().continue_stack
     }
 
     fn cmp_primary_with_zero(&mut self) {
@@ -137,12 +137,12 @@ pub trait AsmGenerator {
 
     fn gen_remainder_inst(&mut self);
 
-    fn curr_function_context(&self) -> &Context {
-        self.global_context().curr_function_context()
+    fn curr_ctx(&self) -> &Context {
+        self.global_context().curr_ctx()
     }
 
-    fn curr_function_context_mut(&mut self) -> &mut Context {
-        self.global_context_mut().curr_function_context_mut()
+    fn curr_ctx_mut(&mut self) -> &mut Context {
+        self.global_context_mut().curr_ctx_mut()
     }
     fn global_context(&self) -> &GlobalContext;
     fn global_context_mut(&mut self) -> &mut GlobalContext;
@@ -197,8 +197,7 @@ pub trait AsmGenerator {
                         self.gen_block_asm(block_items.to_owned())?;
 
                         // TODO: do i need to do anything with the size of the scope?
-                        let (num_deallocated_vars, _globals) =
-                            self.get_scoped_map_mut().exit_scope()?;
+                        let num_deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
                         for _ in 0..num_deallocated_vars {
                             self.decrement_stack_ptr();
                         }
@@ -262,8 +261,7 @@ pub trait AsmGenerator {
         }
 
         {
-            let (variables_to_deallocate, _globals_to_save) =
-                self.get_scoped_map_mut().exit_scope()?;
+            let variables_to_deallocate = self.get_scoped_map_mut().exit_scope()?;
 
             for _ in 0..variables_to_deallocate {
                 self.decrement_stack_ptr();
@@ -434,8 +432,7 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
                 {
-                    let (variables_to_deallocate, _globals_to_save) =
-                        self.get_scoped_map_mut().exit_scope()?;
+                    let variables_to_deallocate = self.get_scoped_map_mut().exit_scope()?;
 
                     for _ in 0..variables_to_deallocate {
                         self.decrement_stack_ptr();
@@ -446,14 +443,14 @@ pub trait AsmGenerator {
                 if let Some(break_label) = self.get_break_stack().last() {
                     self.write_branch_inst(Cond::Always, *break_label);
                 } else {
-                    Err(RustCcError::CodegenError(CodegenError::UnenclosedBreak))?;
+                    return Err(CodegenError::UnenclosedBreak.into());
                 }
             }
             Statement::Continue => {
                 if let Some(continue_label) = self.get_continue_stack().last() {
                     self.write_branch_inst(Cond::Always, *continue_label);
                 } else {
-                    Err(RustCcError::CodegenError(CodegenError::UnenclosedContinue))?;
+                    return Err(CodegenError::UnenclosedContinue.into());
                 }
             }
         }
@@ -480,24 +477,19 @@ pub trait AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) -> RustCcResult<()> {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
-                let sp = self.stack_ptr();
                 let sm = self.get_scoped_map_mut();
-                let var_loc = sm.assign_var(&identifier, sp)?;
+                let var_loc = sm.assign_var(&identifier)?;
                 self.gen_l15_asm(*l15_exp)?;
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
                     VarLoc::PrevFrame(_) => {
-                        return Err(RustCcError::CodegenError(
-                            CodegenError::AssignedToVarInPrevFrame,
-                        ));
+                        return Err(CodegenError::AssignedToVarInPrevFrame.into());
                     }
                     VarLoc::Register(_) => {
-                        return Err(RustCcError::CodegenError(
-                            CodegenError::AssignedToVarInRegister,
-                        ));
+                        return Err(CodegenError::AssignedToVarInRegister.into());
                     }
                     VarLoc::Global(id, offset) => {
-                        let page = self.curr_function_context().get_page_access();
+                        let page = self.curr_ctx().get_page_access();
                         self.write_inst(&format!(
                             "adrp  {}, _{id}@{page}",
                             Self::GLOBAL_VAR_REGISTER
