@@ -43,10 +43,10 @@ pub trait AsmGenerator {
         self.curr_function_context_mut().insts.push(inst);
     }
 
-    fn write_to_file(&mut self, asm_filename: &str) {
-        let mut asm_file = File::create(asm_filename).expect("Failed to create output .s file.");
+    fn write_to_file(&mut self, asm_filename: &str) -> RustCcResult<()> {
+        let mut asm_file = File::create(asm_filename)?;
         let arch = self.get_arch();
-        self.global_context_mut().write_to_file(&mut asm_file, arch);
+        self.global_context_mut().write_to_file(&mut asm_file, arch)
     }
 
     fn write_inst(&mut self, inst: &str) {
@@ -225,7 +225,7 @@ pub trait AsmGenerator {
             }
         }
 
-        self.write_to_file(asm_filename);
+        self.write_to_file(asm_filename)?;
 
         Ok(())
     }

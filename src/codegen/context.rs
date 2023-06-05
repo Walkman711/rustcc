@@ -1,7 +1,10 @@
 use crate::{
     codegen::codegen_enums::Arch,
     parsing::parser_types::{self, Function},
-    utils::scoped_map::{ScopedMap, VarLoc},
+    utils::{
+        error::RustCcResult,
+        scoped_map::{ScopedMap, VarLoc},
+    },
 };
 use std::{fs::File, io::Write};
 
@@ -26,7 +29,7 @@ pub struct Context {
     pub curr_jmp_label: usize,
 }
 
-const WRITELN_EXPECT: &str = "Writeln! failed to write to file.";
+const GLOBAL_EXPECT: &str = "Will always have a global context";
 
 impl Context {
     fn new(function: &parser_types::Function, scoped_map: ScopedMap) -> Self {
@@ -82,22 +85,18 @@ impl Context {
         }
     }
 
-    // TODO:
-    pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) {
+    pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) -> RustCcResult<()> {
         self.fn_prologue(arch);
         for line in &self.prologue {
-            writeln!(f, "{line}").expect(WRITELN_EXPECT);
+            writeln!(f, "{line}")?;
         }
 
         for line in &self.insts {
             match line {
-                Instruction::NoOffset(inst) => writeln!(f, "\t{inst}").expect(WRITELN_EXPECT),
+                Instruction::NoOffset(inst) => writeln!(f, "\t{inst}")?,
                 Instruction::Address(inst, loc) => {
                     if let VarLoc::Register(reg) = loc {
-                        // writeln!(f, "ldr??").unwrap();
-                        writeln!(f, "\t{inst}, w{reg}",)
-                            // writeln!(f, "\t{inst}, [sp, {}]", offset)
-                            .expect("writeln! failed to write inst to file")
+                        writeln!(f, "\t{inst}, w{reg}")?;
                     } else {
                         let addend = match loc {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
@@ -105,19 +104,18 @@ impl Context {
                             VarLoc::Register(_reg) => unreachable!("checked above"),
                             VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
                         };
-                        writeln!(f, "\t{inst}, [sp, {addend}]",)
-                            // writeln!(f, "\t{inst}, [sp, {}]", offset)
-                            .expect(WRITELN_EXPECT)
+                        writeln!(f, "\t{inst}, [sp, {addend}]")?
                     }
                 }
                 Instruction::Ret => {
-                    writeln!(f, "\tldp   x29, x30, [sp], 16").expect(WRITELN_EXPECT);
-                    writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())
-                        .expect(WRITELN_EXPECT);
-                    writeln!(f, "\tret").expect(WRITELN_EXPECT);
+                    writeln!(f, "\tldp   x29, x30, [sp], 16")?;
+                    writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
+                    writeln!(f, "\tret")?;
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -137,15 +135,11 @@ impl GlobalContext {
     }
 
     pub fn curr_function_context(&self) -> &Context {
-        self.function_contexts
-            .last()
-            .expect("Will always have a global context.")
+        self.function_contexts.last().expect(GLOBAL_EXPECT)
     }
 
     pub fn curr_function_context_mut(&mut self) -> &mut Context {
-        self.function_contexts
-            .last_mut()
-            .expect("Will always have a global context.")
+        self.function_contexts.last_mut().expect(GLOBAL_EXPECT)
     }
 
     pub fn write_defined_global_inst(&mut self, inst: String) {
@@ -156,21 +150,22 @@ impl GlobalContext {
         self.declared_global_buffer.push(inst);
     }
 
-    pub fn write_to_file(&mut self, f: &mut File, arch: Arch) {
-        writeln!(f, ".section __DATA,__data").expect(WRITELN_EXPECT);
+    pub fn write_to_file(&mut self, f: &mut File, arch: Arch) -> RustCcResult<()> {
+        writeln!(f, ".section __DATA,__data")?;
         for line in &self.defined_global_buffer {
-            writeln!(f, "{line}").expect(WRITELN_EXPECT);
+            writeln!(f, "{line}")?;
         }
 
-        writeln!(f, ".section    __TEXT,__text,regular,pure_instructions").expect(WRITELN_EXPECT);
+        writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?;
         for ctx in &mut self.function_contexts {
-            ctx.write_to_file(f, arch);
-            writeln!(f).expect(WRITELN_EXPECT);
+            ctx.write_to_file(f, arch)?;
+            writeln!(f)?;
         }
 
-        writeln!(f).expect(WRITELN_EXPECT);
         for line in &self.declared_global_buffer {
-            writeln!(f, "{line}").expect(WRITELN_EXPECT);
+            writeln!(f, "{line}")?;
         }
+
+        Ok(())
     }
 }

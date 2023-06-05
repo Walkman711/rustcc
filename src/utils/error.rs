@@ -14,6 +14,8 @@ pub enum RustCcError {
     FunctionError(#[from] FunctionError),
     #[error("Codegen Error: {0}")]
     CodegenError(#[from] CodegenError),
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 #[derive(Debug, Error)]
