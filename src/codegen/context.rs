@@ -67,8 +67,8 @@ impl Context {
             Arch::x86 => todo!(),
             Arch::ARM => {
                 self.prologue
-                    .push(format!(".global _{}", self.function_name));
-                self.prologue.push(".align 2".to_string());
+                    .push(format!("\t.global _{}", self.function_name));
+                self.prologue.push("\t.align 2".to_string());
                 self.prologue.push(format!("_{}:", self.function_name));
 
                 let stack_offset = self.get_stack_frame_size();

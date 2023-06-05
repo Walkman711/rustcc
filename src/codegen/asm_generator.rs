@@ -506,12 +506,6 @@ pub trait AsmGenerator {
                             "adrp  {}, _{id}@{page}",
                             Self::GLOBAL_VAR_REGISTER
                         ));
-                        self.write_inst(&format!(
-                            "ldr   {}, [{}, _{id}@{page}OFF]",
-                            Self::GLOBAL_VAR_REGISTER,
-                            Self::GLOBAL_VAR_REGISTER
-                        ));
-                        self.write_address_inst(&format!("str   x9"), VarLoc::CurrFrame(offset));
                         self.write_inst("mov   w8, w0");
                         self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
                         self.save_to_stack(offset);
