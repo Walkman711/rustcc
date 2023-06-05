@@ -76,7 +76,9 @@ pub trait AsmGenerator {
     fn get_arch(&self) -> Arch;
 
     fn fn_epilogue(&mut self);
-    fn ret(&mut self);
+    fn ret(&mut self) {
+        self.write_to_buffer(Instruction::Ret);
+    }
 
     fn stack_ptr(&self) -> usize;
     fn increment_stack_ptr(&mut self);
@@ -104,7 +106,10 @@ pub trait AsmGenerator {
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
     fn write_jmp_label(&mut self, lbl: usize) {
-        self.write_to_buffer(Instruction::NoOffset(format!(".L{lbl}:")));
+        self.write_to_buffer(Instruction::NoOffset(format!(
+            ".L{lbl}_{}:",
+            self.curr_function_context().function_name
+        )));
     }
 
     fn get_break_stack(&self) -> &Vec<usize> {

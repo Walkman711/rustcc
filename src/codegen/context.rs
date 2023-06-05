@@ -9,6 +9,7 @@ use std::{fs::File, io::Write};
 pub enum Instruction {
     NoOffset(String),
     Address(String, VarLoc),
+    Ret,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +125,12 @@ impl Context {
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)
                             .expect(WRITELN_EXPECT)
                     }
+                }
+                Instruction::Ret => {
+                    writeln!(f, "\tldp   x29, x30, [sp], 16").expect(WRITELN_EXPECT);
+                    writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())
+                        .expect(WRITELN_EXPECT);
+                    writeln!(f, "\tret").expect(WRITELN_EXPECT);
                 }
             }
         }

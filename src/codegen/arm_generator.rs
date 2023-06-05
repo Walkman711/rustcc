@@ -52,11 +52,6 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst(&format!("add   sp, sp, {stack_offset}"));
     }
 
-    fn ret(&mut self) {
-        self.fn_epilogue();
-        self.write_inst("ret");
-    }
-
     fn stack_ptr(&self) -> usize {
         self.sp
     }
@@ -136,7 +131,11 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
-        self.write_inst(&format!("b{} .L{lbl}", cond.for_arch(self.get_arch())));
+        self.write_inst(&format!(
+            "b{} .L{lbl}_{}",
+            cond.for_arch(self.get_arch()),
+            self.curr_function_context().function_name
+        ));
     }
 
     fn gen_remainder_inst(&mut self) {
