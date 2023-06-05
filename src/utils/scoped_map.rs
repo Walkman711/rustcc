@@ -150,7 +150,7 @@ impl ScopedMap {
         Ok(())
     }
 
-    pub fn assign_var(&mut self, var: &str, offset: usize) -> RustCcResult<VarLoc> {
+    pub fn assign_var(&mut self, var: &str, _offset: usize) -> RustCcResult<VarLoc> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
@@ -224,7 +224,7 @@ impl ScopedMap {
         match self.var_maps.pop() {
             Some(vm) => {
                 let mut globals = vec![];
-                for (var, details) in vm {
+                for (_var, details) in vm {
                     if details.state == VarState::InitializedInThisScope {
                         num_initialized_in_scope += 1;
                     }

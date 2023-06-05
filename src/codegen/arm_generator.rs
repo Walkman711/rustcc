@@ -47,7 +47,7 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn fn_epilogue(&mut self) {
-        self.write_inst(&format!("ldp   x29, x30, [sp], 16"));
+        self.write_inst("ldp   x29, x30, [sp], 16");
         let stack_offset = self.curr_function_context().get_stack_frame_size();
         self.write_inst(&format!("add   sp, sp, {stack_offset}"));
     }
@@ -66,7 +66,10 @@ impl AsmGenerator for ArmGenerator {
 
     fn save_to_stack(&mut self, stack_offset: usize) {
         // println!("store to stack {stack_offset}");
-        self.write_address_inst(&format!("str   w0"), VarLoc::CurrFrame(stack_offset));
+        self.write_address_inst(
+            &format!("str   {}", Self::PRIMARY_REGISTER),
+            VarLoc::CurrFrame(stack_offset),
+        );
     }
 
     // TODO: change name to load_var()
@@ -79,14 +82,6 @@ impl AsmGenerator for ArmGenerator {
             VarLoc::Register(reg_to_load_from) => {
                 self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
             }
-            // VarLoc::Global(id, None) => {
-            //     self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
-            //     self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
-            //     self.write_inst("mov   w0, w8");
-            //     // let sp = self.stack_ptr();
-            //     // self.push_stack();
-            //     // self.scoped_map.store_global_var_locally(&id, sp).unwrap();
-            // }
             VarLoc::Global(id, offset) => {
                 // DRY: pull out
                 let page = if self.curr_function_context().function_name == "main" {
@@ -103,10 +98,8 @@ impl AsmGenerator for ArmGenerator {
                     Self::GLOBAL_VAR_REGISTER,
                     Self::GLOBAL_VAR_REGISTER
                 ));
-                self.write_address_inst(&format!("str   x9"), VarLoc::CurrFrame(offset));
+                self.write_address_inst("str   x9", VarLoc::CurrFrame(offset));
                 self.load_var(Self::PRIMARY_REGISTER, VarLoc::CurrFrame(offset));
-                // self.write_inst(&format!("mov   {reg_to_load_into}, w8"));
-                // self.write_inst(&format!("ldr   {reg_to_load_into}, [sp, {offset}]"))
             }
         }
     }
@@ -119,15 +112,19 @@ impl AsmGenerator for ArmGenerator {
             Self::PRIMARY_REGISTER
         ));
         // set lower byte of reg_a based on if cond is satisfied
-        self.write_inst(&format!("cset  w0, {}", cond.for_arch(self.get_arch())));
+        self.write_inst(&format!(
+            "cset  {}, {}",
+            Self::PRIMARY_REGISTER,
+            cond.for_arch(self.get_arch())
+        ));
         // zero-pad reg_a since cset only sets the lower byte
-        self.write_inst("uxtb  w0, w0");
+        self.write_inst(&format!("uxtb  {}", Self::UNARY_ARGS));
     }
 
     fn logical_not(&mut self) {
         self.cmp_primary_with_zero();
-        self.write_inst("cset  w0, eq");
-        self.write_inst("uxtb  w0, w0");
+        self.write_inst(&format!("cset  {}, eq", Self::PRIMARY_REGISTER));
+        self.write_inst(&format!("uxtb  {}", Self::UNARY_ARGS,));
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {

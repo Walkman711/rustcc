@@ -26,7 +26,7 @@ pub struct Context {
     pub curr_jmp_label: usize,
 }
 
-const WRITELN_EXPECT: &'static str = "Writeln! failed to write to file.";
+const WRITELN_EXPECT: &str = "Writeln! failed to write to file.";
 
 impl Context {
     fn new(function: &parser_types::Function, scoped_map: ScopedMap) -> Self {
@@ -75,25 +75,9 @@ impl Context {
                 let stack_offset = self.get_stack_frame_size();
                 self.prologue
                     .push(format!("\tsub   sp, sp, {stack_offset}"));
-                self.prologue.push(format!("\tstp   x29, x30, [sp, -16]!",));
+                self.prologue
+                    .push("\tstp   x29, x30, [sp, -16]!".to_string());
                 self.prologue.push("\tmov   x29, sp".to_string());
-
-                // dbg!(self.scoped_map.get_globals().unwrap());
-                // TODO: load globals in at prologue time?
-                // NOTE: requires moving scope map in here
-                // for (id, details) in self.scoped_map.get_globals().unwrap() {
-                //     if let VarLoc::Global(_, offset) = details.loc {
-                //         self.prologue.push(format!("\tadrp  x9, _{id}@PAGE"));
-                //         self.prologue
-                //             .push(format!("\tldr   w8, [x8, _{id}@PAGEOFF]"));
-                //         self.prologue.push("\tmov   w0, w8".to_string());
-                //         // FIX: sp in context??
-                //         self.prologue.push(format!(
-                //             "\tstr   w0, [sp, {}]",
-                //             self.get_stack_frame_size() - offset
-                //         ));
-                //     }
-                // }
             }
         }
     }
@@ -138,22 +122,12 @@ impl Context {
 }
 
 // TODO: add function map?
+#[derive(Default)]
 pub struct GlobalContext {
     pub scoped_map: ScopedMap,
     pub function_contexts: Vec<Context>,
     pub defined_global_buffer: Vec<String>,
     pub declared_global_buffer: Vec<String>,
-}
-
-impl Default for GlobalContext {
-    fn default() -> Self {
-        Self {
-            scoped_map: ScopedMap::default(),
-            function_contexts: vec![],
-            defined_global_buffer: vec![],
-            declared_global_buffer: vec![],
-        }
-    }
 }
 
 impl GlobalContext {
@@ -179,7 +153,7 @@ impl GlobalContext {
     }
 
     pub fn write_declared_global_inst(&mut self, inst: String) {
-        self.declared_global_buffer.push(inst.to_owned());
+        self.declared_global_buffer.push(inst);
     }
 
     pub fn write_to_file(&mut self, f: &mut File, arch: Arch) {

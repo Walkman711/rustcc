@@ -175,19 +175,19 @@ pub trait AsmGenerator {
                 TopLevelItem::Fun(function) => match function {
                     Function::Declaration(..) => {}
                     Function::Definition(_id, params, block_items) => {
-                        self.global_context_mut().new_function_context(&function);
+                        self.global_context_mut().new_function_context(function);
 
                         self.get_scoped_map_mut().new_scope()?;
 
                         let mut var_loc = self.stack_ptr() + INT_SIZE;
 
-                        for reg in 0..params.len() {
+                        for (reg, param) in params.iter().enumerate() {
                             // mov arg from register into primary
                             self.mov_into_primary(&format!("w{reg}"));
 
                             // Add param to the scope map
                             let sm = self.get_scoped_map_mut();
-                            sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                            sm.new_param(param, VarLoc::CurrFrame(var_loc))?;
                             var_loc += INT_SIZE;
 
                             // save arg onto stack
@@ -198,7 +198,7 @@ pub trait AsmGenerator {
                         self.gen_block_asm(block_items.to_owned())?;
 
                         // TODO: do i need to do anything with the size of the scope?
-                        let (num_deallocated_vars, globals) =
+                        let (num_deallocated_vars, _globals) =
                             self.get_scoped_map_mut().exit_scope()?;
                         for _ in 0..num_deallocated_vars {
                             self.decrement_stack_ptr();
@@ -445,7 +445,7 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
                 {
-                    let (variables_to_deallocate, globals_to_save) =
+                    let (variables_to_deallocate, _globals_to_save) =
                         self.get_scoped_map_mut().exit_scope()?;
 
                     // for global_loc in globals_to_save {
