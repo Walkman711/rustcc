@@ -176,6 +176,7 @@ impl GlobalContext {
     }
 
     pub fn write_to_file(&mut self, f: &mut File, arch: Arch) {
+        writeln!(f, ".section __DATA,__data").expect(WRITELN_EXPECT);
         for line in &self.defined_global_buffer {
             writeln!(f, "{line}").expect(WRITELN_EXPECT);
         }

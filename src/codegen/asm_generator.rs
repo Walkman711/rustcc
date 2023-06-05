@@ -148,8 +148,8 @@ pub trait AsmGenerator {
                     .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
                 offset += INT_SIZE;
                 // TODO: pull this and .comm into fns
-                gc.write_defined_global_inst(".section __DATA,__data".to_string());
-                gc.write_defined_global_inst(".p2align 2".to_string());
+                // set .p2align to 3 so that globals in the data section are 8-byte aligned
+                gc.write_defined_global_inst(".p2align 3".to_string());
                 gc.write_defined_global_inst(format!(".global _{id}"));
                 gc.write_defined_global_inst(format!("_{id}:"));
                 gc.write_defined_global_inst(format!("\t.long {val}"));

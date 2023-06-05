@@ -9,6 +9,8 @@ enum VarState {
     InitializedInOuterScope,
     DeclaredInThisScope,
     DeclaredInOuterScope,
+    GlobalDeclared,
+    GlobalInitialized,
 }
 
 #[derive(Clone, Debug)]
@@ -66,10 +68,13 @@ impl ScopedMap {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
 
-        let details = VarDetails {
-            state: VarState::InitializedInThisScope,
-            loc,
+        let state = if let VarLoc::Global(..) = loc {
+            VarState::GlobalInitialized
+        } else {
+            VarState::InitializedInThisScope
         };
+
+        let details = VarDetails { state, loc };
 
         if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
             match state {
@@ -78,14 +83,15 @@ impl ScopedMap {
                         var.to_owned(),
                     )))?;
                 }
-                VarState::InitializedInThisScope => {
+                VarState::GlobalInitialized | VarState::InitializedInThisScope => {
                     Err(RustCcError::ScopeError(
                         ScopeError::InitializedTwiceInSameScope(var.to_owned()),
                     ))?;
                 }
                 VarState::InitializedInOuterScope
                 | VarState::DeclaredInThisScope
-                | VarState::DeclaredInOuterScope => {}
+                | VarState::DeclaredInOuterScope
+                | VarState::GlobalDeclared => {}
             }
         }
 
@@ -97,10 +103,13 @@ impl ScopedMap {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
 
-        let details = VarDetails {
-            state: VarState::DeclaredInThisScope,
-            loc,
+        let state = if let VarLoc::Global(..) = loc {
+            VarState::GlobalDeclared
+        } else {
+            VarState::DeclaredInThisScope
         };
+
+        let details = VarDetails { state, loc };
 
         if let Some(VarDetails {
             state: VarState::DeclaredInThisScope,
@@ -132,6 +141,8 @@ impl ScopedMap {
                     var_details.state = VarState::InitializedInOuterScope
                 }
                 VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {}
+                // TODO: is this correct?
+                VarState::GlobalInitialized | VarState::GlobalDeclared => {}
             }
 
             // if let VarLoc::Global(id, None) = &var_details.loc {
@@ -155,7 +166,9 @@ impl ScopedMap {
             match details.state {
                 VarState::Param
                 | VarState::InitializedInThisScope
-                | VarState::InitializedInOuterScope => Ok(details.to_owned()),
+                | VarState::InitializedInOuterScope
+                | VarState::GlobalInitialized
+                | VarState::GlobalDeclared => Ok(details.to_owned()),
                 VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => Err(
                     RustCcError::ScopeError(ScopeError::Uninitialized(var.to_owned())),
                 ),
@@ -174,33 +187,20 @@ impl ScopedMap {
 
         let mut new_map = last.clone();
         for details in new_map.values_mut() {
-            match details.state {
-                VarState::InitializedInThisScope => {
-                    details.state = VarState::InitializedInOuterScope
-                }
-                VarState::DeclaredInThisScope => details.state = VarState::DeclaredInOuterScope,
-                _ => {}
-            }
+            let new_state = match details.state {
+                VarState::InitializedInThisScope
+                | VarState::GlobalDeclared
+                | VarState::GlobalInitialized => VarState::InitializedInOuterScope,
+                VarState::DeclaredInThisScope => VarState::DeclaredInOuterScope,
+                VarState::Param => VarState::Param,
+                VarState::InitializedInOuterScope => VarState::InitializedInOuterScope,
+                VarState::DeclaredInOuterScope => VarState::DeclaredInOuterScope,
+            };
+            details.state = new_state;
         }
         self.var_maps.push(new_map);
         Ok(())
     }
-
-    // fn store_global_var_locally(&mut self, identifier: &str, offset: usize) -> RustCcResult<()> {
-    //     let Some(last) = self.var_maps.last_mut() else {
-    //         return Err(RustCcError::ScopeError(ScopeError::NoScope));
-    //     };
-
-    //     if let Some(var_details) = last.get_mut(identifier) {
-    //         let VarLoc::Global(..) = var_details.loc else {
-    //             panic!("var loc isn't global");
-    //         };
-    //         var_details.loc = VarLoc::CurrFrame(offset);
-    //         return Ok(());
-    //     }
-
-    //     panic!("add a better error here for if the global var doesn't exist")
-    // }
 
     pub fn exit_scope(&mut self) -> RustCcResult<(usize, Vec<VarLoc>)> {
         let mut num_initialized_in_scope = 0;
