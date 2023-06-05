@@ -25,24 +25,10 @@ pub struct Context {
     pub curr_jmp_label: usize,
 }
 
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            function_name: "GLOBAL_CONTEXT".to_owned(),
-            num_args: 0,
-            max_stack_offset: 0,
-            insts: vec![],
-            prologue: vec![],
-            scoped_map: ScopedMap::default(),
-            break_stack: vec![],
-            continue_stack: vec![],
-            curr_jmp_label: 0,
-        }
-    }
-}
+const WRITELN_EXPECT: &'static str = "Writeln! failed to write to file.";
 
-impl From<&parser_types::Function> for Context {
-    fn from(function: &parser_types::Function) -> Self {
+impl Context {
+    fn new(function: &parser_types::Function, scoped_map: ScopedMap) -> Self {
         let (function_name, num_args) = match function {
             Function::Definition(function_name, args, _) => (function_name.to_owned(), args.len()),
             Function::Declaration(function_name, args) => (function_name.to_owned(), args.len()),
@@ -54,7 +40,7 @@ impl From<&parser_types::Function> for Context {
             max_stack_offset: 0,
             insts: vec![],
             prologue: vec![],
-            scoped_map: ScopedMap::default(),
+            scoped_map,
             break_stack: vec![],
             continue_stack: vec![],
             curr_jmp_label: 0,
@@ -81,8 +67,6 @@ impl Context {
             Arch::x86 => todo!(),
             Arch::ARM => {
                 self.prologue
-                    .push(".section    __TEXT,__text,regular,pure_instructions".to_string());
-                self.prologue
                     .push(format!(".global _{}", self.function_name));
                 self.prologue.push(".align 2".to_string());
                 self.prologue.push(format!("_{}:", self.function_name));
@@ -93,44 +77,36 @@ impl Context {
                 self.prologue.push(format!("\tstp   x29, x30, [sp, -16]!",));
                 self.prologue.push("\tmov   x29, sp".to_string());
 
+                // dbg!(self.scoped_map.get_globals().unwrap());
                 // TODO: load globals in at prologue time?
                 // NOTE: requires moving scope map in here
-                for (id, details) in self.scoped_map.get_globals().unwrap() {
-                    if let VarLoc::Global(_, Some(offset)) = details.loc {
-                        self.prologue.push(format!("adrp  x8, _{id}@PAGE"));
-                        self.prologue.push(format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
-                        self.prologue.push("mov   w0, w8".to_string());
-                        self.prologue.push(format!("str   w0, [sp, {offset}]"));
-                    }
-                }
+                // for (id, details) in self.scoped_map.get_globals().unwrap() {
+                //     if let VarLoc::Global(_, offset) = details.loc {
+                //         self.prologue.push(format!("\tadrp  x9, _{id}@PAGE"));
+                //         self.prologue
+                //             .push(format!("\tldr   w8, [x8, _{id}@PAGEOFF]"));
+                //         self.prologue.push("\tmov   w0, w8".to_string());
+                //         // FIX: sp in context??
+                //         self.prologue.push(format!(
+                //             "\tstr   w0, [sp, {}]",
+                //             self.get_stack_frame_size() - offset
+                //         ));
+                //     }
+                // }
             }
         }
     }
 
     // TODO:
     pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) {
-        // // HACK: going to make a proper global context struct and program context (global + vec of
-        // // function contexts) in stage 10
-        if self.function_name == "GLOBAL_CONTEXT" {
-            for line in &self.insts {
-                if let Instruction::NoOffset(inst) = line {
-                    writeln!(f, "{inst}").expect("writeln! failed to write fn header to file.");
-                }
-            }
-            writeln!(f).unwrap();
-            return;
-        }
-
         self.fn_prologue(arch);
         for line in &self.prologue {
-            writeln!(f, "{line}").expect("writeln! failed to write fn header to file.");
+            writeln!(f, "{line}").expect(WRITELN_EXPECT);
         }
 
         for line in &self.insts {
             match line {
-                Instruction::NoOffset(inst) => {
-                    writeln!(f, "\t{inst}").expect("writeln! failed to write inst to file")
-                }
+                Instruction::NoOffset(inst) => writeln!(f, "\t{inst}").expect(WRITELN_EXPECT),
                 Instruction::Address(inst, loc) => {
                     if let VarLoc::Register(reg) = loc {
                         // writeln!(f, "ldr??").unwrap();
@@ -142,11 +118,11 @@ impl Context {
                             VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
                             VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
                             VarLoc::Register(_reg) => unreachable!("checked above"),
-                            VarLoc::Global(_, _) => 10000,
+                            VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
                         };
                         writeln!(f, "\t{inst}, [sp, {addend}]",)
                             // writeln!(f, "\t{inst}, [sp, {}]", offset)
-                            .expect("writeln! failed to write inst to file")
+                            .expect(WRITELN_EXPECT)
                     }
                 }
             }
@@ -158,6 +134,8 @@ impl Context {
 pub struct GlobalContext {
     pub scoped_map: ScopedMap,
     pub function_contexts: Vec<Context>,
+    pub defined_global_buffer: Vec<String>,
+    pub declared_global_buffer: Vec<String>,
 }
 
 impl Default for GlobalContext {
@@ -165,13 +143,15 @@ impl Default for GlobalContext {
         Self {
             scoped_map: ScopedMap::default(),
             function_contexts: vec![],
+            defined_global_buffer: vec![],
+            declared_global_buffer: vec![],
         }
     }
 }
 
 impl GlobalContext {
     pub fn new_function_context(&mut self, function: &parser_types::Function) {
-        let ctx = Context::from(function);
+        let ctx = Context::new(function, self.scoped_map.clone());
         self.function_contexts.push(ctx);
     }
 
@@ -187,9 +167,28 @@ impl GlobalContext {
             .expect("Will always have a global context.")
     }
 
-    pub fn write_to_file(&mut self, asm_file: &mut File, arch: Arch) {
+    pub fn write_defined_global_inst(&mut self, inst: String) {
+        self.defined_global_buffer.push(inst);
+    }
+
+    pub fn write_declared_global_inst(&mut self, inst: String) {
+        self.declared_global_buffer.push(inst.to_owned());
+    }
+
+    pub fn write_to_file(&mut self, f: &mut File, arch: Arch) {
+        for line in &self.defined_global_buffer {
+            writeln!(f, "{line}").expect(WRITELN_EXPECT);
+        }
+
+        writeln!(f, ".section    __TEXT,__text,regular,pure_instructions").expect(WRITELN_EXPECT);
         for ctx in &mut self.function_contexts {
-            ctx.write_to_file(asm_file, arch);
+            ctx.write_to_file(f, arch);
+            writeln!(f).expect(WRITELN_EXPECT);
+        }
+
+        writeln!(f).expect(WRITELN_EXPECT);
+        for line in &self.declared_global_buffer {
+            writeln!(f, "{line}").expect(WRITELN_EXPECT);
         }
     }
 }

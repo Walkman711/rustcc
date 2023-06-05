@@ -33,7 +33,9 @@ impl TryFrom<&Program> for ArmGenerator {
 impl AsmGenerator for ArmGenerator {
     const PRIMARY_REGISTER: &'static str = "w0";
     const BACKUP_REGISTER: &'static str = "w1";
+    const GLOBAL_VAR_REGISTER: &'static str = "x9";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
+
     const UNARY_ARGS: &'static str = "w0, w0";
 
     fn get_fn_map(&self) -> &FunctionMap {
@@ -55,6 +57,18 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("ret");
     }
 
+    fn stack_ptr(&self) -> usize {
+        self.sp
+    }
+
+    fn increment_stack_ptr(&mut self) {
+        self.sp += INT_SIZE;
+    }
+
+    fn decrement_stack_ptr(&mut self) {
+        self.sp -= INT_SIZE;
+    }
+
     fn save_to_stack(&mut self, stack_offset: usize) {
         // println!("store to stack {stack_offset}");
         self.write_address_inst(&format!("str   w0"), VarLoc::CurrFrame(stack_offset));
@@ -70,30 +84,36 @@ impl AsmGenerator for ArmGenerator {
             VarLoc::Register(reg_to_load_from) => {
                 self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
             }
-            VarLoc::Global(id, None) => {
-                self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
-                self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
-                self.write_inst("mov   w0, w8");
-                // let sp = self.stack_ptr();
-                // self.push_stack();
-                // self.scoped_map.store_global_var_locally(&id, sp).unwrap();
-            }
-            VarLoc::Global(_id, Some(offset)) => {
-                self.write_inst(&format!("ldr   {reg_to_load_into} [sp, {offset}"))
+            // VarLoc::Global(id, None) => {
+            //     self.write_inst(&format!("adrp  x8, _{id}@PAGE"));
+            //     self.write_inst(&format!("ldr   w8, [x8, _{id}@PAGEOFF]"));
+            //     self.write_inst("mov   w0, w8");
+            //     // let sp = self.stack_ptr();
+            //     // self.push_stack();
+            //     // self.scoped_map.store_global_var_locally(&id, sp).unwrap();
+            // }
+            VarLoc::Global(id, offset) => {
+                // DRY: pull out
+                let page = if self.curr_function_context().function_name == "main" {
+                    "PAGE"
+                } else {
+                    "GOTPAGE"
+                };
+                self.write_inst(&format!(
+                    "adrp  {}, _{id}@{page}",
+                    Self::GLOBAL_VAR_REGISTER
+                ));
+                self.write_inst(&format!(
+                    "ldr   {}, [{}, _{id}@{page}OFF]",
+                    Self::GLOBAL_VAR_REGISTER,
+                    Self::GLOBAL_VAR_REGISTER
+                ));
+                self.write_address_inst(&format!("str   x9"), VarLoc::CurrFrame(offset));
+                self.load_var(Self::PRIMARY_REGISTER, VarLoc::CurrFrame(offset));
+                // self.write_inst(&format!("mov   {reg_to_load_into}, w8"));
+                // self.write_inst(&format!("ldr   {reg_to_load_into}, [sp, {offset}]"))
             }
         }
-    }
-
-    fn stack_ptr(&self) -> usize {
-        self.sp
-    }
-
-    fn increment_stack_ptr(&mut self) {
-        self.sp += INT_SIZE;
-    }
-
-    fn decrement_stack_ptr(&mut self) {
-        self.sp -= INT_SIZE;
     }
 
     fn logical_comparison(&mut self, cond: Cond) {

@@ -20,6 +20,7 @@ pub const INT_SIZE: usize = 8;
 pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
+    const GLOBAL_VAR_REGISTER: &'static str;
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
 
@@ -139,26 +140,33 @@ pub trait AsmGenerator {
     fn global_context_mut(&mut self) -> &mut GlobalContext;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
+        let mut offset = INT_SIZE;
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
-                self.global_context_mut()
-                    .scoped_map
-                    .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
-                self.write_inst(".section __DATA,__data");
-                self.write_inst(".p2align 2");
-                self.write_inst(&format!(".global _{id}"));
-                self.write_inst(&format!("_{id}:"));
-                self.write_inst(&format!("\t.long {val}"));
+                let gc = self.global_context_mut();
+                gc.scoped_map
+                    .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                offset += INT_SIZE;
+                // TODO: pull this and .comm into fns
+                gc.write_defined_global_inst(".section __DATA,__data".to_string());
+                gc.write_defined_global_inst(".p2align 2".to_string());
+                gc.write_defined_global_inst(format!(".global _{id}"));
+                gc.write_defined_global_inst(format!("_{id}:"));
+                gc.write_defined_global_inst(format!("\t.long {val}"));
+
+                self.increment_stack_ptr();
             }
         }
 
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
-                // FIX: need to have a global context
-                self.global_context_mut()
-                    .scoped_map
-                    .initialize_var(id, VarLoc::Global(id.to_owned(), None))?;
-                self.write_inst(&format!("\t.comm {id},4,2"));
+                let gc = self.global_context_mut();
+                gc.scoped_map
+                    .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                offset += INT_SIZE;
+                gc.write_declared_global_inst(format!("\t.comm _{id},4,2"));
+
+                self.increment_stack_ptr();
             }
         }
 
@@ -193,7 +201,10 @@ pub trait AsmGenerator {
                     self.gen_block_asm(block_items.to_owned())?;
 
                     // TODO: do i need to do anything with the size of the scope?
-                    let _deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
+                    let (num_deallocated_vars, globals) = self.get_scoped_map_mut().exit_scope()?;
+                    for _ in 0..num_deallocated_vars {
+                        self.decrement_stack_ptr();
+                    }
                 }
             }
         }
@@ -239,9 +250,14 @@ pub trait AsmGenerator {
             let (variables_to_deallocate, globals_to_save) =
                 self.get_scoped_map_mut().exit_scope()?;
 
-            for (id, offset) in globals_to_save {
-                self.write_inst(&format!("ldr   w0, [sp, {offset}]"));
-                self.write_inst(&format!("str w0, [x9]"));
+            // DRY: make fn, also, where to store??
+            for global_loc in globals_to_save {
+                self.write_address_inst(
+                    &format!("ldr   {}", Self::GLOBAL_VAR_REGISTER),
+                    global_loc,
+                );
+                self.write_inst(&format!("str   w0, [{}]", Self::GLOBAL_VAR_REGISTER));
+                // self.write_inst("str   w0, [x8]");
             }
 
             for _ in 0..variables_to_deallocate {
@@ -416,10 +432,12 @@ pub trait AsmGenerator {
                     let (variables_to_deallocate, globals_to_save) =
                         self.get_scoped_map_mut().exit_scope()?;
 
-                    for (id, offset) in globals_to_save {
-                        self.write_inst(&format!("ldr   w0, [sp, {offset}]"));
-                        self.write_inst(&format!("str w0, [x8]"));
-                    }
+                    // for global_loc in globals_to_save {
+                    //     self.write_address_inst("ldr   x8", global_loc);
+                    //     self.write_inst("str   w0, [x8]");
+                    //     // self.write_address_inst("ldr   w0", global_loc);
+                    //     // self.write_inst("str   w0, [x8]");
+                    // }
 
                     for _ in 0..variables_to_deallocate {
                         self.decrement_stack_ptr();
@@ -471,14 +489,33 @@ pub trait AsmGenerator {
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
                     VarLoc::PrevFrame(_) => {
-                        panic!("tried to assign to a var in a prev stack frame")
+                        panic!("tried to assign to 0 var in a prev stack frame")
                     }
                     VarLoc::Register(_) => panic!("tried to assign to a var in register"),
                     // TODO: make x8 a constant somewhere
                     // FIX: doesn't work with more than one global
                     // TODO:
-                    VarLoc::Global(_, None) => self.write_inst("mov   w0, [x8]"),
-                    VarLoc::Global(_, Some(offset)) => self.save_to_stack(offset),
+                    // VarLoc::Global(_, None) => self.write_inst("mov   w0, [x8]"),
+                    VarLoc::Global(id, offset) => {
+                        let page = if self.curr_function_context().function_name == "main" {
+                            "PAGE"
+                        } else {
+                            "GOTPAGE"
+                        };
+                        self.write_inst(&format!(
+                            "adrp  {}, _{id}@{page}",
+                            Self::GLOBAL_VAR_REGISTER
+                        ));
+                        self.write_inst(&format!(
+                            "ldr   {}, [{}, _{id}@{page}OFF]",
+                            Self::GLOBAL_VAR_REGISTER,
+                            Self::GLOBAL_VAR_REGISTER
+                        ));
+                        self.write_address_inst(&format!("str   x9"), VarLoc::CurrFrame(offset));
+                        self.write_inst("mov   w8, w0");
+                        self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
+                        self.save_to_stack(offset);
+                    }
                 }
             }
             Level14Exp::NonAssignment(l13_exp) => {
