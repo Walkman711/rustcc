@@ -68,13 +68,16 @@ impl ScopedMap {
             return Err(RustCcError::ScopeError(ScopeError::NoScope));
         };
 
-        let state = if let VarLoc::Global(..) = loc {
+        let new_state = if let VarLoc::Global(..) = loc {
             VarState::GlobalInitialized
         } else {
             VarState::InitializedInThisScope
         };
 
-        let details = VarDetails { state, loc };
+        let details = VarDetails {
+            state: new_state,
+            loc,
+        };
 
         if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
             match state {
@@ -83,7 +86,15 @@ impl ScopedMap {
                         var.to_owned(),
                     )))?;
                 }
-                VarState::GlobalInitialized | VarState::InitializedInThisScope => {
+                VarState::GlobalInitialized => {
+                    if new_state == VarState::GlobalInitialized {
+                        dbg!(self);
+                        Err(RustCcError::ScopeError(
+                            ScopeError::InitializedTwiceInSameScope(var.to_owned()),
+                        ))?;
+                    }
+                }
+                VarState::InitializedInThisScope => {
                     Err(RustCcError::ScopeError(
                         ScopeError::InitializedTwiceInSameScope(var.to_owned()),
                     ))?;
@@ -188,9 +199,9 @@ impl ScopedMap {
         let mut new_map = last.clone();
         for details in new_map.values_mut() {
             let new_state = match details.state {
-                VarState::InitializedInThisScope
-                | VarState::GlobalDeclared
-                | VarState::GlobalInitialized => VarState::InitializedInOuterScope,
+                VarState::InitializedInThisScope => VarState::InitializedInOuterScope,
+                VarState::GlobalDeclared => VarState::GlobalDeclared,
+                VarState::GlobalInitialized => VarState::GlobalInitialized,
                 VarState::DeclaredInThisScope => VarState::DeclaredInOuterScope,
                 VarState::Param => VarState::Param,
                 VarState::InitializedInOuterScope => VarState::InitializedInOuterScope,

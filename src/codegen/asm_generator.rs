@@ -1,4 +1,4 @@
-use std::{cmp::max, fs::File};
+use std::{cmp::max, collections::HashSet, fs::File};
 
 use crate::{
     gen_level_asm,
@@ -141,6 +141,7 @@ pub trait AsmGenerator {
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         let mut offset = INT_SIZE;
+        let mut defined_globals = HashSet::new();
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
                 let gc = self.global_context_mut();
@@ -154,19 +155,23 @@ pub trait AsmGenerator {
                 gc.write_defined_global_inst(format!("_{id}:"));
                 gc.write_defined_global_inst(format!("\t.long {val}"));
 
+                defined_globals.insert(id.to_owned());
+
                 self.increment_stack_ptr();
             }
         }
 
         for top_level_item in &prog.0 {
             if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
-                let gc = self.global_context_mut();
-                gc.scoped_map
-                    .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
-                offset += INT_SIZE;
-                gc.write_declared_global_inst(format!("\t.comm _{id},4,2"));
+                if !defined_globals.contains(id) {
+                    let gc = self.global_context_mut();
+                    gc.scoped_map
+                        .declare_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                    offset += INT_SIZE;
+                    gc.write_declared_global_inst(format!("\t.comm _{id},4,2"));
 
-                self.increment_stack_ptr();
+                    self.increment_stack_ptr();
+                }
             }
         }
 
