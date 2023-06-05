@@ -13,6 +13,22 @@ enum VarState {
     GlobalInitialized,
 }
 
+impl VarState {
+    pub fn new_scope_state(&self) -> Self {
+        match self {
+            VarState::Param => VarState::Param,
+            VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {
+                VarState::InitializedInOuterScope
+            }
+            VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => {
+                VarState::DeclaredInOuterScope
+            }
+            VarState::GlobalDeclared => VarState::GlobalDeclared,
+            VarState::GlobalInitialized => VarState::GlobalInitialized,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum VarLoc {
     CurrFrame(usize),
@@ -88,7 +104,6 @@ impl ScopedMap {
                 }
                 VarState::GlobalInitialized => {
                     if new_state == VarState::GlobalInitialized {
-                        dbg!(self);
                         Err(RustCcError::ScopeError(
                             ScopeError::InitializedTwiceInSameScope(var.to_owned()),
                         ))?;
@@ -198,16 +213,7 @@ impl ScopedMap {
 
         let mut new_map = last.clone();
         for details in new_map.values_mut() {
-            let new_state = match details.state {
-                VarState::InitializedInThisScope => VarState::InitializedInOuterScope,
-                VarState::GlobalDeclared => VarState::GlobalDeclared,
-                VarState::GlobalInitialized => VarState::GlobalInitialized,
-                VarState::DeclaredInThisScope => VarState::DeclaredInOuterScope,
-                VarState::Param => VarState::Param,
-                VarState::InitializedInOuterScope => VarState::InitializedInOuterScope,
-                VarState::DeclaredInOuterScope => VarState::DeclaredInOuterScope,
-            };
-            details.state = new_state;
+            details.state = details.state.new_scope_state();
         }
         self.var_maps.push(new_map);
         Ok(())

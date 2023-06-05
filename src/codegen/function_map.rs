@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
-    parsing::parser_types::{Function, Program, TopLevelItem},
+    parsing::parser_types::{Function, GlobalVar, Program, TopLevelItem},
     utils::error::{FunctionError, RustCcError, RustCcResult},
 };
 
@@ -21,9 +21,14 @@ impl TryFrom<&Program> for FunctionMap {
 
     fn try_from(prog: &Program) -> Result<Self, Self::Error> {
         let mut fn_info: HashMap<String, (FunctionType, usize)> = HashMap::new();
+        let mut global_names = HashSet::new();
         for top_level_item in &prog.0 {
             match top_level_item {
-                TopLevelItem::Var(_) => {} // todo!("top level item in function map"),
+                TopLevelItem::Var(v) => match v {
+                    GlobalVar::Declaration(id) | GlobalVar::Definition(id, _) => {
+                        global_names.insert(id);
+                    }
+                },
                 TopLevelItem::Fun(function) => match function {
                     Function::Definition(name, args, _) => {
                         if let Some((prev_type, num_args)) =
@@ -67,6 +72,12 @@ impl TryFrom<&Program> for FunctionMap {
                         }
                     }
                 },
+            }
+        }
+
+        for id in global_names {
+            if fn_info.contains_key(id) {
+                panic!("redefined global as function");
             }
         }
         Ok(Self { fn_info })

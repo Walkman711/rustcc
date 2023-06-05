@@ -1,4 +1,8 @@
-use std::{cmp::max, collections::HashSet, fs::File};
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    fs::File,
+};
 
 use crate::{
     gen_level_asm,
@@ -141,76 +145,78 @@ pub trait AsmGenerator {
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         let mut offset = INT_SIZE;
-        let mut defined_globals = HashSet::new();
+        let mut defined_globals = HashMap::new();
+        let mut declared_globals = HashSet::new();
         for top_level_item in &prog.0 {
-            if let TopLevelItem::Var(GlobalVar::Definition(id, val)) = top_level_item {
-                let gc = self.global_context_mut();
-                gc.scoped_map
-                    .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
-                offset += INT_SIZE;
-                // TODO: pull this and .comm into fns
-                // set .p2align to 3 so that globals in the data section are 8-byte aligned
-                gc.write_defined_global_inst(".p2align 3".to_string());
-                gc.write_defined_global_inst(format!(".global _{id}"));
-                gc.write_defined_global_inst(format!("_{id}:"));
-                gc.write_defined_global_inst(format!("\t.long {val}"));
-
-                defined_globals.insert(id.to_owned());
-
-                self.increment_stack_ptr();
-            }
-        }
-
-        for top_level_item in &prog.0 {
-            if let TopLevelItem::Var(GlobalVar::Declaration(id)) = top_level_item {
-                if !defined_globals.contains(id) {
+            match top_level_item {
+                TopLevelItem::Var(GlobalVar::Definition(id, val)) => {
+                    let gc = self.global_context_mut();
+                    gc.scoped_map
+                        .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                    offset += INT_SIZE;
+                    defined_globals.insert(id.to_owned(), val);
+                    self.increment_stack_ptr();
+                }
+                TopLevelItem::Var(GlobalVar::Declaration(id)) => {
                     let gc = self.global_context_mut();
                     gc.scoped_map
                         .declare_var(id, VarLoc::Global(id.to_owned(), offset))?;
                     offset += INT_SIZE;
-                    gc.write_declared_global_inst(format!("\t.comm _{id},4,2"));
+
+                    declared_globals.insert(id.to_owned());
 
                     self.increment_stack_ptr();
                 }
+                TopLevelItem::Fun(function) => match function {
+                    Function::Declaration(..) => {}
+                    Function::Definition(_id, params, block_items) => {
+                        self.global_context_mut().new_function_context(&function);
+
+                        self.get_scoped_map_mut().new_scope()?;
+
+                        let mut var_loc = self.stack_ptr() + INT_SIZE;
+
+                        for reg in 0..params.len() {
+                            // mov arg from register into primary
+                            self.mov_into_primary(&format!("w{reg}"));
+
+                            // Add param to the scope map
+                            let sm = self.get_scoped_map_mut();
+                            sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
+                            var_loc += INT_SIZE;
+
+                            // save arg onto stack
+                            self.push_stack();
+                        }
+
+                        // PERF: don't clone this
+                        self.gen_block_asm(block_items.to_owned())?;
+
+                        // TODO: do i need to do anything with the size of the scope?
+                        let (num_deallocated_vars, globals) =
+                            self.get_scoped_map_mut().exit_scope()?;
+                        for _ in 0..num_deallocated_vars {
+                            self.decrement_stack_ptr();
+                        }
+                    }
+                },
             }
         }
 
-        for top_level_item in prog.0 {
-            let TopLevelItem::Fun(ref function) = top_level_item else {
-                continue;
-            };
+        for (id, val) in &defined_globals {
+            let gc = self.global_context_mut();
+            // TODO: pull this and .comm into fns
+            // set .p2align to 3 so that globals in the data section are 8-byte aligned
+            gc.write_defined_global_inst(".p2align 3".to_string());
+            gc.write_defined_global_inst(format!(".global _{id}"));
+            gc.write_defined_global_inst(format!("_{id}:"));
+            gc.write_defined_global_inst(format!("\t.long {val}"));
+        }
 
-            match function {
-                Function::Declaration(_, _) => continue,
-                Function::Definition(_id, params, block_items) => {
-                    self.global_context_mut().new_function_context(function);
-
-                    self.get_scoped_map_mut().new_scope()?;
-
-                    let mut var_loc = self.stack_ptr() + INT_SIZE;
-
-                    for reg in 0..params.len() {
-                        // mov arg from register into primary
-                        self.mov_into_primary(&format!("w{reg}"));
-
-                        // Add param to the scope map
-                        let sm = self.get_scoped_map_mut();
-                        sm.new_param(&params[reg], VarLoc::CurrFrame(var_loc))?;
-                        var_loc += INT_SIZE;
-
-                        // save arg onto stack
-                        self.push_stack();
-                    }
-
-                    // PERF: don't clone this
-                    self.gen_block_asm(block_items.to_owned())?;
-
-                    // TODO: do i need to do anything with the size of the scope?
-                    let (num_deallocated_vars, globals) = self.get_scoped_map_mut().exit_scope()?;
-                    for _ in 0..num_deallocated_vars {
-                        self.decrement_stack_ptr();
-                    }
-                }
+        for id in &declared_globals {
+            if !defined_globals.contains_key(id) {
+                self.global_context_mut()
+                    .write_declared_global_inst(format!("\t.comm _{id},4,2"));
             }
         }
 
