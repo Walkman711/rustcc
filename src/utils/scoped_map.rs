@@ -27,6 +27,41 @@ impl VarState {
             VarState::GlobalInitialized => VarState::GlobalInitialized,
         }
     }
+
+    pub fn validate_initialization(&self, new_state: VarState, var: &str) -> RustCcResult<()> {
+        match self {
+            VarState::Param => Err(RustCcError::ScopeError(
+                ScopeError::ReusedParamNameInFunction(var.to_owned()),
+            )),
+            VarState::GlobalInitialized => {
+                if new_state == VarState::GlobalInitialized {
+                    Err(RustCcError::ScopeError(
+                        ScopeError::InitializedTwiceInSameScope(var.to_owned()),
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+            VarState::InitializedInThisScope => Err(RustCcError::ScopeError(
+                ScopeError::InitializedTwiceInSameScope(var.to_owned()),
+            )),
+            VarState::InitializedInOuterScope
+            | VarState::DeclaredInThisScope
+            | VarState::DeclaredInOuterScope
+            | VarState::GlobalDeclared => Ok(()),
+        }
+    }
+
+    pub fn has_value(&self) -> bool {
+        match self {
+            VarState::Param
+            | VarState::InitializedInThisScope
+            | VarState::InitializedInOuterScope
+            | VarState::GlobalInitialized
+            | VarState::GlobalDeclared => true,
+            VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -73,7 +108,9 @@ impl ScopedMap {
             ..
         }) = last.insert(var.to_owned(), details)
         {
-            panic!("can't use same param name twice in a function");
+            return Err(RustCcError::ScopeError(
+                ScopeError::ReusedParamNameInFunctionPrototype(var.to_owned()),
+            ));
         }
 
         Ok(())
@@ -96,29 +133,7 @@ impl ScopedMap {
         };
 
         if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
-            match state {
-                VarState::Param => {
-                    Err(RustCcError::ScopeError(ScopeError::ReusedParamName(
-                        var.to_owned(),
-                    )))?;
-                }
-                VarState::GlobalInitialized => {
-                    if new_state == VarState::GlobalInitialized {
-                        Err(RustCcError::ScopeError(
-                            ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-                        ))?;
-                    }
-                }
-                VarState::InitializedInThisScope => {
-                    Err(RustCcError::ScopeError(
-                        ScopeError::InitializedTwiceInSameScope(var.to_owned()),
-                    ))?;
-                }
-                VarState::InitializedInOuterScope
-                | VarState::DeclaredInThisScope
-                | VarState::DeclaredInOuterScope
-                | VarState::GlobalDeclared => {}
-            }
+            state.validate_initialization(new_state, var)?;
         }
 
         Ok(())
@@ -157,23 +172,18 @@ impl ScopedMap {
 
         if let Some(var_details) = last.get_mut(var) {
             match var_details.state {
-                VarState::Param => {
-                    panic!("Can't assign to a parameter. TODO: make an actual error");
-                }
                 VarState::DeclaredInThisScope => {
                     var_details.state = VarState::InitializedInThisScope
                 }
                 VarState::DeclaredInOuterScope => {
                     var_details.state = VarState::InitializedInOuterScope
                 }
-                VarState::InitializedInThisScope | VarState::InitializedInOuterScope => {}
-                // TODO: is this correct?
-                VarState::GlobalInitialized | VarState::GlobalDeclared => {}
+                VarState::InitializedInThisScope
+                | VarState::InitializedInOuterScope
+                | VarState::GlobalInitialized
+                | VarState::GlobalDeclared
+                | VarState::Param => {}
             }
-
-            // if let VarLoc::Global(id, None) = &var_details.loc {
-            //     var_details.loc = VarLoc::Global(id.to_owned(), Some(offset));
-            // }
 
             Ok(var_details.loc.clone())
         } else {
@@ -189,15 +199,12 @@ impl ScopedMap {
         };
 
         if let Some(details) = last.get(var) {
-            match details.state {
-                VarState::Param
-                | VarState::InitializedInThisScope
-                | VarState::InitializedInOuterScope
-                | VarState::GlobalInitialized
-                | VarState::GlobalDeclared => Ok(details.to_owned()),
-                VarState::DeclaredInThisScope | VarState::DeclaredInOuterScope => Err(
-                    RustCcError::ScopeError(ScopeError::Uninitialized(var.to_owned())),
-                ),
+            if details.state.has_value() {
+                Ok(details.to_owned())
+            } else {
+                Err(RustCcError::ScopeError(ScopeError::Uninitialized(
+                    var.to_owned(),
+                )))
             }
         } else {
             Err(RustCcError::ScopeError(ScopeError::Undeclared(

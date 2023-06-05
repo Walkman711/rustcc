@@ -65,16 +65,13 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
-        // println!("store to stack {stack_offset}");
         self.write_address_inst(
             &format!("str   {}", Self::PRIMARY_REGISTER),
             VarLoc::CurrFrame(stack_offset),
         );
     }
 
-    // TODO: change name to load_var()
     fn load_var(&mut self, reg_to_load_into: &str, loc: VarLoc) {
-        // println!("load from stack {reg_to_load_into} <- {loc:?}");
         match loc {
             VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
                 self.write_address_inst(&format!("ldr   {reg_to_load_into}"), loc)
@@ -98,7 +95,10 @@ impl AsmGenerator for ArmGenerator {
                     Self::GLOBAL_VAR_REGISTER,
                     Self::GLOBAL_VAR_REGISTER
                 ));
-                self.write_address_inst("str   x9", VarLoc::CurrFrame(offset));
+                self.write_address_inst(
+                    &format!("str   {}", Self::GLOBAL_VAR_REGISTER),
+                    VarLoc::CurrFrame(offset),
+                );
                 self.load_var(Self::PRIMARY_REGISTER, VarLoc::CurrFrame(offset));
             }
         }
@@ -111,13 +111,13 @@ impl AsmGenerator for ArmGenerator {
             Self::BACKUP_REGISTER,
             Self::PRIMARY_REGISTER
         ));
-        // set lower byte of reg_a based on if cond is satisfied
+        // Set lower byte of reg_a based on if cond is satisfied
         self.write_inst(&format!(
             "cset  {}, {}",
             Self::PRIMARY_REGISTER,
             cond.for_arch(self.get_arch())
         ));
-        // zero-pad reg_a since cset only sets the lower byte
+        // Zero-pad reg_a since cset only sets the lower byte
         self.write_inst(&format!("uxtb  {}", Self::UNARY_ARGS));
     }
 

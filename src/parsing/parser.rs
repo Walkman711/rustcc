@@ -78,7 +78,7 @@ impl Parser {
         self.lexer.expect_next(&Token::OpenParen)?;
         while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
             let Some(Token::Identifier(param)) = self.lexer.next_token() else {
-                panic!("bad param");
+                return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
             };
             params.push(param);
             self.lexer.advance_if_match(&Token::Comma);
@@ -140,7 +140,7 @@ impl Parser {
                 let mut init_exp = None;
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
                     let Some(Token::Identifier(id)) = self.lexer.peek() else {
-                        panic!("decl without identifier");
+                        return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
                     };
                     // XXX: can we just declare and not init a var in the init exp?
                     // I think that the Expression type doesn't do empty exps for now.
@@ -235,7 +235,7 @@ impl Parser {
 
             let block_item = if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
-                    panic!("assignment statment needs an identifier")
+                    return Err(RustCcError::ParseError(ParseError::MalformedDeclaration));
                 };
 
                 // Declaration vs initialization
@@ -329,13 +329,13 @@ impl Parser {
             .next_token()
             .ok_or(RustCcError::ParseError(ParseError::UnexpectedTokenEnd))?;
 
-        let l2_exp = match tok {
+        match tok {
             Token::OpenParen => {
                 let f = Level2Exp::ParenExp(Box::new(self.parse_l15_exp()?));
                 self.lexer.expect_next(&Token::CloseParen)?;
-                f
+                Ok(f)
             }
-            Token::Integer(u) => Level2Exp::Const(u),
+            Token::Integer(u) => Ok(Level2Exp::Const(u)),
             Token::Identifier(id) => {
                 if self.lexer.advance_if_match(&Token::OpenParen) {
                     let mut params = vec![];
@@ -349,21 +349,31 @@ impl Parser {
                         self.lexer.advance_if_match(&Token::Comma);
                     }
                     self.lexer.expect_next(&Token::CloseParen)?;
-                    Level2Exp::FunctionCall(id, params)
+                    Ok(Level2Exp::FunctionCall(id, params))
                 } else {
-                    Level2Exp::Var(id)
+                    Ok(Level2Exp::Var(id))
                 }
             }
-            Token::Plus => Level2Exp::Unary(Level2Op::UnaryPlus, Box::new(self.parse_l2_exp()?)),
-            Token::Minus => Level2Exp::Unary(Level2Op::UnaryMinus, Box::new(self.parse_l2_exp()?)),
-            Token::ExclamationPoint => {
-                Level2Exp::Unary(Level2Op::LogicalNot, Box::new(self.parse_l2_exp()?))
-            }
-            Token::Tilde => Level2Exp::Unary(Level2Op::BitwiseNot, Box::new(self.parse_l2_exp()?)),
-            t => panic!("bad l2 token: {t:?}"),
-        };
-
-        Ok(l2_exp)
+            Token::Plus => Ok(Level2Exp::Unary(
+                Level2Op::UnaryPlus,
+                Box::new(self.parse_l2_exp()?),
+            )),
+            Token::Minus => Ok(Level2Exp::Unary(
+                Level2Op::UnaryMinus,
+                Box::new(self.parse_l2_exp()?),
+            )),
+            Token::ExclamationPoint => Ok(Level2Exp::Unary(
+                Level2Op::LogicalNot,
+                Box::new(self.parse_l2_exp()?),
+            )),
+            Token::Tilde => Ok(Level2Exp::Unary(
+                Level2Op::BitwiseNot,
+                Box::new(self.parse_l2_exp()?),
+            )),
+            t => Err(RustCcError::ParseError(
+                ParseError::UnexpectedBottomLevelToken(t),
+            )),
+        }
     }
 }
 

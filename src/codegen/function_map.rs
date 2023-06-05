@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     parsing::parser_types::{Function, GlobalVar, Program, TopLevelItem},
-    utils::error::{FunctionError, RustCcError, RustCcResult},
+    utils::error::{CodegenError, FunctionError, RustCcError, RustCcResult},
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -77,9 +77,12 @@ impl TryFrom<&Program> for FunctionMap {
 
         for id in global_names {
             if fn_info.contains_key(id) {
-                panic!("redefined global as function");
+                return Err(RustCcError::CodegenError(
+                    CodegenError::ReusedIdentifierForFunctionAndGlobal(id.to_owned()),
+                ));
             }
         }
+
         Ok(Self { fn_info })
     }
 }

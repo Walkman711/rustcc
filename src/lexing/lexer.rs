@@ -179,18 +179,12 @@ impl TryFrom<&str> for Lexer {
 impl Lexer {
     pub fn next_token(&mut self) -> Option<Token> {
         let tok = self.tokens.get(self.curr_idx);
-        //        dbg!(tok);
-        if tok == Some(&Token::CloseBrace) {
-            //    panic!("}} here")
-        }
-        // println!("next: {tok:?}");
         self.curr_idx += 1;
         tok.map(|t| t.to_owned())
     }
 
     pub fn peek(&self) -> Option<Token> {
         let tok = self.tokens.get(self.curr_idx);
-        // println!("peek: {tok:?}");
         tok.map(|t| t.to_owned())
     }
 

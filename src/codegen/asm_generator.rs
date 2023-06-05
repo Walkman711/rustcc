@@ -272,8 +272,11 @@ pub trait AsmGenerator {
                     &format!("ldr   {}", Self::GLOBAL_VAR_REGISTER),
                     global_loc,
                 );
-                self.write_inst(&format!("str   w0, [{}]", Self::GLOBAL_VAR_REGISTER));
-                // self.write_inst("str   w0, [x8]");
+                self.write_inst(&format!(
+                    "str   {}, [{}]",
+                    Self::PRIMARY_REGISTER,
+                    Self::GLOBAL_VAR_REGISTER
+                ));
             }
 
             for _ in 0..variables_to_deallocate {
@@ -308,7 +311,7 @@ pub trait AsmGenerator {
                 let else_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
-                // Evaluate exp and store in w0
+                // Evaluate exp and store in primary register
                 self.gen_l15_asm(exp)?;
 
                 // If the exp == 0, trigger the else case to minimize the jump
@@ -339,7 +342,7 @@ pub trait AsmGenerator {
                 self.get_break_stack_mut().push(exit_label);
 
                 self.write_jmp_label(continue_label);
-                // Evaluate exp and store in w0
+                // Evaluate exp and store in primary register
                 self.gen_l15_asm(exp)?;
 
                 // If the exp == 0, trigger the else case to minimize the jump
@@ -365,7 +368,7 @@ pub trait AsmGenerator {
                 self.write_jmp_label(continue_label);
                 self.gen_stmt_asm(*stmt)?;
 
-                // Evaluate exp and store in w0
+                // Evaluate exp and store in primary register
                 self.gen_l15_asm(exp)?;
 
                 self.cmp_primary_with_zero();
@@ -448,13 +451,6 @@ pub trait AsmGenerator {
                     let (variables_to_deallocate, _globals_to_save) =
                         self.get_scoped_map_mut().exit_scope()?;
 
-                    // for global_loc in globals_to_save {
-                    //     self.write_address_inst("ldr   x8", global_loc);
-                    //     self.write_inst("str   w0, [x8]");
-                    //     // self.write_address_inst("ldr   w0", global_loc);
-                    //     // self.write_inst("str   w0, [x8]");
-                    // }
-
                     for _ in 0..variables_to_deallocate {
                         self.decrement_stack_ptr();
                     }
@@ -505,13 +501,15 @@ pub trait AsmGenerator {
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),
                     VarLoc::PrevFrame(_) => {
-                        panic!("tried to assign to 0 var in a prev stack frame")
+                        return Err(RustCcError::CodegenError(
+                            CodegenError::AssignedToVarInPrevFrame,
+                        ));
                     }
-                    VarLoc::Register(_) => panic!("tried to assign to a var in register"),
-                    // TODO: make x8 a constant somewhere
-                    // FIX: doesn't work with more than one global
-                    // TODO:
-                    // VarLoc::Global(_, None) => self.write_inst("mov   w0, [x8]"),
+                    VarLoc::Register(_) => {
+                        return Err(RustCcError::CodegenError(
+                            CodegenError::AssignedToVarInRegister,
+                        ));
+                    }
                     VarLoc::Global(id, offset) => {
                         let page = if self.curr_function_context().function_name == "main" {
                             "PAGE"
@@ -522,7 +520,7 @@ pub trait AsmGenerator {
                             "adrp  {}, _{id}@{page}",
                             Self::GLOBAL_VAR_REGISTER
                         ));
-                        self.write_inst("mov   w8, w0");
+                        self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
                         self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
                         self.save_to_stack(offset);
                     }
@@ -681,7 +679,7 @@ pub trait AsmGenerator {
                     // in w8-w15 until we generate all the expressions
                     let tmp_reg = reg + 8;
                     self.gen_l15_asm(param.to_owned())?;
-                    self.write_inst(&format!("mov   w{tmp_reg}, w0"));
+                    self.write_inst(&format!("mov   w{tmp_reg}, {}", Self::PRIMARY_REGISTER));
                 }
 
                 for reg in 0..params.len() {

@@ -24,6 +24,10 @@ pub enum ParseError {
     UnexpectedTokenEnd,
     #[error("Next token didn't parse into op")]
     PeekFailed,
+    #[error("Int keyword not followed by an identifier")]
+    MalformedDeclaration,
+    #[error("`{0:?}` is not a valid L2 token")]
+    UnexpectedBottomLevelToken(Token),
 }
 
 #[derive(Debug, Error)]
@@ -31,7 +35,9 @@ pub enum ScopeError {
     #[error("Initialized `{0}` twice in the same scope")]
     InitializedTwiceInSameScope(String),
     #[error("Tried to use `{0}` as a variable name in a function, but it's already being used as a param name")]
-    ReusedParamName(String),
+    ReusedParamNameInFunction(String),
+    #[error("Tried to use `{0}` twice as a parameter name")]
+    ReusedParamNameInFunctionPrototype(String),
     #[error("Declared `{0}` twice in the same scope")]
     DeclaredTwiceInSameScope(String),
     #[error("`{0}` is not initialized in this scope")]
@@ -58,6 +64,12 @@ pub enum CodegenError {
     UnenclosedBreak,
     #[error("Continue statement is not enclosed in an iterating statement")]
     UnenclosedContinue,
+    #[error("Cannot assign to a variable in a previous stack frame")]
+    AssignedToVarInPrevFrame,
+    #[error("Cannot assign to a variable in register. Try storing to stack first.")]
+    AssignedToVarInRegister,
+    #[error("`{0}` used for both function and global variable name")]
+    ReusedIdentifierForFunctionAndGlobal(String),
 }
 
 pub type RustCcResult<T> = Result<T, RustCcError>;
