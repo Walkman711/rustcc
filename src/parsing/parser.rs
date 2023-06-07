@@ -34,7 +34,6 @@ impl Parser {
     }
 
     fn parse_top_level_item(&mut self) -> RustCcResult<TopLevelItem> {
-        // self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
         let top_level_type = self.parse_fn_ret_type()?;
 
         let tok = self.lexer.next_token_fallible()?;
@@ -88,6 +87,19 @@ impl Parser {
         }
     }
 
+    fn parse_numeric_type(&mut self) -> Option<Token> {
+        let ret = match self.lexer.peek() {
+            Some(Token::Keyword(Keywords::Int)) => Some(Token::Keyword(Keywords::Int)),
+            _ => None,
+        };
+
+        if ret.is_some() {
+            let _ = self.lexer.next_token();
+        }
+
+        ret
+    }
+
     fn parse_fn(&mut self, identifier: String, ret_type: ReturnType) -> RustCcResult<Function> {
         let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
@@ -95,10 +107,11 @@ impl Parser {
         // Parse params. We should either have nothing, void and nothing else, or a list of args.
         // TODO: remove Keywords::Int check -> we'll be using more numeric types soon
         if !self.lexer.advance_if_match(&Token::Keyword(Keywords::Void)) {
-            while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+            while let Some(_) = self.parse_numeric_type() {
                 let Some(Token::Identifier(param)) = self.lexer.next_token() else {
-                return Err(ParseError::MalformedDeclaration.into());
-            };
+                    return Err(ParseError::MalformedDeclaration.into());
+                };
+
                 params.push(param);
                 self.lexer.advance_if_match(&Token::Comma);
             }
@@ -163,7 +176,7 @@ impl Parser {
                 // TODO: I really, really don't like this
                 let mut decl = None;
                 let mut init_exp = None;
-                if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+                if let Some(_) = self.parse_numeric_type() {
                     let Some(Token::Identifier(id)) = self.lexer.peek() else {
                         return Err(ParseError::MalformedDeclaration.into());
                     };
@@ -258,7 +271,7 @@ impl Parser {
                 break;
             }
 
-            let block_item = if self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+            let block_item = if let Some(_) = self.parse_numeric_type() {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     return Err(ParseError::MalformedDeclaration.into());
                 };
