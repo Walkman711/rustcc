@@ -58,6 +58,12 @@ pub enum FunctionError {
     MultipleDefinitions(String),
     #[error("There is no declaration or definition for {0}")]
     UndeclaredFunction(String),
+    #[error("There is no main function")]
+    NoMain,
+    #[error(
+        "Bad arguments to main. Should either have no arguments or `int argc, char *argv[]`: {0:?}"
+    )]
+    BadArgumentsToMain(Vec<String>),
 }
 
 #[derive(Debug, Error)]
