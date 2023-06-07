@@ -4,7 +4,10 @@ use crate::{
         lexer_enums::{Keywords, Token},
     },
     parse_level,
-    utils::error::{ParseError, RustCcResult},
+    utils::{
+        error::{ParseError, RustCcResult},
+        types::{IntegerType, NumericType, ReturnType},
+    },
 };
 
 use super::{ops::*, parser_types::*};
@@ -31,7 +34,8 @@ impl Parser {
     }
 
     fn parse_top_level_item(&mut self) -> RustCcResult<TopLevelItem> {
-        self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
+        // self.lexer.expect_next(&Token::Keyword(Keywords::Int))?;
+        let top_level_type = self.parse_fn_ret_type()?;
 
         let tok = self.lexer.next_token_fallible()?;
 
@@ -45,6 +49,9 @@ impl Parser {
 
         match tok {
             Token::SingleEquals => {
+                if let ReturnType::Void = top_level_type {
+                    todo!("Error: tried to declare a global var with type Void");
+                }
                 if let Some(Token::Integer(i)) = self.lexer.next_token() {
                     self.lexer.expect_next(&Token::Semicolon)?;
                     Ok(TopLevelItem::Var(GlobalVar::Definition(
@@ -54,29 +61,52 @@ impl Parser {
                     Err(ParseError::ExpectedToken(Token::Integer(100), tok).into())
                 }
             }
-            Token::Semicolon => Ok(TopLevelItem::Var(GlobalVar::Declaration(identifier))),
+            Token::Semicolon => {
+                // DRY: pull this up?
+                if let ReturnType::Void = top_level_type {
+                    todo!("Error: tried to declare a global var with type Void");
+                }
+                Ok(TopLevelItem::Var(GlobalVar::Declaration(identifier)))
+            }
             _ => {
                 self.lexer.back();
-                let function = self.parse_fn(identifier)?;
+                let function = self.parse_fn(identifier, top_level_type)?;
                 Ok(TopLevelItem::Fun(function))
             }
         }
     }
 
-    fn parse_fn(&mut self, identifier: String) -> RustCcResult<Function> {
+    fn parse_fn_ret_type(&mut self) -> RustCcResult<ReturnType> {
+        match self.lexer.next_token_fallible()? {
+            Token::Keyword(Keywords::Int) => {
+                Ok(ReturnType::Numeric(NumericType::Int(IntegerType::Int)))
+            }
+            Token::Keyword(Keywords::Void) => {
+                Ok(ReturnType::Void)
+            }
+            _ => todo!("add error to express that there was a range of tokens we'd accept, but we didn't see one")
+        }
+    }
+
+    fn parse_fn(&mut self, identifier: String, ret_type: ReturnType) -> RustCcResult<Function> {
         let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
-        while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
-            let Some(Token::Identifier(param)) = self.lexer.next_token() else {
+
+        // Parse params. We should either have nothing, void and nothing else, or a list of args.
+        // TODO: remove Keywords::Int check -> we'll be using more numeric types soon
+        if !self.lexer.advance_if_match(&Token::Keyword(Keywords::Void)) {
+            while self.lexer.advance_if_match(&Token::Keyword(Keywords::Int)) {
+                let Some(Token::Identifier(param)) = self.lexer.next_token() else {
                 return Err(ParseError::MalformedDeclaration.into());
             };
-            params.push(param);
-            self.lexer.advance_if_match(&Token::Comma);
+                params.push(param);
+                self.lexer.advance_if_match(&Token::Comma);
+            }
         }
         self.lexer.expect_next(&Token::CloseParen)?;
 
         if self.lexer.advance_if_match(&Token::Semicolon) {
-            Ok(Function::Declaration(identifier, params))
+            Ok(Function::Declaration(identifier, ret_type, params))
         } else {
             let mut block_items = self.parse_block_items()?;
 
@@ -85,7 +115,12 @@ impl Parser {
                 block_items.push(BlockItem::Stmt(Statement::Return(None)))
             }
 
-            Ok(Function::Definition(identifier, params, block_items))
+            Ok(Function::Definition(
+                identifier,
+                ret_type,
+                params,
+                block_items,
+            ))
         }
     }
 

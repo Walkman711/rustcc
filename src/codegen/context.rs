@@ -34,8 +34,12 @@ const GLOBAL_EXPECT: &str = "Will always have a global context";
 impl Context {
     fn new(function: &parser_types::Function, scoped_map: ScopedMap) -> Self {
         let (function_name, num_args) = match function {
-            Function::Definition(function_name, args, _) => (function_name.to_owned(), args.len()),
-            Function::Declaration(function_name, args) => (function_name.to_owned(), args.len()),
+            Function::Definition(function_name, _ret, args, _) => {
+                (function_name.to_owned(), args.len())
+            }
+            Function::Declaration(function_name, _ret, args) => {
+                (function_name.to_owned(), args.len())
+            }
         };
 
         Self {

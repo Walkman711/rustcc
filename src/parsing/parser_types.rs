@@ -1,5 +1,5 @@
 use super::ops::*;
-use crate::define_exp_level;
+use crate::{define_exp_level, utils::types::ReturnType};
 
 pub trait PrettyPrinter {
     fn pretty_print(&self, indentation_level: usize);
@@ -77,16 +77,16 @@ impl std::fmt::Display for TopLevelItem {
 
 #[derive(Clone, Debug)]
 pub enum Function {
-    Definition(String, Vec<String>, Vec<BlockItem>),
-    Declaration(String, Vec<String>),
+    Definition(String, ReturnType, Vec<String>, Vec<BlockItem>),
+    Declaration(String, ReturnType, Vec<String>),
 }
 
 impl PrettyPrinter for Function {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         match self {
-            Function::Definition(func_name, params, block_items) => {
-                print!("{tabs}FUNCTION DEFINITION: {func_name}(");
+            Function::Definition(func_name, ret, params, block_items) => {
+                print!("{tabs}FUNCTION DEFINITION: {func_name} -> {ret:?} (");
 
                 for param in params {
                     print!("{param}, ")
@@ -98,8 +98,8 @@ impl PrettyPrinter for Function {
                 }
                 println!("{tabs}}}");
             }
-            Function::Declaration(func_name, params) => {
-                print!("{tabs}FUNCTION DECLARATION: {func_name}(");
+            Function::Declaration(func_name, ret, params) => {
+                print!("{tabs}FUNCTION DECLARATION: {func_name} -> {ret:?} (");
 
                 for param in params {
                     print!("{param}, ")
@@ -113,8 +113,8 @@ impl PrettyPrinter for Function {
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Function::Definition(func_name, params, block_items) => {
-                write!(f, "FUNCTION: {func_name}(")?;
+            Function::Definition(func_name, ret, params, block_items) => {
+                write!(f, "FUNCTION: {func_name} -> {ret:?} (")?;
 
                 for param in params {
                     write!(f, "{param}, ")?;
@@ -126,8 +126,8 @@ impl std::fmt::Display for Function {
                 }
                 writeln!(f, "}}")?;
             }
-            Function::Declaration(func_name, params) => {
-                write!(f, "FUNCTION DECLARATION: {func_name}(")?;
+            Function::Declaration(func_name, ret, params) => {
+                write!(f, "FUNCTION DECLARATION: {func_name} -> {ret:?} (")?;
 
                 for param in params {
                     write!(f, "{param}, ")?;

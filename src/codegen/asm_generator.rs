@@ -173,7 +173,7 @@ pub trait AsmGenerator {
                 }
                 TopLevelItem::Fun(function) => match function {
                     Function::Declaration(..) => {}
-                    Function::Definition(_id, params, block_items) => {
+                    Function::Definition(_id, _ret, params, block_items) => {
                         self.global_context_mut().new_function_context(function);
 
                         self.get_scoped_map_mut().new_scope()?;
