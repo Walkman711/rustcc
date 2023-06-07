@@ -6,7 +6,7 @@ use crate::{
     parse_level,
     utils::{
         error::{ParseError, RustCcResult},
-        types::{IntegerType, NumericType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType, VariableType},
     },
 };
 
@@ -86,14 +86,14 @@ impl Parser {
 
     fn parse_variable_type(&mut self) -> RustCcResult<VariableType> {
         let nt = self.parse_numeric_type()?;
-        Ok(VariableType::Num(nt))
+        Ok(VariableType::Basic(nt))
     }
 
-    fn parse_numeric_type(&mut self) -> RustCcResult<NumericType> {
+    fn parse_numeric_type(&mut self) -> RustCcResult<BasicType> {
         let ret = match self.lexer.peek() {
-            Some(Token::Keyword(Keywords::Int)) => Ok(NumericType::Int(IntegerType::Int)),
-            Some(Token::Keyword(Keywords::Char)) => Ok(NumericType::Int(IntegerType::Char)),
-            _ => Err(ParseError::CouldNotParseNumericType.into()),
+            Some(Token::Keyword(Keywords::Int)) => Ok(BasicType::Int(IntegerType::Int)),
+            Some(Token::Keyword(Keywords::Char)) => Ok(BasicType::Int(IntegerType::Char)),
+            _ => Err(ParseError::CouldNotParseBasicType.into()),
         };
 
         if ret.is_ok() {

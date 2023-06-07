@@ -32,8 +32,8 @@ pub enum ParseError {
     MalformedDeclaration,
     #[error("`{0:?}` is not a valid L2 token")]
     UnexpectedBottomLevelToken(Token),
-    #[error("Could not parse numeric type")]
-    CouldNotParseNumericType,
+    #[error("Could not parse basic type")]
+    CouldNotParseBasicType,
 }
 
 #[derive(Debug, Error)]

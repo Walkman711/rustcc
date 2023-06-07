@@ -4,7 +4,7 @@ use crate::{
     parsing::parser_types::{Function, GlobalVar, Param, Program, TopLevelItem},
     utils::{
         error::{CodegenError, FunctionError, RustCcError, RustCcResult},
-        types::{IntegerType, NumericType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType, VariableType},
     },
 };
 
@@ -114,7 +114,7 @@ impl TryFrom<&Program> for FunctionMap {
             return Err(FunctionError::NoMain.into());
         };
 
-        if main_fn.1 != ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int))) {
+        if main_fn.1 != ReturnType::NonVoid(BasicType::Int(IntegerType::Int).into()) {
             todo!("Error: Main has to return type `int`");
         }
 

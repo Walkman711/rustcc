@@ -10,7 +10,7 @@ use crate::{
     utils::{
         error::{CodegenError, RustCcResult},
         scoped_map::{ScopedMap, VarLoc},
-        types::{IntegerType, NumericType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType, VariableType},
     },
 };
 
@@ -158,8 +158,8 @@ pub trait AsmGenerator {
                     let gc = self.global_context_mut();
                     gc.scoped_map.initialize_var(
                         id,
-                        VariableType::Num(NumericType::Int(IntegerType::Int)),
-                        ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int))),
+                        BasicType::Int(IntegerType::Int).into(),
+                        ReturnType::NonVoid(BasicType::Int(IntegerType::Int).into()),
                         VarLoc::Global(id.to_owned(), offset),
                     )?;
                     offset += INT_SIZE;
@@ -170,7 +170,7 @@ pub trait AsmGenerator {
                     let gc = self.global_context_mut();
                     gc.scoped_map.declare_var(
                         id,
-                        VariableType::Num(NumericType::Int(IntegerType::Int)),
+                        BasicType::Int(IntegerType::Int).into(),
                         VarLoc::Global(id.to_owned(), offset),
                     )?;
                     offset += INT_SIZE;

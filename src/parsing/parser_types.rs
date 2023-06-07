@@ -4,7 +4,7 @@ use crate::{
     define_exp_level,
     utils::{
         scoped_map::{ScopedMap, VarDetails},
-        types::{IntegerType, NumericType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType, VariableType},
     },
 };
 
@@ -465,7 +465,12 @@ impl GetExpressionType for Level14Exp {
 impl GetExpressionType for Level13Exp {
     fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
         match self {
-            Level13Exp::Ternary(_, exp, _) => exp.exp_type(fn_map, scope_map),
+            Level13Exp::Ternary(_, if_exp, else_exp) => {
+                let if_exp_ret = if_exp.exp_type(fn_map, scope_map);
+                let else_exp_ret = else_exp.exp_type(fn_map, scope_map);
+                assert_eq!(if_exp_ret, else_exp_ret);
+                if_exp_ret
+            }
             Level13Exp::NoTernary(exp) => exp.exp_type(fn_map, scope_map),
         }
     }
@@ -475,11 +480,12 @@ impl GetExpressionType for Level2Exp {
     fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
         match self {
             Level2Exp::FunctionCall(fn_name, _) => fn_map.ret_type(fn_name),
-            Level2Exp::Const(_) => {
-                ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int)))
-            }
+            Level2Exp::Const(_) => ReturnType::NonVoid(BasicType::Int(IntegerType::Int).into()),
             Level2Exp::Var(id) => ReturnType::NonVoid(scope_map.get_var(id).unwrap().var_type),
-            Level2Exp::Unary(_, exp) => exp.exp_type(fn_map, scope_map),
+            Level2Exp::Unary(op, exp) => match op {
+                Level2Op::SizeOf => ReturnType::NonVoid(BasicType::Int(IntegerType::Int).into()),
+                _ => exp.exp_type(fn_map, scope_map),
+            },
             Level2Exp::ParenExp(exp) => exp.exp_type(fn_map, scope_map),
         }
     }

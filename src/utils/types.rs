@@ -24,7 +24,9 @@ impl ReturnType {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VariableType {
-    Num(NumericType),
+    Basic(BasicType),
+    // Enum(EnumeratedType),
+    // Derived(DerivedType),
     // Ptr,
     // Array,
     // Enum,
@@ -35,37 +37,43 @@ pub enum VariableType {
 impl VariableType {
     pub fn binop(&self, rh_vt: VariableType) -> Self {
         match (self, rh_vt) {
-            (VariableType::Num(lh), VariableType::Num(rh)) => VariableType::Num(lh.binop(rh)),
+            (VariableType::Basic(lh), VariableType::Basic(rh)) => VariableType::Basic(lh.binop(rh)),
         }
     }
 
     pub fn sizeof(&self) -> usize {
         match self {
-            VariableType::Num(n) => n.sizeof(),
+            VariableType::Basic(n) => n.sizeof(),
         }
+    }
+}
+
+impl From<BasicType> for VariableType {
+    fn from(value: BasicType) -> Self {
+        Self::Basic(value)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NumericType {
+pub enum BasicType {
     Int(IntegerType),
     Float(FloatingType),
 }
 
-impl NumericType {
-    pub fn binop(&self, rh_nt: NumericType) -> Self {
+impl BasicType {
+    pub fn binop(&self, rh_nt: BasicType) -> Self {
         match (self, rh_nt) {
-            (NumericType::Int(lh), NumericType::Int(rh)) => NumericType::Int(lh.binop(rh)),
-            (NumericType::Int(_), NumericType::Float(_)) => todo!(),
-            (NumericType::Float(_), NumericType::Int(_)) => todo!(),
-            (NumericType::Float(_), NumericType::Float(_)) => todo!(),
+            (BasicType::Int(lh), BasicType::Int(rh)) => BasicType::Int(lh.binop(rh)),
+            (BasicType::Int(_), BasicType::Float(_)) => todo!(),
+            (BasicType::Float(_), BasicType::Int(_)) => todo!(),
+            (BasicType::Float(_), BasicType::Float(_)) => todo!(),
         }
     }
 
     pub fn sizeof(&self) -> usize {
         match self {
-            NumericType::Int(i) => i.sizeof(),
-            NumericType::Float(_) => todo!(),
+            BasicType::Int(i) => i.sizeof(),
+            BasicType::Float(_) => todo!(),
         }
     }
 }
@@ -126,4 +134,13 @@ pub enum FloatingType {
     // Float,
     // Double,
     // LongDouble,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DerivedType {
+    Ptr,
+    Array,
+    Struct,
+    Union(Vec<VariableType>),
+    FunType,
 }
