@@ -13,6 +13,13 @@ impl ReturnType {
             (ReturnType::Void, ReturnType::Void) => todo!(),
         }
     }
+
+    pub fn sizeof(&self) -> usize {
+        match self {
+            ReturnType::NonVoid(nv) => nv.sizeof(),
+            ReturnType::Void => unreachable!("Expressions should never be Void"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -31,6 +38,12 @@ impl VariableType {
             (VariableType::Num(lh), VariableType::Num(rh)) => VariableType::Num(lh.binop(rh)),
         }
     }
+
+    pub fn sizeof(&self) -> usize {
+        match self {
+            VariableType::Num(n) => n.sizeof(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -46,6 +59,13 @@ impl NumericType {
             (NumericType::Int(_), NumericType::Float(_)) => todo!(),
             (NumericType::Float(_), NumericType::Int(_)) => todo!(),
             (NumericType::Float(_), NumericType::Float(_)) => todo!(),
+        }
+    }
+
+    pub fn sizeof(&self) -> usize {
+        match self {
+            NumericType::Int(i) => i.sizeof(),
+            NumericType::Float(_) => todo!(),
         }
     }
 }
@@ -87,6 +107,16 @@ impl IntegerType {
             (IntegerType::Char, IntegerType::Int) => IntegerType::Int,
             (IntegerType::Int, IntegerType::Char) => IntegerType::Int,
             (IntegerType::Int, IntegerType::Int) => IntegerType::Int,
+        }
+    }
+
+    pub fn sizeof(&self) -> usize {
+        match self {
+            IntegerType::Char => 1,
+            // TODO: this should be platform specific, but will need to
+            // redo some codegen stuff where i use w-registers instead
+            // of x-registers.
+            IntegerType::Int => 4,
         }
     }
 }

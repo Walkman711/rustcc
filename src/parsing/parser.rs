@@ -407,6 +407,10 @@ impl Parser {
                 Level2Op::BitwiseNot,
                 Box::new(self.parse_l2_exp()?),
             )),
+            Token::Keyword(Keywords::Sizeof) => Ok(Level2Exp::Unary(
+                Level2Op::SizeOf,
+                Box::new(self.parse_l2_exp()?),
+            )),
             t => Err(ParseError::UnexpectedBottomLevelToken(t).into()),
         }
     }

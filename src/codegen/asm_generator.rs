@@ -290,7 +290,15 @@ pub trait AsmGenerator {
                         let exp_ret_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
                         let fun_ret_type =
                             self.get_fn_map().ret_type(&self.curr_ctx().function_name);
-                        assert_eq!(fun_ret_type, exp_ret_type);
+                        if exp_ret_type != fun_ret_type {
+                            return Err(CodegenError::ReturningIncorrectType(
+                                self.curr_ctx().function_name.to_owned(),
+                                fun_ret_type,
+                                exp_ret_type,
+                            )
+                            .into());
+                        }
+
                         // TODO: this is ugly, should be some way to stop generating ASM
                         self.gen_l15_asm(exp)?;
                     }
@@ -654,12 +662,18 @@ pub trait AsmGenerator {
                 self.load_var(Self::PRIMARY_REGISTER, var_details.loc);
             }
             Level2Exp::Unary(op, factor) => {
-                self.gen_l2_asm(*factor)?;
+                self.gen_l2_asm(*factor.clone())?;
                 match op {
                     Level2Op::UnaryMinus => self.write_unary_inst(Mnemonic::Neg),
                     Level2Op::LogicalNot => self.logical_not(),
                     Level2Op::BitwiseNot => self.write_unary_inst(Mnemonic::BitwiseNot),
-                    Level2Op::SizeOf => todo!("SizeOf"),
+                    Level2Op::SizeOf => {
+                        let sm = self.get_scoped_map();
+                        let fn_map = self.get_fn_map();
+                        let factor_type = factor.exp_type(fn_map, sm);
+                        let size = factor_type.sizeof();
+                        self.mov_into_primary(&size.to_string());
+                    }
                     _ => todo!("{op} is unimplemented for now"),
                 }
             }

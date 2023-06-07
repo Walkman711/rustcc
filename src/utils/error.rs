@@ -2,6 +2,8 @@ use crate::{lexing::lexer_enums::Token, parsing::parser_types::Param};
 
 use thiserror::Error;
 
+use super::types::ReturnType;
+
 #[derive(Debug, Error)]
 pub enum RustCcError {
     #[error("Bad lex {0}")]
@@ -80,6 +82,8 @@ pub enum CodegenError {
     AssignedToVarInRegister,
     #[error("`{0}` used for both function and global variable name")]
     ReusedIdentifierForFunctionAndGlobal(String),
+    #[error("Function `{0}` is supposed to return `{1:?}` but it is returning `{2:?}")]
+    ReturningIncorrectType(String, ReturnType, ReturnType),
 }
 
 pub type RustCcResult<T> = Result<T, RustCcError>;
