@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use super::error::{RustCcResult, ScopeError};
+use super::{
+    error::{RustCcResult, ScopeError},
+    types::VariableType,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum VarState {
+pub enum VarState {
     Param,
     InitializedInThisScope,
     InitializedInOuterScope,
@@ -70,7 +73,8 @@ pub enum VarLoc {
 
 #[derive(Clone, Debug)]
 pub struct VarDetails {
-    state: VarState,
+    pub var_type: VariableType,
+    pub state: VarState,
     pub loc: VarLoc,
 }
 
@@ -89,12 +93,13 @@ impl Default for ScopedMap {
 }
 
 impl ScopedMap {
-    pub fn new_param(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
+    pub fn new_param(&mut self, id: &str, var_type: VariableType, loc: VarLoc) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
         let details = VarDetails {
+            var_type,
             state: VarState::Param,
             loc,
         };
@@ -102,15 +107,20 @@ impl ScopedMap {
         if let Some(VarDetails {
             state: VarState::Param,
             ..
-        }) = last.insert(var.to_owned(), details)
+        }) = last.insert(id.to_owned(), details)
         {
-            return Err(ScopeError::ReusedParamNameInFunctionPrototype(var.to_owned()).into());
+            return Err(ScopeError::ReusedParamNameInFunctionPrototype(id.to_owned()).into());
         }
 
         Ok(())
     }
 
-    pub fn initialize_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
+    pub fn initialize_var(
+        &mut self,
+        var: &str,
+        var_type: VariableType,
+        loc: VarLoc,
+    ) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
@@ -122,6 +132,7 @@ impl ScopedMap {
         };
 
         let details = VarDetails {
+            var_type,
             state: new_state,
             loc,
         };
@@ -133,7 +144,12 @@ impl ScopedMap {
         Ok(())
     }
 
-    pub fn declare_var(&mut self, var: &str, loc: VarLoc) -> RustCcResult<()> {
+    pub fn declare_var(
+        &mut self,
+        var: &str,
+        var_type: VariableType,
+        loc: VarLoc,
+    ) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
@@ -144,7 +160,11 @@ impl ScopedMap {
             VarState::DeclaredInThisScope
         };
 
-        let details = VarDetails { state, loc };
+        let details = VarDetails {
+            var_type,
+            state,
+            loc,
+        };
 
         if let Some(VarDetails {
             state: VarState::DeclaredInThisScope,
@@ -157,6 +177,7 @@ impl ScopedMap {
         Ok(())
     }
 
+    // TODO: validate that the RH value == var_type of LH
     pub fn assign_var(&mut self, var: &str) -> RustCcResult<VarLoc> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());

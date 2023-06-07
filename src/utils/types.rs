@@ -1,7 +1,17 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReturnType {
-    Numeric(NumericType),
+    NonVoid(VariableType),
     Void,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VariableType {
+    Num(NumericType),
+    // Ptr,
+    // Array,
+    // Enum,
+    // Union,
+    // Struct,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

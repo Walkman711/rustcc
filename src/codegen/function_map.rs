@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    parsing::parser_types::{Function, GlobalVar, Program, TopLevelItem},
+    parsing::parser_types::{Function, GlobalVar, Param, Program, TopLevelItem},
     utils::{
         error::{CodegenError, FunctionError, RustCcError, RustCcResult},
-        types::{IntegerType, NumericType, ReturnType},
+        types::{IntegerType, NumericType, ReturnType, VariableType},
     },
 };
 
@@ -19,14 +19,14 @@ pub struct FunctionMap {
     // TODO: once we start having a notion of variable types, will also want to store that here as
     // well
     // TODO: I don't love this - should store function, but that'll be a messier update
-    fn_info: HashMap<String, (FunctionType, ReturnType, Vec<String>)>,
+    fn_info: HashMap<String, (FunctionType, ReturnType, Vec<Param>)>,
 }
 
 impl TryFrom<&Program> for FunctionMap {
     type Error = RustCcError;
 
     fn try_from(prog: &Program) -> Result<Self, Self::Error> {
-        let mut fn_info: HashMap<String, (FunctionType, ReturnType, Vec<String>)> = HashMap::new();
+        let mut fn_info: HashMap<String, (FunctionType, ReturnType, Vec<Param>)> = HashMap::new();
         let mut global_names = HashSet::new();
         for top_level_item in &prog.0 {
             match top_level_item {
@@ -114,7 +114,7 @@ impl TryFrom<&Program> for FunctionMap {
             return Err(FunctionError::NoMain.into());
         };
 
-        if main_fn.1 != ReturnType::Numeric(NumericType::Int(IntegerType::Int)) {
+        if main_fn.1 != ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int))) {
             todo!("Error: Main has to return type `int`");
         }
 
@@ -122,13 +122,10 @@ impl TryFrom<&Program> for FunctionMap {
 
         match main_args.len() {
             0 => {}
-            1 => {
-                todo!("handle `(void)`-style main fns")
-            }
             2 => {
-                if !main_args.contains(&"argv".to_string())
-                    || !main_args.contains(&"argc".to_string())
-                {
+                let argc = main_args.iter().any(|param| param.id == "argc");
+                let argv = main_args.iter().any(|param| param.id == "argv");
+                if !argc || !argv {
                     return Err(FunctionError::BadArgumentsToMain(main_args.to_owned()).into());
                 }
             }
@@ -142,7 +139,9 @@ impl TryFrom<&Program> for FunctionMap {
 }
 
 impl FunctionMap {
-    // TODO: update to check arg types once we handle new numeric types
+    // TODO: update to check arg types once we handle new numeric types. This seems like it'll be
+    // difficult with expressions. Will start needing to reason about what the return type of an
+    // expression is.
     // TODO: update to check that the return type of the function will work with the variable the
     // result is assigned to.
     pub fn validate_fn_call(&self, fn_name: &str, num_args_in_call: usize) -> RustCcResult<()> {

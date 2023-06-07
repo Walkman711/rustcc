@@ -1,4 +1,4 @@
-use crate::lexing::lexer_enums::Token;
+use crate::{lexing::lexer_enums::Token, parsing::parser_types::Param};
 
 use thiserror::Error;
 
@@ -30,6 +30,8 @@ pub enum ParseError {
     MalformedDeclaration,
     #[error("`{0:?}` is not a valid L2 token")]
     UnexpectedBottomLevelToken(Token),
+    #[error("Could not parse numeric type")]
+    CouldNotParseNumericType,
 }
 
 #[derive(Debug, Error)]
@@ -63,7 +65,7 @@ pub enum FunctionError {
     #[error(
         "Bad arguments to main. Should either have no arguments or `int argc, char *argv[]`: {0:?}"
     )]
-    BadArgumentsToMain(Vec<String>),
+    BadArgumentsToMain(Vec<Param>),
 }
 
 #[derive(Debug, Error)]

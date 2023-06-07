@@ -1,5 +1,8 @@
 use super::ops::*;
-use crate::{define_exp_level, utils::types::ReturnType};
+use crate::{
+    define_exp_level,
+    utils::types::{ReturnType, VariableType},
+};
 
 pub trait PrettyPrinter {
     fn pretty_print(&self, indentation_level: usize);
@@ -30,6 +33,12 @@ impl std::fmt::Display for Program {
 pub enum GlobalVar {
     Declaration(String),
     Definition(String, i64),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Param {
+    pub var_type: VariableType,
+    pub id: String,
 }
 
 impl PrettyPrinter for GlobalVar {
@@ -77,8 +86,8 @@ impl std::fmt::Display for TopLevelItem {
 
 #[derive(Clone, Debug)]
 pub enum Function {
-    Definition(String, ReturnType, Vec<String>, Vec<BlockItem>),
-    Declaration(String, ReturnType, Vec<String>),
+    Definition(String, ReturnType, Vec<Param>, Vec<BlockItem>),
+    Declaration(String, ReturnType, Vec<Param>),
 }
 
 impl PrettyPrinter for Function {
@@ -89,7 +98,7 @@ impl PrettyPrinter for Function {
                 print!("{tabs}FUNCTION DEFINITION: {func_name} -> {ret:?} (");
 
                 for param in params {
-                    print!("{param}, ")
+                    print!("{}, ", param.id)
                 }
                 println!(")");
                 println!("{tabs}{{");
@@ -102,7 +111,7 @@ impl PrettyPrinter for Function {
                 print!("{tabs}FUNCTION DECLARATION: {func_name} -> {ret:?} (");
 
                 for param in params {
-                    print!("{param}, ")
+                    print!("{}, ", param.id)
                 }
                 println!(");");
             }
@@ -117,7 +126,7 @@ impl std::fmt::Display for Function {
                 write!(f, "FUNCTION: {func_name} -> {ret:?} (")?;
 
                 for param in params {
-                    write!(f, "{param}, ")?;
+                    write!(f, "{}, ", param.id)?;
                 }
                 writeln!(f, ")")?;
                 writeln!(f, "{{")?;
@@ -130,7 +139,7 @@ impl std::fmt::Display for Function {
                 write!(f, "FUNCTION DECLARATION: {func_name} -> {ret:?} (")?;
 
                 for param in params {
-                    write!(f, "{param}, ")?;
+                    write!(f, "{}, ", param.id)?;
                 }
                 writeln!(f, ");")?;
             }
@@ -139,7 +148,7 @@ impl std::fmt::Display for Function {
     }
 }
 
-pub type Declaration = (String, Option<Level15Exp>);
+pub type Declaration = (String, VariableType, Option<Level15Exp>);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
@@ -353,9 +362,9 @@ impl std::fmt::Display for BlockItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BlockItem::Stmt(s) => writeln!(f, "{s}"),
-            BlockItem::Declare((id, exp_opt)) => match exp_opt {
-                Some(exp) => writeln!(f, "INITIALIZE {id} = {exp}"),
-                None => writeln!(f, "DECLARE {id}"),
+            BlockItem::Declare((id, vt, exp_opt)) => match exp_opt {
+                Some(exp) => writeln!(f, "INITIALIZE {vt:?} {id} = {exp}"),
+                None => writeln!(f, "DECLARE {vt:?} {id}"),
             },
         }
     }

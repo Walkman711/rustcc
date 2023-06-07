@@ -6,7 +6,7 @@ use crate::{
     parse_level,
     utils::{
         error::{ParseError, RustCcResult},
-        types::{IntegerType, NumericType, ReturnType},
+        types::{IntegerType, NumericType, ReturnType, VariableType},
     },
 };
 
@@ -76,24 +76,26 @@ impl Parser {
     }
 
     fn parse_fn_ret_type(&mut self) -> RustCcResult<ReturnType> {
-        match self.lexer.next_token_fallible()? {
-            Token::Keyword(Keywords::Int) => {
-                Ok(ReturnType::Numeric(NumericType::Int(IntegerType::Int)))
-            }
-            Token::Keyword(Keywords::Void) => {
-                Ok(ReturnType::Void)
-            }
-            _ => todo!("add error to express that there was a range of tokens we'd accept, but we didn't see one")
+        if self.lexer.advance_if_match(&Token::Keyword(Keywords::Void)) {
+            Ok(ReturnType::Void)
+        } else {
+            let vt = self.parse_variable_type()?;
+            Ok(ReturnType::NonVoid(vt))
         }
     }
 
-    fn parse_numeric_type(&mut self) -> Option<Token> {
+    fn parse_variable_type(&mut self) -> RustCcResult<VariableType> {
+        let nt = self.parse_numeric_type()?;
+        Ok(VariableType::Num(nt))
+    }
+
+    fn parse_numeric_type(&mut self) -> RustCcResult<NumericType> {
         let ret = match self.lexer.peek() {
-            Some(Token::Keyword(Keywords::Int)) => Some(Token::Keyword(Keywords::Int)),
-            _ => None,
+            Some(Token::Keyword(Keywords::Int)) => Ok(NumericType::Int(IntegerType::Int)),
+            _ => Err(ParseError::CouldNotParseNumericType.into()),
         };
 
-        if ret.is_some() {
+        if ret.is_ok() {
             let _ = self.lexer.next_token();
         }
 
@@ -105,14 +107,13 @@ impl Parser {
         self.lexer.expect_next(&Token::OpenParen)?;
 
         // Parse params. We should either have nothing, void and nothing else, or a list of args.
-        // TODO: remove Keywords::Int check -> we'll be using more numeric types soon
         if !self.lexer.advance_if_match(&Token::Keyword(Keywords::Void)) {
-            while let Some(_) = self.parse_numeric_type() {
-                let Some(Token::Identifier(param)) = self.lexer.next_token() else {
+            while let Ok(var_type) = self.parse_variable_type() {
+                let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     return Err(ParseError::MalformedDeclaration.into());
                 };
 
-                params.push(param);
+                params.push(Param { var_type, id });
                 self.lexer.advance_if_match(&Token::Comma);
             }
         }
@@ -176,13 +177,13 @@ impl Parser {
                 // TODO: I really, really don't like this
                 let mut decl = None;
                 let mut init_exp = None;
-                if let Some(_) = self.parse_numeric_type() {
+                if let Ok(var_type) = self.parse_variable_type() {
                     let Some(Token::Identifier(id)) = self.lexer.peek() else {
                         return Err(ParseError::MalformedDeclaration.into());
                     };
                     // XXX: can we just declare and not init a var in the init exp?
                     // I think that the Expression type doesn't do empty exps for now.
-                    decl = Some((id, Some(self.parse_l15_exp()?)));
+                    decl = Some((id, var_type, Some(self.parse_l15_exp()?)));
                     self.lexer.expect_next(&Token::Semicolon)?;
                 } else if !self.lexer.advance_if_match(&Token::Semicolon) {
                     let exp = self.parse_l15_exp()?;
@@ -271,7 +272,7 @@ impl Parser {
                 break;
             }
 
-            let block_item = if let Some(_) = self.parse_numeric_type() {
+            let block_item = if let Ok(var_type) = self.parse_variable_type() {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
                     return Err(ParseError::MalformedDeclaration.into());
                 };
@@ -287,7 +288,7 @@ impl Parser {
                     Some(exp)
                 };
 
-                BlockItem::Declare((id, exp))
+                BlockItem::Declare((id, var_type, exp))
             } else {
                 BlockItem::Stmt(self.parse_statement()?)
             };

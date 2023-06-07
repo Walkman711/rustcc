@@ -10,6 +10,7 @@ use crate::{
     utils::{
         error::{CodegenError, RustCcResult},
         scoped_map::{ScopedMap, VarLoc},
+        types::{IntegerType, NumericType, VariableType},
     },
 };
 
@@ -155,16 +156,22 @@ pub trait AsmGenerator {
             match top_level_item {
                 TopLevelItem::Var(GlobalVar::Definition(id, val)) => {
                     let gc = self.global_context_mut();
-                    gc.scoped_map
-                        .initialize_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                    gc.scoped_map.initialize_var(
+                        id,
+                        VariableType::Num(NumericType::Int(IntegerType::Int)),
+                        VarLoc::Global(id.to_owned(), offset),
+                    )?;
                     offset += INT_SIZE;
                     defined_globals.insert(id.to_owned(), val);
                     self.increment_stack_ptr();
                 }
                 TopLevelItem::Var(GlobalVar::Declaration(id)) => {
                     let gc = self.global_context_mut();
-                    gc.scoped_map
-                        .declare_var(id, VarLoc::Global(id.to_owned(), offset))?;
+                    gc.scoped_map.declare_var(
+                        id,
+                        VariableType::Num(NumericType::Int(IntegerType::Int)),
+                        VarLoc::Global(id.to_owned(), offset),
+                    )?;
                     offset += INT_SIZE;
 
                     declared_globals.insert(id.to_owned());
@@ -186,7 +193,7 @@ pub trait AsmGenerator {
 
                             // Add param to the scope map
                             let sm = self.get_scoped_map_mut();
-                            sm.new_param(param, VarLoc::CurrFrame(var_loc))?;
+                            sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
                             var_loc += INT_SIZE;
 
                             // save arg onto stack
@@ -229,17 +236,18 @@ pub trait AsmGenerator {
     }
 
     fn gen_var_decl_asm(&mut self, decl: Declaration) -> RustCcResult<()> {
-        let (id, exp_opt) = decl;
+        let (id, vt, exp_opt) = decl;
         let var_loc = self.stack_ptr();
         let sm = self.get_scoped_map_mut();
+        // TODO: this is incorrect. should be able to get the type out of declaration
         match exp_opt {
             Some(exp) => {
-                sm.initialize_var(&id, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                sm.initialize_var(&id, vt, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.gen_l15_asm(exp)?;
                 self.push_stack();
             }
             None => {
-                sm.declare_var(&id, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                sm.declare_var(&id, vt, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.mov_into_primary("999");
                 self.push_stack();
             }
@@ -642,6 +650,7 @@ pub trait AsmGenerator {
                     Level2Op::UnaryMinus => self.write_unary_inst(Mnemonic::Neg),
                     Level2Op::LogicalNot => self.logical_not(),
                     Level2Op::BitwiseNot => self.write_unary_inst(Mnemonic::BitwiseNot),
+                    Level2Op::SizeOf => todo!("SizeOf"),
                     _ => todo!("{op} is unimplemented for now"),
                 }
             }
