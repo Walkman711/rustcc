@@ -92,6 +92,7 @@ impl Parser {
     fn parse_numeric_type(&mut self) -> RustCcResult<NumericType> {
         let ret = match self.lexer.peek() {
             Some(Token::Keyword(Keywords::Int)) => Ok(NumericType::Int(IntegerType::Int)),
+            Some(Token::Keyword(Keywords::Char)) => Ok(NumericType::Int(IntegerType::Char)),
             _ => Err(ParseError::CouldNotParseNumericType.into()),
         };
 

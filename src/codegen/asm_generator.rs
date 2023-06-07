@@ -10,7 +10,7 @@ use crate::{
     utils::{
         error::{CodegenError, RustCcResult},
         scoped_map::{ScopedMap, VarLoc},
-        types::{IntegerType, NumericType, VariableType},
+        types::{IntegerType, NumericType, ReturnType, VariableType},
     },
 };
 
@@ -159,6 +159,7 @@ pub trait AsmGenerator {
                     gc.scoped_map.initialize_var(
                         id,
                         VariableType::Num(NumericType::Int(IntegerType::Int)),
+                        ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int))),
                         VarLoc::Global(id.to_owned(), offset),
                     )?;
                     offset += INT_SIZE;
@@ -236,18 +237,20 @@ pub trait AsmGenerator {
     }
 
     fn gen_var_decl_asm(&mut self, decl: Declaration) -> RustCcResult<()> {
-        let (id, vt, exp_opt) = decl;
+        let (id, lh_type, exp_opt) = decl;
         let var_loc = self.stack_ptr();
-        let sm = self.get_scoped_map_mut();
         // TODO: this is incorrect. should be able to get the type out of declaration
         match exp_opt {
             Some(exp) => {
-                sm.initialize_var(&id, vt, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                let rh_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
+                let sm = self.get_scoped_map_mut();
+                sm.initialize_var(&id, lh_type, rh_type, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.gen_l15_asm(exp)?;
                 self.push_stack();
             }
             None => {
-                sm.declare_var(&id, vt, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                let sm = self.get_scoped_map_mut();
+                sm.declare_var(&id, lh_type, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
                 self.mov_into_primary("999");
                 self.push_stack();
             }
@@ -284,6 +287,10 @@ pub trait AsmGenerator {
             Statement::Return(exp_opt) => {
                 match exp_opt {
                     Some(exp) => {
+                        let exp_ret_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
+                        let fun_ret_type =
+                            self.get_fn_map().ret_type(&self.curr_ctx().function_name);
+                        assert_eq!(fun_ret_type, exp_ret_type);
                         // TODO: this is ugly, should be some way to stop generating ASM
                         self.gen_l15_asm(exp)?;
                     }
@@ -485,8 +492,10 @@ pub trait AsmGenerator {
     fn gen_l14_asm(&mut self, l14: Level14Exp) -> RustCcResult<()> {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
+                let exp_type = l15_exp.exp_type(self.get_fn_map(), self.get_scoped_map());
+                dbg!(exp_type);
                 let sm = self.get_scoped_map_mut();
-                let var_loc = sm.assign_var(&identifier)?;
+                let var_loc = sm.assign_var(&identifier, exp_type)?;
                 self.gen_l15_asm(*l15_exp)?;
                 match var_loc {
                     VarLoc::CurrFrame(offset) => self.save_to_stack(offset),

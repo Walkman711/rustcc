@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     error::{RustCcResult, ScopeError},
-    types::VariableType,
+    types::{ReturnType, VariableType},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -119,11 +119,18 @@ impl ScopedMap {
         &mut self,
         var: &str,
         var_type: VariableType,
+        rh_type: ReturnType,
         loc: VarLoc,
     ) -> RustCcResult<()> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
+
+        let ReturnType::NonVoid(rh) = rh_type else {
+            panic!("tried to assign void to a variable");
+        };
+
+        // assert_eq!(rh, var_type);
 
         let new_state = if let VarLoc::Global(..) = loc {
             VarState::GlobalInitialized
@@ -178,12 +185,17 @@ impl ScopedMap {
     }
 
     // TODO: validate that the RH value == var_type of LH
-    pub fn assign_var(&mut self, var: &str) -> RustCcResult<VarLoc> {
+    pub fn assign_var(&mut self, var: &str, rh_type: ReturnType) -> RustCcResult<VarLoc> {
         let Some(last) = self.var_maps.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
+        let ReturnType::NonVoid(vt) = rh_type else {
+            panic!("tried to assign void to a variable");
+        };
+
         if let Some(var_details) = last.get_mut(var) {
+            assert_eq!(var_details.var_type, vt);
             match var_details.state {
                 VarState::DeclaredInThisScope => {
                     var_details.state = VarState::InitializedInThisScope
@@ -204,7 +216,7 @@ impl ScopedMap {
         }
     }
 
-    pub fn get_var(&mut self, var: &str) -> RustCcResult<VarDetails> {
+    pub fn get_var(&self, var: &str) -> RustCcResult<VarDetails> {
         let Some(last) = self.var_maps.last() else {
             return Err(ScopeError::NoScope.into());
         };

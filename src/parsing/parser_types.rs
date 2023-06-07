@@ -1,7 +1,11 @@
 use super::ops::*;
 use crate::{
+    codegen::function_map::FunctionMap,
     define_exp_level,
-    utils::types::{ReturnType, VariableType},
+    utils::{
+        scoped_map::{ScopedMap, VarDetails},
+        types::{IntegerType, NumericType, ReturnType, VariableType},
+    },
 };
 
 pub trait PrettyPrinter {
@@ -445,6 +449,42 @@ impl std::fmt::Display for Level2Exp {
     }
 }
 
+pub trait GetExpressionType {
+    fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType;
+}
+
+impl GetExpressionType for Level14Exp {
+    fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
+        match self {
+            Level14Exp::SimpleAssignment(_, exp) => exp.exp_type(fn_map, scope_map),
+            Level14Exp::NonAssignment(exp) => exp.exp_type(fn_map, scope_map),
+        }
+    }
+}
+
+impl GetExpressionType for Level13Exp {
+    fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
+        match self {
+            Level13Exp::Ternary(_, exp, _) => exp.exp_type(fn_map, scope_map),
+            Level13Exp::NoTernary(exp) => exp.exp_type(fn_map, scope_map),
+        }
+    }
+}
+
+impl GetExpressionType for Level2Exp {
+    fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
+        match self {
+            Level2Exp::FunctionCall(fn_name, _) => fn_map.ret_type(fn_name),
+            Level2Exp::Const(_) => {
+                ReturnType::NonVoid(VariableType::Num(NumericType::Int(IntegerType::Int)))
+            }
+            Level2Exp::Var(id) => ReturnType::NonVoid(scope_map.get_var(id).unwrap().var_type),
+            Level2Exp::Unary(_, exp) => exp.exp_type(fn_map, scope_map),
+            Level2Exp::ParenExp(exp) => exp.exp_type(fn_map, scope_map),
+        }
+    }
+}
+
 // TODO: Level1 Expressions involve structs, arrays, and pointers, so save that for later
 
 #[macro_export]
@@ -460,6 +500,17 @@ macro_rules! define_exp_level {
                     write!(f, " {op} {exp}")?;
                 }
                 Ok(())
+            }
+        }
+
+        impl GetExpressionType for $exp {
+            fn exp_type(&self, fn_map: &FunctionMap, scope_map: &ScopedMap) -> ReturnType {
+                let mut ret_type = self.0 .0.exp_type(fn_map, scope_map);
+                for (_op, rh_exp) in &self.0 .1 {
+                    let rh_ret_type = rh_exp.exp_type(fn_map, scope_map);
+                    ret_type = ret_type.binop(rh_ret_type);
+                }
+                ret_type
             }
         }
     };

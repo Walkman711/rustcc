@@ -158,4 +158,8 @@ impl FunctionMap {
             Err(FunctionError::UndeclaredFunction(fn_name.to_owned()).into())
         }
     }
+
+    pub fn ret_type(&self, fn_name: &str) -> ReturnType {
+        self.fn_info.get(fn_name).unwrap().1
+    }
 }
