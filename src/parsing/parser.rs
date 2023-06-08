@@ -85,11 +85,11 @@ impl Parser {
     }
 
     fn parse_variable_type(&mut self) -> RustCcResult<VariableType> {
-        let nt = self.parse_numeric_type()?;
-        Ok(VariableType::Basic(nt))
+        let bt = self.parse_basic_type()?;
+        Ok(VariableType::Basic(bt))
     }
 
-    fn parse_numeric_type(&mut self) -> RustCcResult<BasicType> {
+    fn parse_basic_type(&mut self) -> RustCcResult<BasicType> {
         let ret = match self.lexer.peek() {
             Some(Token::Keyword(Keywords::Int)) => Ok(BasicType::Int(IntegerType::Int)),
             Some(Token::Keyword(Keywords::Char)) => Ok(BasicType::Int(IntegerType::Char)),

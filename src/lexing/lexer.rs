@@ -162,7 +162,7 @@ impl TryFrom<&str> for Lexer {
                     } else if let Ok(u) = s.parse::<u64>() {
                         Token::Integer(u)
                     } else {
-                        Token::Identifier(s.to_string())
+                        Self::valid_identifier(s)?
                     }
                 }
             };
@@ -173,6 +173,24 @@ impl TryFrom<&str> for Lexer {
             tokens,
             curr_idx: 0,
         })
+    }
+}
+
+impl Lexer {
+    fn valid_identifier(s: &str) -> RustCcResult<Token> {
+        for (i, c) in s.chars().enumerate() {
+            if i == 0 {
+                if !c.is_alphabetic() && c != '_' {
+                    return Err(RustCcError::LexError(format!("Malformed identifier: {s}. C identifiers can only contain a-z, A-Z, 0-9, and _.")));
+                }
+            } else {
+                if !c.is_alphanumeric() && c != '_' {
+                    return Err(RustCcError::LexError(format!("Malformed identifier: {s}. C identifiers can only contain a-z, A-Z, 0-9, and _.")));
+                }
+            }
+        }
+
+        Ok(Token::Identifier(s.to_owned()))
     }
 }
 

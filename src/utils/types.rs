@@ -136,7 +136,7 @@ pub enum FloatingType {
     // LongDouble,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DerivedType {
     Ptr,
     Array,
