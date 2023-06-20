@@ -177,6 +177,8 @@ impl TryFrom<&str> for Lexer {
 }
 
 impl Lexer {
+    // (6.4.2.1)
+    // TODO: handle universal characters
     fn valid_identifier(s: &str) -> RustCcResult<Token> {
         for (i, c) in s.chars().enumerate() {
             if i == 0 {

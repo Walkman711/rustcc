@@ -25,25 +25,29 @@ impl ReturnType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VariableType {
     Basic(BasicType),
-    // Enum(EnumeratedType),
+    // TODO: need to think about how to handle enum variants. Probably will go into
+    // some map in ctx.
+    // I can't take the string value of the variant bc we can do arithmetic ops on the variant.
+    Enum(u32),
     // Derived(DerivedType),
-    // Ptr,
-    // Array,
-    // Enum,
-    // Union,
-    // Struct,
 }
 
 impl VariableType {
     pub fn binop(&self, rh_vt: VariableType) -> Self {
         match (self, rh_vt) {
             (VariableType::Basic(lh), VariableType::Basic(rh)) => VariableType::Basic(lh.binop(rh)),
+            (VariableType::Basic(_), VariableType::Enum(_)) => todo!(),
+            (VariableType::Enum(_), VariableType::Basic(_)) => todo!(),
+            (VariableType::Enum(_), VariableType::Enum(_)) => todo!(),
         }
     }
 
     pub fn sizeof(&self) -> usize {
         match self {
             VariableType::Basic(n) => n.sizeof(),
+            // (6.7.2.2): The expression that defines the value of an enumeration constant
+            // shall be an integer constant expression that has a value representable as an int.
+            VariableType::Enum(_) => IntegerType::Int.sizeof(),
         }
     }
 }
