@@ -32,17 +32,17 @@ impl TryFrom<&Program> for x86Generator {
 }
 
 impl AsmGenerator for x86Generator {
-    const PRIMARY_REGISTER: &'static str = "eax";
+    const PRIMARY_REGISTER: &'static str = "%eax";
 
-    const BACKUP_REGISTER: &'static str = "edx";
+    const BACKUP_REGISTER: &'static str = "%edx";
 
-    const RETURN_REGISTER: &'static str = "eax";
+    const RETURN_REGISTER: &'static str = "%eax";
 
     const GLOBAL_VAR_REGISTER: &'static str = "GLOBAL_VAR_TODO";
 
-    const DEFAULT_ARGS: &'static str = "eax, edx";
+    const DEFAULT_ARGS: &'static str = "%eax, %edx";
 
-    const UNARY_ARGS: &'static str = "eax";
+    const UNARY_ARGS: &'static str = "%eax";
 
     const INT_SIZE: usize = 8;
 
@@ -71,23 +71,28 @@ impl AsmGenerator for x86Generator {
     }
 
     fn decrement_stack_ptr(&mut self) {
-        self.sp += Self::INT_SIZE;
+        self.sp -= Self::INT_SIZE;
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
-        self.write_address_inst(
-            &format!("mov   DWORD PTR [rbp-x], {}", Self::PRIMARY_REGISTER),
-            VarLoc::CurrFrame(stack_offset),
-        )
+        self.write_inst(&format!(
+            "movl {}, -{stack_offset}(%rbp)",
+            Self::PRIMARY_REGISTER,
+        ))
+        // self.write_address_inst(
+        //     &format!("movq DWORD PTR [rbp-x], {}", Self::PRIMARY_REGISTER),
+        //     VarLoc::CurrFrame(stack_offset),
+        // )
     }
 
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
         match loc {
-            VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
-                self.write_address_inst(&format!("mov   {dst_reg}, DWORD PTR [rbp-x]"), loc);
+            VarLoc::CurrFrame(stack_offset) | VarLoc::PrevFrame(stack_offset) => {
+                // self.write_address_inst(&format!("movq   {dst_reg}, DWORD PTR [rbp-x]"), loc);
+                self.write_inst(&format!("movl -{stack_offset}(%rbp), {dst_reg}"));
             }
             VarLoc::Register(reg_to_load_from) => {
-                self.write_inst(&format!("mov   {dst_reg}, {reg_to_load_from}"));
+                self.write_inst(&format!("movl   {dst_reg}, {reg_to_load_from}"));
             }
             VarLoc::Global(_, _) => todo!("x86 globals"),
         }
@@ -98,19 +103,42 @@ impl AsmGenerator for x86Generator {
     }
 
     fn logical_not(&mut self) {
-        todo!()
+        self.write_inst(&format!(
+            "testl  {}, {}",
+            Self::PRIMARY_REGISTER,
+            Self::PRIMARY_REGISTER
+        ));
+        self.write_inst("sete  %al");
+        self.write_inst(&format!("movzx %al, {}", Self::PRIMARY_REGISTER));
     }
 
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize) {
-        todo!()
+        self.write_inst(&format!(
+            "j{} .L{lbl}_{}",
+            cond.for_arch(self.get_arch()),
+            self.curr_ctx().function_name
+        ));
     }
 
     fn cmp_primary_with_zero(&mut self) {
-        todo!()
+        // self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
+        self.write_inst(&format!(
+            "test  {}, {}",
+            Self::PRIMARY_REGISTER,
+            Self::PRIMARY_REGISTER
+        ));
     }
 
     fn mov_into_primary(&mut self, val: &str) {
-        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
+        let (mov_inst, dollar_sign) = if val.contains('%') {
+            ("movq", "")
+        } else {
+            ("movl", "$")
+        };
+        self.write_inst(&format!(
+            "{mov_inst}  {dollar_sign}{val}, {}",
+            Self::PRIMARY_REGISTER
+        ));
     }
 
     fn gen_remainder_inst(&mut self) {

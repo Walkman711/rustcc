@@ -119,6 +119,10 @@ pub trait AsmGenerator {
             mnemonic.for_arch(self.get_arch()),
             Self::DEFAULT_ARGS
         ));
+        // HACK: I dislike this immensely, need to come up with something better for x86 asm
+        if self.get_arch() == Arch::x86 {
+            self.write_inst("movl %edx, %eax");
+        }
     }
 
     fn write_unary_inst(&mut self, mnemonic: Mnemonic) {
@@ -149,10 +153,11 @@ pub trait AsmGenerator {
     }
 
     fn write_jmp_label(&mut self, lbl: usize) {
-        self.write_to_buffer(Instruction::NoOffset(format!(
-            ".L{lbl}_{}:",
-            self.curr_ctx().function_name
-        )));
+        self.write_inst(&format!(".L{lbl}_{}:", self.curr_ctx().function_name));
+        // self.write_to_buffer(Instruction::NoOffset(format!(
+        //     ".L{lbl}_{}:",
+        //     self.curr_ctx().function_name
+        // )));
     }
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {

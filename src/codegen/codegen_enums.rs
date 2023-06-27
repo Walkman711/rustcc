@@ -141,7 +141,7 @@ impl Cond {
                 Cond::LessThanEquals => "le",
                 Cond::GreaterThan => "g",
                 Cond::GreaterThanEquals => "ge",
-                Cond::Always => "",
+                Cond::Always => "mp", // Okay, this one makes me chuckle
             },
             Arch::ARM => match self {
                 Self::Equals => "eq",

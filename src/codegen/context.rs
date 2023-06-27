@@ -92,8 +92,12 @@ impl Context {
     }
 
     fn x86_fn_prologue(&mut self) {
-        self.prologue.push("\tpush rbp".to_string());
-        self.prologue.push("\tmov  rbp, rsp".to_string());
+        self.prologue.push(format!(".globl {}", self.function_name));
+        self.prologue
+            .push(format!(".type  {}, @function", self.function_name));
+        self.prologue.push(format!("{}:", self.function_name));
+        self.prologue.push("\tpushq %rbp".to_string());
+        self.prologue.push("\tmovq  %rsp, %rbp".to_string());
     }
 
     fn arm_fn_prologue(&mut self) {
@@ -146,11 +150,11 @@ impl Context {
                         VarLoc::Register(_reg) => unreachable!("checked above"),
                         VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
                     };
-                    writeln!(f, "\t{inst}, DWORD PTR [sp-{addend}]")?
+                    writeln!(f, "\t{inst}, DWORD PTR -{addend}%(rbp)")?
                 }
             }
             Instruction::Ret => {
-                writeln!(f, "\tpop   rbp")?;
+                writeln!(f, "\tpopq   %rbp")?;
                 writeln!(f, "\tret")?;
             }
         }
@@ -293,12 +297,12 @@ impl GlobalContext {
     }
 
     pub fn write_to_file(&mut self, f: &mut File) -> RustCcResult<()> {
-        writeln!(f, ".section __DATA,__data")?;
+        // writeln!(f, ".section __DATA,__data")?;
         for line in &self.defined_global_buffer {
             writeln!(f, "{line}")?;
         }
 
-        writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?;
+        // writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?;
         for ctx in &mut self.function_contexts {
             ctx.write_to_file(f)?;
             writeln!(f)?;
