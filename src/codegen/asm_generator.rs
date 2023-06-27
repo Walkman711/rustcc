@@ -10,7 +10,7 @@ use crate::{
     utils::{
         error::{CodegenError, RustCcResult},
         scoped_map::{ScopedMap, VarLoc},
-        types::{BasicType, IntegerType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType},
     },
 };
 
@@ -68,9 +68,6 @@ pub trait AsmGenerator {
 
     /// Write instructions needed to perform modular division.
     fn gen_remainder_inst(&mut self);
-
-    /// Write the function epilogue for the flavor of assembly we're targeting. Restore stack, etc.
-    fn fn_epilogue(&mut self);
 
     /* Getters and setters that don't need to be implemented by structs */
     fn get_scoped_map(&self) -> &ScopedMap {

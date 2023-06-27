@@ -7,10 +7,7 @@ use super::{
 
 use crate::{
     parsing::parser_types::Program,
-    utils::{
-        error::RustCcError,
-        scoped_map::{ScopedMap, VarLoc},
-    },
+    utils::{error::RustCcError, scoped_map::VarLoc},
 };
 
 pub struct ArmGenerator {
@@ -155,12 +152,5 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sdiv  w2, w1, w0");
         self.write_inst("mul   w0, w2, w0");
         self.write_inst("sub   w0, w1, w0")
-    }
-
-    // FIX: this isn't used
-    fn fn_epilogue(&mut self) {
-        self.write_inst("ldp   x29, x30, [sp], 16");
-        let stack_offset = self.curr_ctx().get_stack_frame_size();
-        self.write_inst(&format!("add   sp, sp, {stack_offset}"));
     }
 }

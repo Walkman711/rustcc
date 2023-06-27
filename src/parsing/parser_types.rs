@@ -3,7 +3,7 @@ use crate::{
     codegen::function_map::FunctionMap,
     define_exp_level,
     utils::{
-        scoped_map::{ScopedMap, VarDetails},
+        scoped_map::ScopedMap,
         types::{BasicType, IntegerType, ReturnType, VariableType},
     },
 };

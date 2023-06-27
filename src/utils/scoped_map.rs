@@ -126,8 +126,8 @@ impl ScopedMap {
             return Err(ScopeError::NoScope.into());
         };
 
-        let ReturnType::NonVoid(rh) = rh_type else {
-            panic!("tried to assign void to a variable");
+        let ReturnType::NonVoid(_rh) = rh_type else {
+            panic!("tried to assign void to a variable: {rh_type:?}");
         };
 
         // assert_eq!(rh, var_type);

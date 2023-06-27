@@ -72,7 +72,7 @@ impl AsmGenerator for RiscVGenerator {
 
     fn save_to_stack(&mut self, stack_offset: usize) {
         self.write_address_inst(
-            &format!("sw {}", Self::PRIMARY_REGISTER),
+            &format!("sw    {}", Self::PRIMARY_REGISTER),
             VarLoc::CurrFrame(stack_offset),
         );
     }
@@ -80,16 +80,16 @@ impl AsmGenerator for RiscVGenerator {
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
         match loc {
             VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
-                self.write_address_inst(&format!("sd {dst_reg}"), loc);
+                self.write_address_inst(&format!("sw    {dst_reg}"), loc);
             }
             VarLoc::Register(reg_to_load_from) => {
-                self.write_inst(&format!("mv {dst_reg}, {reg_to_load_from}"))
+                self.write_inst(&format!("mv   {dst_reg}, {reg_to_load_from}"))
             }
             VarLoc::Global(_, _) => todo!("global vars for riscv"),
         }
     }
 
-    fn compare_primary_with_backup(&mut self, cond: Cond) {
+    fn compare_primary_with_backup(&mut self, _cond: Cond) {
         todo!()
     }
 
@@ -110,14 +110,10 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn mov_into_primary(&mut self, val: &str) {
-        self.write_inst(&format!("mv {}, {val}", Self::PRIMARY_REGISTER));
+        self.write_inst(&format!("mv    {}, {val}", Self::PRIMARY_REGISTER));
     }
 
     fn gen_remainder_inst(&mut self) {
-        todo!()
-    }
-
-    fn fn_epilogue(&mut self) {
         todo!()
     }
 }

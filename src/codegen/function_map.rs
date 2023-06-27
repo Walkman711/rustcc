@@ -4,7 +4,7 @@ use crate::{
     parsing::parser_types::{Function, GlobalVar, Param, Program, TopLevelItem},
     utils::{
         error::{CodegenError, FunctionError, RustCcError, RustCcResult},
-        types::{BasicType, IntegerType, ReturnType, VariableType},
+        types::{BasicType, IntegerType, ReturnType},
     },
 };
 

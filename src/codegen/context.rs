@@ -109,7 +109,7 @@ impl Context {
         self.prologue.push(format!("{}:", self.function_name));
         let stack_offset = self.get_stack_frame_size();
         self.prologue
-            .push(format!("\taddi   sp, sp, -{stack_offset}"));
+            .push(format!("\taddi  sp, sp, -{stack_offset}"));
     }
 
     fn write_inst_to_file(
@@ -178,10 +178,6 @@ impl Context {
                 writeln!(f, "\tmv    a0,a5")?;
                 writeln!(f, "\taddi  sp, sp, {}", self.get_stack_frame_size())?;
                 writeln!(f, "\tjr    ra")?;
-
-                // writeln!(f, "\tldp   x29, x30, [sp], 16")?;
-                // writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
-                // writeln!(f, "\tret")?;
             }
         }
         Ok(())
