@@ -99,7 +99,14 @@ impl AsmGenerator for x86Generator {
     }
 
     fn compare_primary_with_backup(&mut self, cond: Cond) {
-        todo!()
+        self.write_inst(&format!(
+            "cmp  {}, {}",
+            // Self::BACKUP_REGISTER,
+            Self::PRIMARY_REGISTER,
+            Self::BACKUP_REGISTER,
+        ));
+        self.write_inst(&format!("set{} %al", cond.for_arch(self.get_arch())));
+        self.write_inst(&format!("movzx %al, {}", Self::PRIMARY_REGISTER));
     }
 
     fn logical_not(&mut self) {
