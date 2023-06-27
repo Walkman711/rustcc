@@ -30,16 +30,67 @@ pub trait AsmGenerator {
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
 
+    /* Trivial getters and setters that clients need to implement */
+    fn get_fn_map(&self) -> &FunctionMap;
+    fn get_arch(&self) -> Arch;
+    fn global_context(&self) -> &GlobalContext;
+    fn global_context_mut(&mut self) -> &mut GlobalContext;
+    fn stack_ptr(&self) -> usize;
+    fn increment_stack_ptr(&mut self);
+    fn decrement_stack_ptr(&mut self);
+
+    /* More assembly generation stuff that clients need to implement */
+    /// Write instruction to store `PRIMARY_REGISTER` on the stack.
+    fn save_to_stack(&mut self, stack_offset: usize);
+    /// Loads the variable stored at `loc` to the specified register.
+    fn load_var(&mut self, dst_reg: &str, loc: VarLoc);
+    /// Compares `PRIMARY_REGISTER` with `BACKUP_REGISTER`. Stores result in `PRIMARY_REGISTER`
+    fn compare_primary_with_backup(&mut self, cond: Cond);
+    /// Write instructions to perform logical negation of the contents of `PRIMARY_REGISTER` and
+    /// store the result in `PRIMARY_REGISTER`.
+    fn logical_not(&mut self);
+    /// Write instructions for branching on a specified condition. Requires a comparison to be made
+    /// prior to calling.
+    // TODO: once we target more asms this could be removed as long as the client specifies the
+    // jump mnemonic. Not sure if any targets differ wildly w/r/t jumping
+    // TODO: wonder if we could statically enforce comparisons coming before branch insts?
+    fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
+    /// Compare `PRIMARY_REGISTER` with 0 and store result in `PRIMARY_REGISTER`.
+    fn cmp_primary_with_zero(&mut self);
+    /// Moves `val` into `PRIMARY_REGISTER`. Can use numeric literals or registers.
+    fn mov_into_primary(&mut self, val: &str);
+    /// Write instructions needed to perform modular division.
+    fn gen_remainder_inst(&mut self);
+    /// Write the function epilogue for the flavor of assembly we're targeting. Restore stack, etc.
+    fn fn_epilogue(&mut self);
+
+    // Getters and setters that don't need to be implemented by structs
     fn get_scoped_map(&self) -> &ScopedMap {
         &self.curr_ctx().scoped_map
     }
-
     fn get_scoped_map_mut(&mut self) -> &mut ScopedMap {
         &mut self.curr_ctx_mut().scoped_map
     }
+    fn get_break_stack(&self) -> &Vec<usize> {
+        &self.curr_ctx().break_stack
+    }
+    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.curr_ctx_mut().break_stack
+    }
+    fn get_continue_stack(&self) -> &Vec<usize> {
+        &self.curr_ctx().continue_stack
+    }
+    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.curr_ctx_mut().continue_stack
+    }
+    fn curr_ctx(&self) -> &Context {
+        self.global_context().curr_ctx()
+    }
+    fn curr_ctx_mut(&mut self) -> &mut Context {
+        self.global_context_mut().curr_ctx_mut()
+    }
 
-    fn get_fn_map(&self) -> &FunctionMap;
-
+    /* Instruction utilities */
     fn write_to_buffer(&mut self, inst: Instruction) {
         self.curr_ctx_mut().insts.push(inst);
     }
@@ -74,22 +125,12 @@ pub trait AsmGenerator {
         ));
     }
 
-    fn get_arch(&self) -> Arch;
-
-    fn fn_epilogue(&mut self);
-    fn ret(&mut self) {
-        self.write_to_buffer(Instruction::Ret);
-    }
-
-    fn stack_ptr(&self) -> usize;
-    fn increment_stack_ptr(&mut self);
-    fn decrement_stack_ptr(&mut self);
-    fn save_to_stack(&mut self, stack_offset: usize);
-    fn load_var(&mut self, reg: &str, loc: VarLoc);
+    /* Provided stack ops */
     fn pop_stack_into_backup(&mut self) {
         self.load_var(Self::BACKUP_REGISTER, VarLoc::CurrFrame(self.stack_ptr()));
         self.decrement_stack_ptr();
     }
+
     fn push_stack(&mut self) {
         self.increment_stack_ptr();
         self.save_to_stack(self.stack_ptr());
@@ -98,56 +139,17 @@ pub trait AsmGenerator {
         fc.max_stack_offset = max(fc.max_stack_offset, sp);
     }
 
-    fn logical_comparison(&mut self, cond: Cond);
-    fn logical_not(&mut self);
-
+    /* Jmp label utilities */
     fn get_next_jmp_label(&mut self) -> usize {
         self.curr_ctx_mut().get_next_jmp_label()
     }
 
-    fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
     fn write_jmp_label(&mut self, lbl: usize) {
         self.write_to_buffer(Instruction::NoOffset(format!(
             ".L{lbl}_{}:",
             self.curr_ctx().function_name
         )));
     }
-
-    fn get_break_stack(&self) -> &Vec<usize> {
-        &self.curr_ctx().break_stack
-    }
-
-    fn get_break_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.curr_ctx_mut().break_stack
-    }
-
-    fn get_continue_stack(&self) -> &Vec<usize> {
-        &self.curr_ctx().continue_stack
-    }
-
-    fn get_continue_stack_mut(&mut self) -> &mut Vec<usize> {
-        &mut self.curr_ctx_mut().continue_stack
-    }
-
-    fn cmp_primary_with_zero(&mut self) {
-        self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
-    }
-
-    fn mov_into_primary(&mut self, val: &str) {
-        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
-    }
-
-    fn gen_remainder_inst(&mut self);
-
-    fn curr_ctx(&self) -> &Context {
-        self.global_context().curr_ctx()
-    }
-
-    fn curr_ctx_mut(&mut self) -> &mut Context {
-        self.global_context_mut().curr_ctx_mut()
-    }
-    fn global_context(&self) -> &GlobalContext;
-    fn global_context_mut(&mut self) -> &mut GlobalContext;
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
         let mut offset = INT_SIZE;
@@ -308,7 +310,7 @@ pub trait AsmGenerator {
                         self.mov_into_primary("0");
                     }
                 }
-                self.ret();
+                self.write_to_buffer(Instruction::Ret);
             }
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
@@ -631,8 +633,18 @@ pub trait AsmGenerator {
     gen_level_asm!(gen_l10_asm, Level10Exp, gen_l9_asm, write_mnemonic);
     gen_level_asm!(gen_l9_asm, Level9Exp, gen_l8_asm, write_mnemonic);
     gen_level_asm!(gen_l8_asm, Level8Exp, gen_l7_asm, write_mnemonic);
-    gen_level_asm!(gen_l7_asm, Level7Exp, gen_l6_asm, logical_comparison);
-    gen_level_asm!(gen_l6_asm, Level6Exp, gen_l5_asm, logical_comparison);
+    gen_level_asm!(
+        gen_l7_asm,
+        Level7Exp,
+        gen_l6_asm,
+        compare_primary_with_backup
+    );
+    gen_level_asm!(
+        gen_l6_asm,
+        Level6Exp,
+        gen_l5_asm,
+        compare_primary_with_backup
+    );
     gen_level_asm!(gen_l5_asm, Level5Exp, gen_l4_asm, write_mnemonic);
     gen_level_asm!(gen_l4_asm, Level4Exp, gen_l3_asm, write_mnemonic);
 

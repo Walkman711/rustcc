@@ -58,15 +58,68 @@ impl Context {
 
 pub trait Ctx {
     fn fn_prologue(&mut self);
+    fn write_inst_to_file(
+        &mut self,
+        f: &mut std::fs::File,
+        instr: &Instruction,
+    ) -> RustCcResult<()>;
+    fn calc_stack_frame_size(&self, num_args: usize, max_offset: usize) -> usize {
+        let default_size = 16;
+        let arg_size = 4 * num_args;
+        let unaligned = default_size + arg_size + max_offset;
+        let diff = 16 - (unaligned % 16);
+        unaligned + diff
+    }
+}
+
+impl Ctx for Context {
+    fn fn_prologue(&mut self) {
+        self.prologue
+            .push(format!("\t.global _{}", self.function_name));
+        self.prologue.push("\t.align 2".to_string());
+        self.prologue.push(format!("_{}:", self.function_name));
+
+        let stack_offset = self.get_stack_frame_size();
+        self.prologue
+            .push(format!("\tsub   sp, sp, {stack_offset}"));
+        self.prologue
+            .push("\tstp   x29, x30, [sp, -16]!".to_string());
+        self.prologue.push("\tmov   x29, sp".to_string());
+    }
+
+    fn write_inst_to_file(
+        &mut self,
+        f: &mut std::fs::File,
+        instr: &Instruction,
+    ) -> RustCcResult<()> {
+        match instr {
+            Instruction::NoOffset(inst) => writeln!(f, "\t{inst}")?,
+            Instruction::Address(inst, loc) => {
+                if let VarLoc::Register(reg) = loc {
+                    writeln!(f, "\t{inst}, w{reg}")?;
+                } else {
+                    let addend = match loc {
+                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                        VarLoc::Register(_reg) => unreachable!("checked above"),
+                        VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
+                    };
+                    writeln!(f, "\t{inst}, [sp, {addend}]")?
+                }
+            }
+            Instruction::Ret => {
+                writeln!(f, "\tldp   x29, x30, [sp], 16")?;
+                writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
+                writeln!(f, "\tret")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Context {
     pub fn get_stack_frame_size(&self) -> usize {
-        let default_size = 16;
-        let arg_size = 4 * self.num_args;
-        let unaligned = default_size + arg_size + self.max_stack_offset;
-        let diff = 16 - (unaligned % 16);
-        unaligned + diff
+        self.calc_stack_frame_size(self.num_args, self.max_stack_offset)
     }
 
     pub fn get_next_jmp_label(&mut self) -> usize {
@@ -74,60 +127,17 @@ impl Context {
         self.curr_jmp_label
     }
 
-    fn fn_prologue(&mut self, arch: Arch) {
-        match arch {
-            Arch::x86 => todo!(),
-            Arch::ARM => {
-                self.prologue
-                    .push(format!("\t.global _{}", self.function_name));
-                self.prologue.push("\t.align 2".to_string());
-                self.prologue.push(format!("_{}:", self.function_name));
-
-                let stack_offset = self.get_stack_frame_size();
-                self.prologue
-                    .push(format!("\tsub   sp, sp, {stack_offset}"));
-                self.prologue
-                    .push("\tstp   x29, x30, [sp, -16]!".to_string());
-                self.prologue.push("\tmov   x29, sp".to_string());
-            }
-            Arch::RISCV => {
-                self.prologue.push(format!("{}:", self.function_name));
-                let stack_offset = self.get_stack_frame_size();
-                self.prologue
-                    .push(format!("\taddi   sp, sp, {stack_offset}"));
-            }
-        }
-    }
-
     pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) -> RustCcResult<()> {
-        self.fn_prologue(arch);
+        self.fn_prologue();
         for line in &self.prologue {
             writeln!(f, "{line}")?;
         }
 
-        for line in &self.insts {
-            match line {
-                Instruction::NoOffset(inst) => writeln!(f, "\t{inst}")?,
-                Instruction::Address(inst, loc) => {
-                    if let VarLoc::Register(reg) = loc {
-                        writeln!(f, "\t{inst}, w{reg}")?;
-                    } else {
-                        let addend = match loc {
-                            VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
-                            VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
-                            VarLoc::Register(_reg) => unreachable!("checked above"),
-                            VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
-                        };
-                        writeln!(f, "\t{inst}, [sp, {addend}]")?
-                    }
-                }
-                Instruction::Ret => {
-                    match self.get_stack_frame_size
-                    writeln!(f, "\tldp   x29, x30, [sp], 16")?;
-                    writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
-                    writeln!(f, "\tret")?;
-                }
-            }
+        // BORROW: only happens once, so not a major issue
+        let instr_copy = self.insts.clone();
+
+        for instr in &instr_copy {
+            self.write_inst_to_file(f, instr)?;
         }
 
         Ok(())

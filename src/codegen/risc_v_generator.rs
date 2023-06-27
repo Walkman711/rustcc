@@ -52,8 +52,12 @@ impl AsmGenerator for RiscVGenerator {
         Arch::RISCV
     }
 
-    fn fn_epilogue(&mut self) {
-        todo!()
+    fn global_context(&self) -> &GlobalContext {
+        &self.global_context
+    }
+
+    fn global_context_mut(&mut self) -> &mut GlobalContext {
+        &mut self.global_context
     }
 
     fn stack_ptr(&self) -> usize {
@@ -79,13 +83,8 @@ impl AsmGenerator for RiscVGenerator {
         todo!()
     }
 
-    fn logical_comparison(&mut self, cond: Cond) {
-        // Compare registers
-        self.write_inst(&format!(
-            "cmp   {}, {}",
-            Self::BACKUP_REGISTER,
-            Self::PRIMARY_REGISTER
-        ));
+    fn compare_primary_with_backup(&mut self, cond: Cond) {
+        todo!()
     }
 
     fn logical_not(&mut self) {
@@ -100,15 +99,19 @@ impl AsmGenerator for RiscVGenerator {
         ));
     }
 
+    fn cmp_primary_with_zero(&mut self) {
+        todo!()
+    }
+
+    fn mov_into_primary(&mut self, val: &str) {
+        todo!()
+    }
+
     fn gen_remainder_inst(&mut self) {
         todo!()
     }
 
-    fn global_context(&self) -> &GlobalContext {
-        &self.global_context
-    }
-
-    fn global_context_mut(&mut self) -> &mut GlobalContext {
-        &mut self.global_context
+    fn fn_epilogue(&mut self) {
+        todo!()
     }
 }

@@ -48,10 +48,12 @@ impl AsmGenerator for ArmGenerator {
         Arch::ARM
     }
 
-    fn fn_epilogue(&mut self) {
-        self.write_inst("ldp   x29, x30, [sp], 16");
-        let stack_offset = self.curr_ctx().get_stack_frame_size();
-        self.write_inst(&format!("add   sp, sp, {stack_offset}"));
+    fn global_context(&self) -> &GlobalContext {
+        &self.global_context
+    }
+
+    fn global_context_mut(&mut self) -> &mut GlobalContext {
+        &mut self.global_context
     }
 
     fn stack_ptr(&self) -> usize {
@@ -73,13 +75,13 @@ impl AsmGenerator for ArmGenerator {
         );
     }
 
-    fn load_var(&mut self, reg_to_load_into: &str, loc: VarLoc) {
+    fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
         match loc {
             VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
-                self.write_address_inst(&format!("ldr   {reg_to_load_into}"), loc)
+                self.write_address_inst(&format!("ldr   {dst_reg}"), loc)
             }
             VarLoc::Register(reg_to_load_from) => {
-                self.write_inst(&format!("mov   {reg_to_load_into}, w{reg_to_load_from}"))
+                self.write_inst(&format!("mov   {dst_reg}, w{reg_to_load_from}"))
             }
             VarLoc::Global(id, offset) => {
                 let page = self.curr_ctx().get_page_access();
@@ -101,7 +103,7 @@ impl AsmGenerator for ArmGenerator {
         }
     }
 
-    fn logical_comparison(&mut self, cond: Cond) {
+    fn compare_primary_with_backup(&mut self, cond: Cond) {
         self.write_inst(&format!(
             "cmp   {}, {}",
             Self::BACKUP_REGISTER,
@@ -131,6 +133,14 @@ impl AsmGenerator for ArmGenerator {
         ));
     }
 
+    fn cmp_primary_with_zero(&mut self) {
+        self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
+    }
+
+    fn mov_into_primary(&mut self, val: &str) {
+        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
+    }
+
     fn gen_remainder_inst(&mut self) {
         // 3 % 2
         // w0 3
@@ -143,11 +153,9 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sub   w0, w1, w0")
     }
 
-    fn global_context(&self) -> &GlobalContext {
-        &self.global_context
-    }
-
-    fn global_context_mut(&mut self) -> &mut GlobalContext {
-        &mut self.global_context
+    fn fn_epilogue(&mut self) {
+        self.write_inst("ldp   x29, x30, [sp], 16");
+        let stack_offset = self.curr_ctx().get_stack_frame_size();
+        self.write_inst(&format!("add   sp, sp, {stack_offset}"));
     }
 }
