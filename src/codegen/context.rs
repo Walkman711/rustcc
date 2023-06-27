@@ -85,10 +85,15 @@ impl Context {
 
     pub fn fn_prologue(&mut self) {
         match self.arch {
-            Arch::x86 => todo!(),
+            Arch::x86 => self.x86_fn_prologue(),
             Arch::ARM => self.arm_fn_prologue(),
             Arch::RISCV => self.riscv_fn_prologue(),
         }
+    }
+
+    fn x86_fn_prologue(&mut self) {
+        self.prologue.push("\tpush rbp".to_string());
+        self.prologue.push("\tmov  rbp, rsp".to_string());
     }
 
     fn arm_fn_prologue(&mut self) {
@@ -118,10 +123,38 @@ impl Context {
         instr: &Instruction,
     ) -> RustCcResult<()> {
         match self.arch {
-            Arch::x86 => todo!(),
+            Arch::x86 => self.write_x86_inst_to_file(f, instr),
             Arch::ARM => self.write_arm_inst_to_file(f, instr),
             Arch::RISCV => self.write_riscv_inst_to_file(f, instr),
         }
+    }
+
+    fn write_x86_inst_to_file(
+        &mut self,
+        f: &mut std::fs::File,
+        instr: &Instruction,
+    ) -> RustCcResult<()> {
+        match instr {
+            Instruction::NoOffset(inst) => writeln!(f, "\t{inst}")?,
+            Instruction::Address(inst, loc) => {
+                if let VarLoc::Register(reg) = loc {
+                    writeln!(f, "\t{inst}, w{reg}")?;
+                } else {
+                    let addend = match loc {
+                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                        VarLoc::Register(_reg) => unreachable!("checked above"),
+                        VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
+                    };
+                    writeln!(f, "\t{inst}, DWORD PTR [sp-{addend}]")?
+                }
+            }
+            Instruction::Ret => {
+                writeln!(f, "\tpop   rbp")?;
+                writeln!(f, "\tret")?;
+            }
+        }
+        Ok(())
     }
 
     fn write_arm_inst_to_file(

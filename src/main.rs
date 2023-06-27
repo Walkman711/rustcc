@@ -6,6 +6,7 @@ use rustcc::parsing::parser::Parser;
 use rustcc::{
     codegen::{
         arm_generator::ArmGenerator, asm_generator::AsmGenerator, risc_v_generator::RiscVGenerator,
+        x86_generator::x86Generator,
     },
     parsing::parser_types::PrettyPrinter,
 };
@@ -32,8 +33,11 @@ fn main() -> anyhow::Result<()> {
     // let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;
     // arm_generator.gen_asm(&asm_filename, parsed_program)?;
 
-    let mut risc_v_generator = RiscVGenerator::try_from(&parsed_program)?;
-    risc_v_generator.gen_asm(&asm_filename, parsed_program)?;
+    // let mut risc_v_generator = RiscVGenerator::try_from(&parsed_program)?;
+    // risc_v_generator.gen_asm(&asm_filename, parsed_program)?;
+
+    let mut x86_generator = x86Generator::try_from(&parsed_program)?;
+    x86_generator.gen_asm(&asm_filename, parsed_program)?;
 
     // Build
     Command::new("gcc")
