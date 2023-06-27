@@ -27,12 +27,13 @@ pub struct Context {
     pub break_stack: Vec<usize>,
     pub continue_stack: Vec<usize>,
     pub curr_jmp_label: usize,
+    pub arch: Arch,
 }
 
 const GLOBAL_EXPECT: &str = "Will always have a global context";
 
 impl Context {
-    fn new(function: &parser_types::Function, scoped_map: ScopedMap) -> Self {
+    fn new(function: &parser_types::Function, scoped_map: ScopedMap, arch: Arch) -> Self {
         let (function_name, num_args) = match function {
             Function::Definition(function_name, _ret, args, _) => {
                 (function_name.to_owned(), args.len())
@@ -52,28 +53,45 @@ impl Context {
             break_stack: vec![],
             continue_stack: vec![],
             curr_jmp_label: 0,
+            arch,
         }
     }
 }
 
-pub trait Ctx {
-    fn fn_prologue(&mut self);
-    fn write_inst_to_file(
-        &mut self,
-        f: &mut std::fs::File,
-        instr: &Instruction,
-    ) -> RustCcResult<()>;
-    fn calc_stack_frame_size(&self, num_args: usize, max_offset: usize) -> usize {
+// pub trait Ctx {
+//     fn fn_prologue(&mut self);
+//     fn write_inst_to_file(
+//         &mut self,
+//         f: &mut std::fs::File,
+//         instr: &Instruction,
+//     ) -> RustCcResult<()>;
+//     fn calc_stack_frame_size(&self, num_args: usize, max_offset: usize) -> usize {
+//         let default_size = 16;
+//         let arg_size = 4 * num_args;
+//         let unaligned = default_size + arg_size + max_offset;
+//         let diff = 16 - (unaligned % 16);
+//         unaligned + diff
+//     }
+// }
+
+impl Context {
+    pub fn calc_stack_frame_size(&self, num_args: usize, max_offset: usize) -> usize {
         let default_size = 16;
         let arg_size = 4 * num_args;
         let unaligned = default_size + arg_size + max_offset;
         let diff = 16 - (unaligned % 16);
         unaligned + diff
     }
-}
 
-impl Ctx for Context {
-    fn fn_prologue(&mut self) {
+    pub fn fn_prologue(&mut self) {
+        match self.arch {
+            Arch::x86 => todo!(),
+            Arch::ARM => self.arm_fn_prologue(),
+            Arch::RISCV => self.riscv_fn_prologue(),
+        }
+    }
+
+    fn arm_fn_prologue(&mut self) {
         self.prologue
             .push(format!("\t.global _{}", self.function_name));
         self.prologue.push("\t.align 2".to_string());
@@ -87,7 +105,26 @@ impl Ctx for Context {
         self.prologue.push("\tmov   x29, sp".to_string());
     }
 
+    fn riscv_fn_prologue(&mut self) {
+        self.prologue.push(format!("{}:", self.function_name));
+        let stack_offset = self.get_stack_frame_size();
+        self.prologue
+            .push(format!("\taddi   sp, sp, -{stack_offset}"));
+    }
+
     fn write_inst_to_file(
+        &mut self,
+        f: &mut std::fs::File,
+        instr: &Instruction,
+    ) -> RustCcResult<()> {
+        match self.arch {
+            Arch::x86 => todo!(),
+            Arch::ARM => self.write_arm_inst_to_file(f, instr),
+            Arch::RISCV => self.write_riscv_inst_to_file(f, instr),
+        }
+    }
+
+    fn write_arm_inst_to_file(
         &mut self,
         f: &mut std::fs::File,
         instr: &Instruction,
@@ -115,6 +152,40 @@ impl Ctx for Context {
         }
         Ok(())
     }
+
+    fn write_riscv_inst_to_file(
+        &mut self,
+        f: &mut std::fs::File,
+        instr: &Instruction,
+    ) -> RustCcResult<()> {
+        match instr {
+            Instruction::NoOffset(inst) => writeln!(f, "\t{inst}")?,
+            Instruction::Address(inst, loc) => {
+                // FIX: VarLoc Register should be a string
+                if let VarLoc::Register(reg) = loc {
+                    writeln!(f, "\t{inst}, a{reg}")?;
+                } else {
+                    let addend = match loc {
+                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                        VarLoc::Register(_reg) => unreachable!("checked above"),
+                        VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
+                    };
+                    writeln!(f, "\t{inst}, {addend}(sp)")?
+                }
+            }
+            Instruction::Ret => {
+                writeln!(f, "\tmv    a0,a5")?;
+                writeln!(f, "\taddi  sp, sp, {}", self.get_stack_frame_size())?;
+                writeln!(f, "\tjr    ra")?;
+
+                // writeln!(f, "\tldp   x29, x30, [sp], 16")?;
+                // writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
+                // writeln!(f, "\tret")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Context {
@@ -127,7 +198,7 @@ impl Context {
         self.curr_jmp_label
     }
 
-    pub fn write_to_file(&mut self, f: &mut std::fs::File, arch: Arch) -> RustCcResult<()> {
+    pub fn write_to_file(&mut self, f: &mut std::fs::File) -> RustCcResult<()> {
         self.fn_prologue();
         for line in &self.prologue {
             writeln!(f, "{line}")?;
@@ -153,17 +224,26 @@ impl Context {
 }
 
 // TODO: add function map?
-#[derive(Default)]
 pub struct GlobalContext {
     pub scoped_map: ScopedMap,
     pub function_contexts: Vec<Context>,
     pub defined_global_buffer: Vec<String>,
     pub declared_global_buffer: Vec<String>,
+    pub arch: Arch,
 }
 
 impl GlobalContext {
+    pub fn new(arch: Arch) -> Self {
+        Self {
+            scoped_map: ScopedMap::default(),
+            function_contexts: vec![],
+            defined_global_buffer: vec![],
+            declared_global_buffer: vec![],
+            arch,
+        }
+    }
     pub fn new_function_context(&mut self, function: &parser_types::Function) {
-        let ctx = Context::new(function, self.scoped_map.clone());
+        let ctx = Context::new(function, self.scoped_map.clone(), self.arch);
         self.function_contexts.push(ctx);
     }
 
@@ -183,7 +263,7 @@ impl GlobalContext {
         self.declared_global_buffer.push(inst);
     }
 
-    pub fn write_to_file(&mut self, f: &mut File, arch: Arch) -> RustCcResult<()> {
+    pub fn write_to_file(&mut self, f: &mut File) -> RustCcResult<()> {
         writeln!(f, ".section __DATA,__data")?;
         for line in &self.defined_global_buffer {
             writeln!(f, "{line}")?;
@@ -191,7 +271,7 @@ impl GlobalContext {
 
         writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?;
         for ctx in &mut self.function_contexts {
-            ctx.write_to_file(f, arch)?;
+            ctx.write_to_file(f)?;
             writeln!(f)?;
         }
 

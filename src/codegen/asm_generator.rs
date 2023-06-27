@@ -20,8 +20,6 @@ use super::{
     function_map::FunctionMap,
 };
 
-pub const INT_SIZE: usize = 8;
-
 pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
@@ -29,6 +27,7 @@ pub trait AsmGenerator {
     const GLOBAL_VAR_REGISTER: &'static str;
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
+    const INT_SIZE: usize;
 
     /* Trivial getters and setters that clients need to implement */
     fn get_fn_map(&self) -> &FunctionMap;
@@ -40,31 +39,40 @@ pub trait AsmGenerator {
     fn decrement_stack_ptr(&mut self);
 
     /* More assembly generation stuff that clients need to implement */
+
     /// Write instruction to store `PRIMARY_REGISTER` on the stack.
     fn save_to_stack(&mut self, stack_offset: usize);
+
     /// Loads the variable stored at `loc` to the specified register.
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc);
+
     /// Compares `PRIMARY_REGISTER` with `BACKUP_REGISTER`. Stores result in `PRIMARY_REGISTER`
     fn compare_primary_with_backup(&mut self, cond: Cond);
+
     /// Write instructions to perform logical negation of the contents of `PRIMARY_REGISTER` and
     /// store the result in `PRIMARY_REGISTER`.
     fn logical_not(&mut self);
+
     /// Write instructions for branching on a specified condition. Requires a comparison to be made
     /// prior to calling.
     // TODO: once we target more asms this could be removed as long as the client specifies the
     // jump mnemonic. Not sure if any targets differ wildly w/r/t jumping
     // TODO: wonder if we could statically enforce comparisons coming before branch insts?
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
+
     /// Compare `PRIMARY_REGISTER` with 0 and store result in `PRIMARY_REGISTER`.
     fn cmp_primary_with_zero(&mut self);
+
     /// Moves `val` into `PRIMARY_REGISTER`. Can use numeric literals or registers.
     fn mov_into_primary(&mut self, val: &str);
+
     /// Write instructions needed to perform modular division.
     fn gen_remainder_inst(&mut self);
+
     /// Write the function epilogue for the flavor of assembly we're targeting. Restore stack, etc.
     fn fn_epilogue(&mut self);
 
-    // Getters and setters that don't need to be implemented by structs
+    /* Getters and setters that don't need to be implemented by structs */
     fn get_scoped_map(&self) -> &ScopedMap {
         &self.curr_ctx().scoped_map
     }
@@ -97,8 +105,7 @@ pub trait AsmGenerator {
 
     fn write_to_file(&mut self, asm_filename: &str) -> RustCcResult<()> {
         let mut asm_file = File::create(asm_filename)?;
-        let arch = self.get_arch();
-        self.global_context_mut().write_to_file(&mut asm_file, arch)
+        self.global_context_mut().write_to_file(&mut asm_file)
     }
 
     fn write_inst(&mut self, inst: &str) {
@@ -152,7 +159,7 @@ pub trait AsmGenerator {
     }
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
-        let mut offset = INT_SIZE;
+        let mut offset = Self::INT_SIZE;
         let mut defined_globals = HashMap::new();
         let mut declared_globals = HashSet::new();
         for top_level_item in &prog.0 {
@@ -165,7 +172,7 @@ pub trait AsmGenerator {
                         ReturnType::NonVoid(BasicType::Int(IntegerType::Int).into()),
                         VarLoc::Global(id.to_owned(), offset),
                     )?;
-                    offset += INT_SIZE;
+                    offset += Self::INT_SIZE;
                     defined_globals.insert(id.to_owned(), val);
                     self.increment_stack_ptr();
                 }
@@ -176,7 +183,7 @@ pub trait AsmGenerator {
                         BasicType::Int(IntegerType::Int).into(),
                         VarLoc::Global(id.to_owned(), offset),
                     )?;
-                    offset += INT_SIZE;
+                    offset += Self::INT_SIZE;
 
                     declared_globals.insert(id.to_owned());
 
@@ -189,7 +196,7 @@ pub trait AsmGenerator {
 
                         self.get_scoped_map_mut().new_scope()?;
 
-                        let mut var_loc = self.stack_ptr() + INT_SIZE;
+                        let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
 
                         for (reg, param) in params.iter().enumerate() {
                             // mov arg from register into primary
@@ -198,7 +205,7 @@ pub trait AsmGenerator {
                             // Add param to the scope map
                             let sm = self.get_scoped_map_mut();
                             sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
-                            var_loc += INT_SIZE;
+                            var_loc += Self::INT_SIZE;
 
                             // save arg onto stack
                             self.push_stack();
@@ -247,13 +254,18 @@ pub trait AsmGenerator {
             Some(exp) => {
                 let rh_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
                 let sm = self.get_scoped_map_mut();
-                sm.initialize_var(&id, lh_type, rh_type, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                sm.initialize_var(
+                    &id,
+                    lh_type,
+                    rh_type,
+                    VarLoc::CurrFrame(var_loc + Self::INT_SIZE),
+                )?;
                 self.gen_l15_asm(exp)?;
                 self.push_stack();
             }
             None => {
                 let sm = self.get_scoped_map_mut();
-                sm.declare_var(&id, lh_type, VarLoc::CurrFrame(var_loc + INT_SIZE))?;
+                sm.declare_var(&id, lh_type, VarLoc::CurrFrame(var_loc + Self::INT_SIZE))?;
                 self.mov_into_primary("999");
                 self.push_stack();
             }

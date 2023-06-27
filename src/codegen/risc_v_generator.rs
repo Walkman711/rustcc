@@ -1,5 +1,5 @@
 use super::{
-    asm_generator::{AsmGenerator, INT_SIZE},
+    asm_generator::AsmGenerator,
     codegen_enums::{Arch, Cond},
     context::GlobalContext,
     function_map::FunctionMap,
@@ -25,24 +25,22 @@ impl TryFrom<&Program> for RiscVGenerator {
         Ok(Self {
             sp: 0,
             fn_map,
-            global_context: GlobalContext::default(),
+            global_context: GlobalContext::new(Arch::RISCV),
         })
     }
 }
 
 impl AsmGenerator for RiscVGenerator {
-    const PRIMARY_REGISTER: &'static str = "x28";
-
-    const BACKUP_REGISTER: &'static str = "x29";
-
+    // TODO: this is what godbolt is doing for 64-bit risc-v but 32 is different
+    const PRIMARY_REGISTER: &'static str = "a5";
+    const BACKUP_REGISTER: &'static str = "a6";
     const RETURN_REGISTER: &'static str = "ra";
 
     // XXX: incorrect
     const GLOBAL_VAR_REGISTER: &'static str = "x30";
-
-    const DEFAULT_ARGS: &'static str = "x28, x28, x29";
-
-    const UNARY_ARGS: &'static str = "x28, x28";
+    const DEFAULT_ARGS: &'static str = "a5, a5, a6";
+    const UNARY_ARGS: &'static str = "a5, a5";
+    const INT_SIZE: usize = 8;
 
     fn get_fn_map(&self) -> &FunctionMap {
         &self.fn_map
@@ -65,22 +63,30 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn increment_stack_ptr(&mut self) {
-        self.sp += INT_SIZE;
+        self.sp += Self::INT_SIZE;
     }
 
     fn decrement_stack_ptr(&mut self) {
-        self.sp -= INT_SIZE;
+        self.sp -= Self::INT_SIZE;
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
         self.write_address_inst(
-            &format!("sw {}, ", Self::PRIMARY_REGISTER),
+            &format!("sw {}", Self::PRIMARY_REGISTER),
             VarLoc::CurrFrame(stack_offset),
         );
     }
 
-    fn load_var(&mut self, reg: &str, loc: VarLoc) {
-        todo!()
+    fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
+        match loc {
+            VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
+                self.write_address_inst(&format!("sd {dst_reg}"), loc);
+            }
+            VarLoc::Register(reg_to_load_from) => {
+                self.write_inst(&format!("mv {dst_reg}, {reg_to_load_from}"))
+            }
+            VarLoc::Global(_, _) => todo!("global vars for riscv"),
+        }
     }
 
     fn compare_primary_with_backup(&mut self, cond: Cond) {
@@ -104,7 +110,7 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn mov_into_primary(&mut self, val: &str) {
-        todo!()
+        self.write_inst(&format!("mv {}, {val}", Self::PRIMARY_REGISTER));
     }
 
     fn gen_remainder_inst(&mut self) {

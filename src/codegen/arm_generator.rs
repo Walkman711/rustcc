@@ -1,5 +1,5 @@
 use super::{
-    asm_generator::{AsmGenerator, INT_SIZE},
+    asm_generator::AsmGenerator,
     codegen_enums::{Arch, Cond},
     context::GlobalContext,
     function_map::FunctionMap,
@@ -7,7 +7,10 @@ use super::{
 
 use crate::{
     parsing::parser_types::Program,
-    utils::{error::RustCcError, scoped_map::VarLoc},
+    utils::{
+        error::RustCcError,
+        scoped_map::{ScopedMap, VarLoc},
+    },
 };
 
 pub struct ArmGenerator {
@@ -25,7 +28,7 @@ impl TryFrom<&Program> for ArmGenerator {
         Ok(Self {
             sp: 0,
             fn_map,
-            global_context: GlobalContext::default(),
+            global_context: GlobalContext::new(Arch::ARM),
         })
     }
 }
@@ -37,6 +40,7 @@ impl AsmGenerator for ArmGenerator {
     const RETURN_REGISTER: &'static str = "w0";
     const GLOBAL_VAR_REGISTER: &'static str = "x9";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
+    const INT_SIZE: usize = 8;
 
     const UNARY_ARGS: &'static str = "w0, w0";
 
@@ -61,11 +65,11 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn increment_stack_ptr(&mut self) {
-        self.sp += INT_SIZE;
+        self.sp += Self::INT_SIZE;
     }
 
     fn decrement_stack_ptr(&mut self) {
-        self.sp -= INT_SIZE;
+        self.sp -= Self::INT_SIZE;
     }
 
     fn save_to_stack(&mut self, stack_offset: usize) {
@@ -153,6 +157,7 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sub   w0, w1, w0")
     }
 
+    // FIX: this isn't used
     fn fn_epilogue(&mut self) {
         self.write_inst("ldp   x29, x30, [sp], 16");
         let stack_offset = self.curr_ctx().get_stack_frame_size();
