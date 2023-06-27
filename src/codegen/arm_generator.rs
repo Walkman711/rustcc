@@ -31,8 +31,10 @@ impl TryFrom<&Program> for ArmGenerator {
 }
 
 impl AsmGenerator for ArmGenerator {
+    // TODO: make this and backup and default args temporary registers
     const PRIMARY_REGISTER: &'static str = "w0";
     const BACKUP_REGISTER: &'static str = "w1";
+    const RETURN_REGISTER: &'static str = "w0";
     const GLOBAL_VAR_REGISTER: &'static str = "x9";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
 
@@ -100,7 +102,6 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn logical_comparison(&mut self, cond: Cond) {
-        // Compare registers
         self.write_inst(&format!(
             "cmp   {}, {}",
             Self::BACKUP_REGISTER,

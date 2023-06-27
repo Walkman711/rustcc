@@ -1,7 +1,9 @@
 use std::process::Command;
 
 use rustcc::{
-    codegen::{arm_generator::ArmGenerator, asm_generator::AsmGenerator},
+    codegen::{
+        arm_generator::ArmGenerator, asm_generator::AsmGenerator, risc_v_generator::RiscVGenerator,
+    },
     parsing::parser::Parser,
 };
 
@@ -27,8 +29,11 @@ fn main() -> anyhow::Result<()> {
     // parsed_program.pretty_print(0);
 
     // Translate to assembly
-    let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;
-    arm_generator.gen_asm(&asm_filename, parsed_program)?;
+    // let mut arm_generator = ArmGenerator::try_from(&parsed_program)?;
+    // arm_generator.gen_asm(&asm_filename, parsed_program)?;
+
+    let mut risc_v_generator = RiscVGenerator::try_from(&parsed_program)?;
+    risc_v_generator.gen_asm(&asm_filename, parsed_program)?;
 
     // Build
     Command::new("gcc")

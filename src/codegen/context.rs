@@ -56,6 +56,10 @@ impl Context {
     }
 }
 
+pub trait Ctx {
+    fn fn_prologue(&mut self);
+}
+
 impl Context {
     pub fn get_stack_frame_size(&self) -> usize {
         let default_size = 16;
@@ -86,6 +90,12 @@ impl Context {
                     .push("\tstp   x29, x30, [sp, -16]!".to_string());
                 self.prologue.push("\tmov   x29, sp".to_string());
             }
+            Arch::RISCV => {
+                self.prologue.push(format!("{}:", self.function_name));
+                let stack_offset = self.get_stack_frame_size();
+                self.prologue
+                    .push(format!("\taddi   sp, sp, {stack_offset}"));
+            }
         }
     }
 
@@ -112,6 +122,7 @@ impl Context {
                     }
                 }
                 Instruction::Ret => {
+                    match self.get_stack_frame_size
                     writeln!(f, "\tldp   x29, x30, [sp], 16")?;
                     writeln!(f, "\tadd   sp, sp, {}", self.get_stack_frame_size())?;
                     writeln!(f, "\tret")?;

@@ -25,6 +25,7 @@ pub const INT_SIZE: usize = 8;
 pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
+    const RETURN_REGISTER: &'static str;
     const GLOBAL_VAR_REGISTER: &'static str;
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;

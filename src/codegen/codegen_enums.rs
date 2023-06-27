@@ -7,6 +7,7 @@ use crate::parsing::ops::{
 pub enum Arch {
     x86,
     ARM,
+    RISCV,
 }
 
 pub enum Mnemonic {
@@ -53,6 +54,20 @@ impl Mnemonic {
                 Mnemonic::Divide => "sdiv",
                 Mnemonic::Neg => "neg",
                 Mnemonic::BitwiseNot => "mvn",
+                Mnemonic::Mod => todo!(),
+            },
+            Arch::RISCV => match self {
+                Mnemonic::Or => "ori",
+                Mnemonic::Xor => "xori",
+                Mnemonic::And => "andi",
+                Mnemonic::BitwiseLeftShift => "slliw",
+                Mnemonic::BitwiseRightShift => "sraiw",
+                Mnemonic::Add => "addiw",
+                Mnemonic::Subtract => "subw",
+                Mnemonic::Multiply => "mulw",
+                Mnemonic::Divide => "divw",
+                Mnemonic::Neg => "negw",
+                Mnemonic::BitwiseNot => "not",
                 Mnemonic::Mod => todo!(),
             },
         }
@@ -136,6 +151,15 @@ impl Cond {
                 Self::GreaterThan => "gt",
                 Self::GreaterThanEquals => "ge",
                 Self::Always => "al",
+            },
+            Arch::RISCV => match self {
+                Cond::Equals => "eq",
+                Cond::NotEquals => "ne",
+                Cond::LessThan => "lt",
+                Cond::LessThanEquals => "le",
+                Cond::GreaterThan => "gt",
+                Cond::GreaterThanEquals => "ge",
+                Cond::Always => "",
             },
         }
     }
