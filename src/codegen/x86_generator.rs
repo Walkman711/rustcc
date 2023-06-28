@@ -151,4 +151,12 @@ impl AsmGenerator for x86Generator {
     fn gen_remainder_inst(&mut self) {
         todo!()
     }
+
+    fn gen_div_inst(&mut self) {
+        // TODO: comment why this is the simplest option for now
+        self.write_inst("movl %eax, %ecx");
+        self.write_inst("movl %edx, %eax");
+        self.write_inst("cdq");
+        self.write_inst("idiv %ecx");
+    }
 }

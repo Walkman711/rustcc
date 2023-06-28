@@ -69,6 +69,11 @@ pub trait AsmGenerator {
     /// Write instructions needed to perform modular division.
     fn gen_remainder_inst(&mut self);
 
+    /// Write division instruction. Needed for x86
+    fn gen_div_inst(&mut self) {
+        self.write_mnemonic(Mnemonic::Divide);
+    }
+
     /* Getters and setters that don't need to be implemented by structs */
     fn get_scoped_map(&self) -> &ScopedMap {
         &self.curr_ctx().scoped_map
@@ -672,7 +677,7 @@ pub trait AsmGenerator {
             self.pop_stack_into_backup();
             match op {
                 Level3Op::Multiplication => self.write_mnemonic(Mnemonic::Multiply),
-                Level3Op::Division => self.write_mnemonic(Mnemonic::Divide),
+                Level3Op::Division => self.gen_div_inst(),
                 Level3Op::Remainder => self.gen_remainder_inst(),
             }
         }
