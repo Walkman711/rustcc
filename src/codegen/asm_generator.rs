@@ -60,6 +60,11 @@ pub trait AsmGenerator {
     // TODO: wonder if we could statically enforce comparisons coming before branch insts?
     fn write_branch_inst(&mut self, cond: Cond, lbl: usize);
 
+    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()>;
+
+    /// When entering a function, move the arguments from registers onto the stack
+    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()>;
+
     /// Compare `PRIMARY_REGISTER` with 0 and store result in `PRIMARY_REGISTER`.
     fn cmp_primary_with_zero(&mut self);
 
@@ -203,20 +208,23 @@ pub trait AsmGenerator {
 
                         self.get_scoped_map_mut().new_scope()?;
 
-                        let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
+                        self.move_args_onto_stack(params)?;
 
-                        for (reg, param) in params.iter().enumerate() {
-                            // mov arg from register into primary
-                            self.mov_into_primary(&format!("w{reg}"));
+                        // let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
 
-                            // Add param to the scope map
-                            let sm = self.get_scoped_map_mut();
-                            sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
-                            var_loc += Self::INT_SIZE;
+                        // for (reg, param) in params.iter().enumerate() {
+                        //     // mov arg from register into primary
+                        //     // FIX: this is where the w0 is sneaking into x86 codegen
+                        //     self.mov_into_primary(&format!("w{reg}"));
 
-                            // save arg onto stack
-                            self.push_stack();
-                        }
+                        //     // Add param to the scope map
+                        //     let sm = self.get_scoped_map_mut();
+                        //     sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
+                        //     var_loc += Self::INT_SIZE;
+
+                        //     // save arg onto stack
+                        //     self.push_stack();
+                        // }
 
                         // PERF: don't clone this
                         self.gen_block_asm(block_items.to_owned())?;
@@ -710,23 +718,9 @@ pub trait AsmGenerator {
                 }
             }
             Level2Exp::ParenExp(exp) => self.gen_l15_asm(*exp)?,
-            Level2Exp::FunctionCall(fn_name, params) => {
-                self.get_fn_map().validate_fn_call(&fn_name, params.len())?;
-                for (reg, param) in params.iter().enumerate() {
-                    // HACK: we can only pass 8 args, so just store the args to be passed in w0-w7
-                    // in w8-w15 until we generate all the expressions
-                    let tmp_reg = reg + 8;
-                    self.gen_l15_asm(param.to_owned())?;
-                    self.write_inst(&format!("mov   w{tmp_reg}, {}", Self::PRIMARY_REGISTER));
-                }
-
-                for reg in 0..params.len() {
-                    let tmp_reg = reg + 8;
-                    self.write_inst(&format!("mov   w{reg}, w{tmp_reg}"));
-                }
-
-                // FIX: only for ARM
-                self.write_inst(&format!("bl    _{fn_name}"));
+            Level2Exp::FunctionCall(fn_name, args) => {
+                self.get_fn_map().validate_fn_call(&fn_name, args.len())?;
+                self.write_fn_call(&fn_name, args)?;
             }
         }
         Ok(())

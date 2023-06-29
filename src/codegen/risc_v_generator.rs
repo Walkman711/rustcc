@@ -6,8 +6,11 @@ use super::{
 };
 
 use crate::{
-    parsing::parser_types::Program,
-    utils::{error::RustCcError, scoped_map::VarLoc},
+    parsing::parser_types::{Level15Exp, Param, Program},
+    utils::{
+        error::{RustCcError, RustCcResult},
+        scoped_map::VarLoc,
+    },
 };
 
 pub struct RiscVGenerator {
@@ -114,6 +117,14 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn gen_remainder_inst(&mut self) {
+        todo!()
+    }
+
+    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
+        todo!()
+    }
+
+    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
         todo!()
     }
 }

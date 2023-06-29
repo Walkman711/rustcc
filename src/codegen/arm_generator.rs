@@ -6,8 +6,11 @@ use super::{
 };
 
 use crate::{
-    parsing::parser_types::Program,
-    utils::{error::RustCcError, scoped_map::VarLoc},
+    parsing::parser_types::{Level15Exp, Param, Program},
+    utils::{
+        error::{RustCcError, RustCcResult},
+        scoped_map::VarLoc,
+    },
 };
 
 pub struct ArmGenerator {
@@ -152,5 +155,44 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sdiv  w2, w1, w0");
         self.write_inst("mul   w0, w2, w0");
         self.write_inst("sub   w0, w1, w0")
+    }
+
+    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
+        for (reg, arg) in args.iter().enumerate() {
+            // HACK: we can only pass 8 args, so just store the args to be passed in w0-w7
+            // in w8-w15 until we generate all the expressions
+            let tmp_reg = reg + 8;
+            self.gen_l15_asm(arg.to_owned())?;
+            self.write_inst(&format!("mov   w{tmp_reg}, {}", Self::PRIMARY_REGISTER));
+        }
+
+        for reg in 0..args.len() {
+            let tmp_reg = reg + 8;
+            self.write_inst(&format!("mov   w{reg}, w{tmp_reg}"));
+        }
+
+        // FIX: only for ARM
+        self.write_inst(&format!("bl    _{fn_name}"));
+        Ok(())
+    }
+
+    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
+        let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
+
+        for (reg, param) in params.iter().enumerate() {
+            // mov arg from register into primary
+            // FIX: this is where the w0 is sneaking into x86 codegen
+            self.mov_into_primary(&format!("w{reg}"));
+
+            // Add param to the scope map
+            let sm = self.get_scoped_map_mut();
+            sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
+            var_loc += Self::INT_SIZE;
+
+            // save arg onto stack
+            self.push_stack();
+        }
+
+        Ok(())
     }
 }

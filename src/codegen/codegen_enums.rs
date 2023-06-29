@@ -36,7 +36,7 @@ impl Mnemonic {
                 Mnemonic::BitwiseRightShift => todo!(),
                 Mnemonic::Add => "add",
                 Mnemonic::Subtract => "sub",
-                Mnemonic::Multiply => "imul",
+                Mnemonic::Multiply => "imull",
                 Mnemonic::Divide => "idiv",
                 Mnemonic::Neg => "neg",
                 Mnemonic::BitwiseNot => "not",
