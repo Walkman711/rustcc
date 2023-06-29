@@ -120,11 +120,11 @@ impl AsmGenerator for RiscVGenerator {
         todo!()
     }
 
-    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
+    fn write_fn_call(&mut self, _fn_name: &str, _args: Vec<Level15Exp>) -> RustCcResult<()> {
         todo!()
     }
 
-    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
+    fn move_args_onto_stack(&mut self, _params: &[Param]) -> RustCcResult<()> {
         todo!()
     }
 }

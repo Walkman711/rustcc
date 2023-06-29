@@ -76,10 +76,6 @@ impl AsmGenerator for x86Generator {
             "movl {}, -{stack_offset}(%rbp)",
             Self::PRIMARY_REGISTER,
         ))
-        // self.write_address_inst(
-        //     &format!("movq DWORD PTR [rbp-x], {}", Self::PRIMARY_REGISTER),
-        //     VarLoc::CurrFrame(stack_offset),
-        // )
     }
 
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
@@ -92,7 +88,10 @@ impl AsmGenerator for x86Generator {
                 self.write_inst(&format!("#load_reg_{reg_to_load_from}"));
                 self.write_inst(&format!("movl   {dst_reg}, {reg_to_load_from}"));
             }
-            VarLoc::Global(_, _) => todo!("x86 globals"),
+            VarLoc::Global(id, offset) => {
+                self.write_inst(&format!("movl {id}(%rip), {}", Self::PRIMARY_REGISTER));
+                // self.load_var(Self::PRIMARY_REGISTER, VarLoc::CurrFrame(offset));
+            }
         }
     }
 
@@ -108,6 +107,13 @@ impl AsmGenerator for x86Generator {
     }
 
     fn logical_not(&mut self) {
+        /*
+        self.write_inst("xor   %eax, %eax");
+        self.write_inst("test  %edi, %edi");
+        self.write_inst("sete  %al");
+        self.write_inst(&format!("movzx %al, {}", Self::PRIMARY_REGISTER));
+        */
+
         self.write_inst(&format!(
             "testl  {}, {}",
             Self::PRIMARY_REGISTER,

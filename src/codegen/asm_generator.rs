@@ -240,19 +240,47 @@ pub trait AsmGenerator {
         }
 
         for (id, val) in &defined_globals {
+            let arch = self.get_arch();
             let gc = self.global_context_mut();
-            // TODO: pull this and .comm into fns
-            // set .p2align to 3 so that globals in the data section are 8-byte aligned
-            gc.write_defined_global_inst(".p2align 3".to_string());
-            gc.write_defined_global_inst(format!(".global _{id}"));
-            gc.write_defined_global_inst(format!("_{id}:"));
-            gc.write_defined_global_inst(format!("\t.long {val}"));
+            match arch {
+                Arch::ARM => {
+                    // TODO: pull this and .comm into fns
+                    // set .p2align to 3 so that globals in the data section are 8-byte aligned
+                    gc.write_defined_global_inst(".p2align 3".to_string());
+                    gc.write_defined_global_inst(format!(".global _{id}"));
+                    gc.write_defined_global_inst(format!("_{id}:"));
+                    gc.write_defined_global_inst(format!("\t.long {val}"));
+                }
+                Arch::x86 => {
+                    gc.write_defined_global_inst(format!("\t.global {id}"));
+                    gc.write_defined_global_inst("\t.data".to_string());
+                    gc.write_defined_global_inst("\t.align 4".to_string());
+                    gc.write_defined_global_inst(format!("\t.type {id}, @object"));
+                    gc.write_defined_global_inst(format!("\t.size {id}, 4"));
+                    gc.write_defined_global_inst(format!("{id}:"));
+                    gc.write_defined_global_inst(format!("\t.long {val}"));
+                }
+                Arch::RISCV => {
+                    todo!("pull global stuff into separate fns, or a trait.")
+                }
+            }
         }
 
         for id in &declared_globals {
             if !defined_globals.contains_key(id) {
-                self.global_context_mut()
-                    .write_declared_global_inst(format!("\t.comm _{id},4,2"));
+                match self.get_arch() {
+                    Arch::x86 => {
+                        self.global_context_mut()
+                            .write_declared_global_inst(format!("\t.text"));
+                        self.global_context_mut()
+                            .write_declared_global_inst(format!("\t.comm {id},4,4"));
+                    }
+                    Arch::ARM => {
+                        self.global_context_mut()
+                            .write_declared_global_inst(format!("\t.comm _{id},4,2"));
+                    }
+                    Arch::RISCV => todo!(),
+                }
             }
         }
 
@@ -544,14 +572,30 @@ pub trait AsmGenerator {
                         return Err(CodegenError::AssignedToVarInRegister.into());
                     }
                     VarLoc::Global(id, offset) => {
-                        let page = self.curr_ctx().get_page_access();
-                        self.write_inst(&format!(
-                            "adrp  {}, _{id}@{page}",
-                            Self::GLOBAL_VAR_REGISTER
-                        ));
-                        self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
-                        self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
-                        self.save_to_stack(offset);
+                        let arch = self.get_arch();
+                        match arch {
+                            Arch::x86 => {
+                                self.write_inst(&format!(
+                                    "movl  {}, {id}(%rip)",
+                                    Self::PRIMARY_REGISTER
+                                ));
+                            }
+                            Arch::ARM => {
+                                let page = self.curr_ctx().get_page_access();
+                                // COMMENT:
+                                self.write_inst(&format!(
+                                    "adrp  {}, _{id}@{page}",
+                                    Self::GLOBAL_VAR_REGISTER
+                                ));
+                                self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
+                                self.write_inst(&format!(
+                                    "str   w8, [{}]",
+                                    Self::GLOBAL_VAR_REGISTER
+                                ));
+                                self.save_to_stack(offset);
+                            }
+                            Arch::RISCV => todo!(),
+                        }
                     }
                 }
             }

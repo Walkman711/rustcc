@@ -297,12 +297,22 @@ impl GlobalContext {
     }
 
     pub fn write_to_file(&mut self, f: &mut File) -> RustCcResult<()> {
-        // writeln!(f, ".section __DATA,__data")?;
+        match self.arch {
+            Arch::x86 => writeln!(f, ".data")?,
+            Arch::ARM => writeln!(f, ".section __DATA,__data")?,
+            Arch::RISCV => todo!(),
+        }
+
         for line in &self.defined_global_buffer {
             writeln!(f, "{line}")?;
         }
 
-        // writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?;
+        match self.arch {
+            Arch::x86 => writeln!(f, ".text")?,
+            Arch::ARM => writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?,
+            Arch::RISCV => todo!(),
+        }
+
         for ctx in &mut self.function_contexts {
             ctx.write_to_file(f)?;
             writeln!(f)?;
