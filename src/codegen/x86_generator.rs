@@ -176,7 +176,10 @@ impl AsmGenerator for x86Generator {
                     REGISTERS.get(i).unwrap()
                 ))
             } else {
-                self.push_stack();
+                todo!(
+                    "handle stack passing later - will require cleaning up how I'm managing the sp"
+                )
+                // self.push_stack();
                 // self.save_to_stack(self.stack_ptr());
                 // self.write_inst(&format!("push  {}", Self::PRIMARY_REGISTER));
             }
@@ -194,7 +197,6 @@ impl AsmGenerator for x86Generator {
 
         for (i, param) in params.iter().enumerate() {
             // mov arg from register into primary
-            // FIX: this is where the w0 is sneaking into x86 codegen
             if let Some(reg) = REGISTERS.get(i) {
                 // self.mov_into_primary(REGISTERS.get(i).unwrap());
                 self.write_inst(&format!("movl   {reg}, {}", Self::PRIMARY_REGISTER));

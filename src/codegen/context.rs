@@ -98,6 +98,8 @@ impl Context {
         self.prologue.push(format!("{}:", self.function_name));
         self.prologue.push("\tpushq %rbp".to_string());
         self.prologue.push("\tmovq  %rsp, %rbp".to_string());
+        let stack_offset = self.get_stack_frame_size();
+        self.prologue.push(format!("\tsub   ${stack_offset}, %rsp"));
     }
 
     fn arm_fn_prologue(&mut self) {
@@ -144,16 +146,18 @@ impl Context {
                 if let VarLoc::Register(reg) = loc {
                     writeln!(f, "\t{inst}, w{reg}")?;
                 } else {
-                    let addend = match loc {
-                        VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
-                        VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
-                        VarLoc::Register(_reg) => unreachable!("checked above"),
-                        VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
-                    };
-                    writeln!(f, "\t{inst}, DWORD PTR -{addend}%(rbp)")?
+                    todo!("don't think i have to use address insts for x86?")
+                    // let addend = match loc {
+                    //     VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
+                    //     VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
+                    //     VarLoc::Register(_reg) => unreachable!("checked above"),
+                    //     VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
+                    // };
+                    // writeln!(f, "\t{inst}, DWORD PTR -{addend}%(rbp)")?
                 }
             }
             Instruction::Ret => {
+                writeln!(f, "\tmovq  %rbp, %rsp")?;
                 writeln!(f, "\tpopq   %rbp")?;
                 writeln!(f, "\tret")?;
             }
