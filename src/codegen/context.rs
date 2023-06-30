@@ -147,13 +147,6 @@ impl Context {
                     writeln!(f, "\t{inst}, w{reg}")?;
                 } else {
                     todo!("don't think i have to use address insts for x86?")
-                    // let addend = match loc {
-                    //     VarLoc::CurrFrame(offset) => self.get_stack_frame_size() - offset,
-                    //     VarLoc::PrevFrame(offset) => self.get_stack_frame_size() + offset,
-                    //     VarLoc::Register(_reg) => unreachable!("checked above"),
-                    //     VarLoc::Global(_, offset) => self.get_stack_frame_size() - offset,
-                    // };
-                    // writeln!(f, "\t{inst}, DWORD PTR -{addend}%(rbp)")?
                 }
             }
             Instruction::Ret => {
@@ -301,22 +294,12 @@ impl GlobalContext {
     }
 
     pub fn write_to_file(&mut self, f: &mut File) -> RustCcResult<()> {
-        match self.arch {
-            Arch::x86 => writeln!(f, ".data")?,
-            Arch::ARM => writeln!(f, ".section __DATA,__data")?,
-            Arch::RISCV => todo!(),
-        }
-
+        self.write_data_section(f)?;
         for line in &self.defined_global_buffer {
             writeln!(f, "{line}")?;
         }
 
-        match self.arch {
-            Arch::x86 => writeln!(f, ".text")?,
-            Arch::ARM => writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?,
-            Arch::RISCV => todo!(),
-        }
-
+        self.write_text_section(f)?;
         for ctx in &mut self.function_contexts {
             ctx.write_to_file(f)?;
             writeln!(f)?;
@@ -326,6 +309,24 @@ impl GlobalContext {
             writeln!(f, "{line}")?;
         }
 
+        Ok(())
+    }
+
+    fn write_data_section(&mut self, f: &mut File) -> RustCcResult<()> {
+        match self.arch {
+            Arch::x86 => writeln!(f, ".data")?,
+            Arch::ARM => writeln!(f, ".section __DATA,__data")?,
+            Arch::RISCV => todo!(),
+        }
+        Ok(())
+    }
+
+    fn write_text_section(&mut self, f: &mut File) -> RustCcResult<()> {
+        match self.arch {
+            Arch::x86 => writeln!(f, ".text")?,
+            Arch::ARM => writeln!(f, ".section    __TEXT,__text,regular,pure_instructions")?,
+            Arch::RISCV => todo!(),
+        }
         Ok(())
     }
 }

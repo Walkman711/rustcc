@@ -40,9 +40,9 @@ impl AsmGenerator for ArmGenerator {
     const RETURN_REGISTER: &'static str = "w0";
     const GLOBAL_VAR_REGISTER: &'static str = "x9";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
-    const INT_SIZE: usize = 8;
-
     const UNARY_ARGS: &'static str = "w0, w0";
+
+    const INT_SIZE: usize = 8;
 
     fn get_fn_map(&self) -> &FunctionMap {
         &self.fn_map
@@ -77,6 +77,18 @@ impl AsmGenerator for ArmGenerator {
             &format!("str   {}", Self::PRIMARY_REGISTER),
             VarLoc::CurrFrame(stack_offset),
         );
+    }
+
+    fn assign_to_global(&mut self, id: &str, offset: usize) {
+        let page = self.curr_ctx().get_page_access();
+        // COMMENT:
+        self.write_inst(&format!(
+            "adrp  {}, _{id}@{page}",
+            Self::GLOBAL_VAR_REGISTER
+        ));
+        self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
+        self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
+        self.save_to_stack(offset);
     }
 
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
@@ -137,26 +149,6 @@ impl AsmGenerator for ArmGenerator {
         ));
     }
 
-    fn cmp_primary_with_zero(&mut self) {
-        self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
-    }
-
-    fn mov_into_primary(&mut self, val: &str) {
-        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
-    }
-
-    fn gen_remainder_inst(&mut self) {
-        // 3 % 2
-        // w0 3
-        // push
-        // w0 2
-        // w1 3
-        // w2 1
-        self.write_inst("sdiv  w2, w1, w0");
-        self.write_inst("mul   w0, w2, w0");
-        self.write_inst("sub   w0, w1, w0")
-    }
-
     fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
         for (reg, arg) in args.iter().enumerate() {
             // HACK: we can only pass 8 args, so just store the args to be passed in w0-w7
@@ -194,5 +186,30 @@ impl AsmGenerator for ArmGenerator {
         }
 
         Ok(())
+    }
+
+    fn cmp_primary_with_zero(&mut self) {
+        self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
+    }
+
+    fn mov_into_primary(&mut self, val: &str) {
+        self.write_inst(&format!("mov   {}, {val}", Self::PRIMARY_REGISTER));
+    }
+
+    fn gen_remainder_inst(&mut self) {
+        // 3 % 2
+        // w0 3
+        // push
+        // w0 2
+        // w1 3
+        // w2 1
+        self.write_inst("sdiv  w2, w1, w0");
+        self.write_inst("mul   w0, w2, w0");
+        self.write_inst("sub   w0, w1, w0")
+    }
+
+    fn declare_global(&mut self, id: &str) {
+        self.global_context_mut()
+            .write_declared_global_inst(format!("\t.comm _{id},4,2"));
     }
 }

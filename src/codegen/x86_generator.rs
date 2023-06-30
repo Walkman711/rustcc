@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+const REGISTERS: &[&str; 6] = &["%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"];
+
 #[allow(non_camel_case_types)]
 pub struct x86Generator {
     sp: usize,
@@ -78,17 +80,20 @@ impl AsmGenerator for x86Generator {
         ))
     }
 
+    fn assign_to_global(&mut self, id: &str, _offset: usize) {
+        self.write_inst(&format!("movl  {}, {id}(%rip)", Self::PRIMARY_REGISTER));
+    }
+
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
         match loc {
             VarLoc::CurrFrame(stack_offset) | VarLoc::PrevFrame(stack_offset) => {
-                // self.write_address_inst(&format!("movq   {dst_reg}, DWORD PTR [rbp-x]"), loc);
                 self.write_inst(&format!("movl -{stack_offset}(%rbp), {dst_reg}"));
             }
             VarLoc::Register(reg_to_load_from) => {
                 self.write_inst(&format!("#load_reg_{reg_to_load_from}"));
                 self.write_inst(&format!("movl   {dst_reg}, {reg_to_load_from}"));
             }
-            VarLoc::Global(id, offset) => {
+            VarLoc::Global(id, _offset) => {
                 self.write_inst(&format!("movl {id}(%rip), {}", Self::PRIMARY_REGISTER));
                 // self.load_var(Self::PRIMARY_REGISTER, VarLoc::CurrFrame(offset));
             }
@@ -98,7 +103,6 @@ impl AsmGenerator for x86Generator {
     fn compare_primary_with_backup(&mut self, cond: Cond) {
         self.write_inst(&format!(
             "cmp  {}, {}",
-            // Self::BACKUP_REGISTER,
             Self::PRIMARY_REGISTER,
             Self::BACKUP_REGISTER,
         ));
@@ -107,13 +111,6 @@ impl AsmGenerator for x86Generator {
     }
 
     fn logical_not(&mut self) {
-        /*
-        self.write_inst("xor   %eax, %eax");
-        self.write_inst("test  %edi, %edi");
-        self.write_inst("sete  %al");
-        self.write_inst(&format!("movzx %al, {}", Self::PRIMARY_REGISTER));
-        */
-
         self.write_inst(&format!(
             "testl  {}, {}",
             Self::PRIMARY_REGISTER,
@@ -131,8 +128,59 @@ impl AsmGenerator for x86Generator {
         ));
     }
 
+    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
+        for (i, arg) in args.iter().enumerate() {
+            self.gen_l15_asm(arg.to_owned())?;
+            if i < REGISTERS.len() {
+                self.write_inst(&format!(
+                    "movl  {}, {}",
+                    Self::PRIMARY_REGISTER,
+                    REGISTERS.get(i).unwrap()
+                ))
+            } else {
+                todo!(
+                    "handle stack passing later - will require cleaning up how I'm managing the sp"
+                )
+                // self.push_stack();
+                // self.save_to_stack(self.stack_ptr());
+                // self.write_inst(&format!("push  {}", Self::PRIMARY_REGISTER));
+            }
+        }
+
+        self.write_inst(&format!("call  {fn_name}"));
+        Ok(())
+    }
+
+    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
+        let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
+        for (i, param) in params.iter().enumerate() {
+            // mov arg from register into primary
+            if let Some(reg) = REGISTERS.get(i) {
+                self.write_inst(&format!("movl   {reg}, {}", Self::PRIMARY_REGISTER));
+            } else {
+                todo!(
+                    "handle stack passing later - will require cleaning up how I'm managing the sp"
+                )
+                // self.write_inst(&format!(
+                //     "movl {}(%rbp), {}",
+                //     (i - REGISTERS.len() + 1) * 4,
+                //     Self::PRIMARY_REGISTER
+                // ))
+            }
+
+            // Add param to the scope map
+            let sm = self.get_scoped_map_mut();
+            sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
+            var_loc += Self::INT_SIZE;
+
+            // save arg onto stack
+            self.push_stack();
+        }
+
+        Ok(())
+    }
+
     fn cmp_primary_with_zero(&mut self) {
-        // self.write_inst(&format!("cmp   {}, 0", Self::PRIMARY_REGISTER));
         self.write_inst(&format!(
             "test  {}, {}",
             Self::PRIMARY_REGISTER,
@@ -165,61 +213,9 @@ impl AsmGenerator for x86Generator {
         self.write_inst("idiv %ecx");
     }
 
-    fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()> {
-        const REGISTERS: &[&'static str; 6] = &["%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"];
-        for (i, arg) in args.iter().enumerate() {
-            self.gen_l15_asm(arg.to_owned())?;
-            if i < REGISTERS.len() {
-                self.write_inst(&format!(
-                    "movl  {}, {}",
-                    Self::PRIMARY_REGISTER,
-                    REGISTERS.get(i).unwrap()
-                ))
-            } else {
-                todo!(
-                    "handle stack passing later - will require cleaning up how I'm managing the sp"
-                )
-                // self.push_stack();
-                // self.save_to_stack(self.stack_ptr());
-                // self.write_inst(&format!("push  {}", Self::PRIMARY_REGISTER));
-            }
-        }
-
-        self.write_inst(&format!("call  {fn_name}"));
-        Ok(())
-    }
-
-    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
-        // DRY: make module scoped
-        const REGISTERS: &[&'static str; 6] = &["%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"];
-
-        let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
-
-        for (i, param) in params.iter().enumerate() {
-            // mov arg from register into primary
-            if let Some(reg) = REGISTERS.get(i) {
-                // self.mov_into_primary(REGISTERS.get(i).unwrap());
-                self.write_inst(&format!("movl   {reg}, {}", Self::PRIMARY_REGISTER));
-            } else {
-                todo!(
-                    "handle stack passing later - will require cleaning up how I'm managing the sp"
-                )
-                // self.write_inst(&format!(
-                //     "movl {}(%rbp), {}",
-                //     (i - REGISTERS.len() + 1) * 4,
-                //     Self::PRIMARY_REGISTER
-                // ))
-            }
-
-            // Add param to the scope map
-            let sm = self.get_scoped_map_mut();
-            sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
-            var_loc += Self::INT_SIZE;
-
-            // save arg onto stack
-            self.push_stack();
-        }
-
-        Ok(())
+    fn declare_global(&mut self, id: &str) {
+        let gc = self.global_context_mut();
+        gc.write_declared_global_inst("\t.text".to_string());
+        gc.write_declared_global_inst(format!("\t.comm {id},4,4"));
     }
 }

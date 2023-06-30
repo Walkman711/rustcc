@@ -43,6 +43,12 @@ pub trait AsmGenerator {
     /// Write instruction to store `PRIMARY_REGISTER` on the stack.
     fn save_to_stack(&mut self, stack_offset: usize);
 
+    /// Write instruction to store `PRIMARY_REGISTER` on the stack.
+    fn assign_to_global(&mut self, id: &str, offset: usize);
+
+    /// Write instruction to declare uninitialized global variables
+    fn declare_global(&mut self, id: &str);
+
     /// Loads the variable stored at `loc` to the specified register.
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc);
 
@@ -204,32 +210,19 @@ pub trait AsmGenerator {
                 TopLevelItem::Fun(function) => match function {
                     Function::Declaration(..) => {}
                     Function::Definition(_id, _ret, params, block_items) => {
+                        // Making a new function, so declare a new context,
                         self.global_context_mut().new_function_context(function);
 
+                        // And then enter a new scope
                         self.get_scoped_map_mut().new_scope()?;
 
+                        // Move arguments from registers and the previous stack frame into the
+                        // current stack frame
                         self.move_args_onto_stack(params)?;
-
-                        // let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
-
-                        // for (reg, param) in params.iter().enumerate() {
-                        //     // mov arg from register into primary
-                        //     // FIX: this is where the w0 is sneaking into x86 codegen
-                        //     self.mov_into_primary(&format!("w{reg}"));
-
-                        //     // Add param to the scope map
-                        //     let sm = self.get_scoped_map_mut();
-                        //     sm.new_param(&param.id, param.var_type, VarLoc::CurrFrame(var_loc))?;
-                        //     var_loc += Self::INT_SIZE;
-
-                        //     // save arg onto stack
-                        //     self.push_stack();
-                        // }
 
                         // PERF: don't clone this
                         self.gen_block_asm(block_items.to_owned())?;
 
-                        // TODO: do i need to do anything with the size of the scope?
                         let num_deallocated_vars = self.get_scoped_map_mut().exit_scope()?;
                         for _ in 0..num_deallocated_vars {
                             self.decrement_stack_ptr();
@@ -268,19 +261,7 @@ pub trait AsmGenerator {
 
         for id in &declared_globals {
             if !defined_globals.contains_key(id) {
-                match self.get_arch() {
-                    Arch::x86 => {
-                        self.global_context_mut()
-                            .write_declared_global_inst(format!("\t.text"));
-                        self.global_context_mut()
-                            .write_declared_global_inst(format!("\t.comm {id},4,4"));
-                    }
-                    Arch::ARM => {
-                        self.global_context_mut()
-                            .write_declared_global_inst(format!("\t.comm _{id},4,2"));
-                    }
-                    Arch::RISCV => todo!(),
-                }
+                self.declare_global(id);
             }
         }
 
@@ -559,7 +540,6 @@ pub trait AsmGenerator {
         match l14 {
             Level14Exp::SimpleAssignment(identifier, l15_exp) => {
                 let exp_type = l15_exp.exp_type(self.get_fn_map(), self.get_scoped_map());
-                dbg!(exp_type);
                 let sm = self.get_scoped_map_mut();
                 let var_loc = sm.assign_var(&identifier, exp_type)?;
                 self.gen_l15_asm(*l15_exp)?;
@@ -572,30 +552,7 @@ pub trait AsmGenerator {
                         return Err(CodegenError::AssignedToVarInRegister.into());
                     }
                     VarLoc::Global(id, offset) => {
-                        let arch = self.get_arch();
-                        match arch {
-                            Arch::x86 => {
-                                self.write_inst(&format!(
-                                    "movl  {}, {id}(%rip)",
-                                    Self::PRIMARY_REGISTER
-                                ));
-                            }
-                            Arch::ARM => {
-                                let page = self.curr_ctx().get_page_access();
-                                // COMMENT:
-                                self.write_inst(&format!(
-                                    "adrp  {}, _{id}@{page}",
-                                    Self::GLOBAL_VAR_REGISTER
-                                ));
-                                self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
-                                self.write_inst(&format!(
-                                    "str   w8, [{}]",
-                                    Self::GLOBAL_VAR_REGISTER
-                                ));
-                                self.save_to_stack(offset);
-                            }
-                            Arch::RISCV => todo!(),
-                        }
+                        self.assign_to_global(&id, offset);
                     }
                 }
             }

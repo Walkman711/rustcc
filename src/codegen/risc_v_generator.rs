@@ -80,6 +80,14 @@ impl AsmGenerator for RiscVGenerator {
         );
     }
 
+    fn assign_to_global(&mut self, _id: &str, _offset: usize) {
+        todo!()
+    }
+
+    fn declare_global(&mut self, _id: &str) {
+        todo!()
+    }
+
     fn load_var(&mut self, dst_reg: &str, loc: VarLoc) {
         match loc {
             VarLoc::CurrFrame(_) | VarLoc::PrevFrame(_) => {
@@ -108,6 +116,14 @@ impl AsmGenerator for RiscVGenerator {
         ));
     }
 
+    fn write_fn_call(&mut self, _fn_name: &str, _args: Vec<Level15Exp>) -> RustCcResult<()> {
+        todo!()
+    }
+
+    fn move_args_onto_stack(&mut self, _params: &[Param]) -> RustCcResult<()> {
+        todo!()
+    }
+
     fn cmp_primary_with_zero(&mut self) {
         todo!()
     }
@@ -117,14 +133,6 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn gen_remainder_inst(&mut self) {
-        todo!()
-    }
-
-    fn write_fn_call(&mut self, _fn_name: &str, _args: Vec<Level15Exp>) -> RustCcResult<()> {
-        todo!()
-    }
-
-    fn move_args_onto_stack(&mut self, _params: &[Param]) -> RustCcResult<()> {
         todo!()
     }
 }
