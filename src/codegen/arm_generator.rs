@@ -21,6 +21,14 @@ pub struct ArmGenerator {
 
 impl ArmGenerator {
     const GLOBAL_VAR_REGISTER: &'static str = "x9";
+
+    fn get_page_access(&self) -> String {
+        if self.curr_ctx().function_name == "main" {
+            "PAGE".to_string()
+        } else {
+            "GOTPAGE".to_string()
+        }
+    }
 }
 
 impl TryFrom<&Program> for ArmGenerator {
@@ -83,11 +91,11 @@ impl AsmGenerator for ArmGenerator {
     }
 
     fn assign_to_global(&mut self, id: &str, offset: usize) {
-        let page = self.curr_ctx().get_page_access();
         // COMMENT:
         self.write_inst(&format!(
-            "adrp  {}, _{id}@{page}",
-            Self::GLOBAL_VAR_REGISTER
+            "adrp  {}, _{id}@{}",
+            Self::GLOBAL_VAR_REGISTER,
+            self.get_page_access()
         ));
         self.write_inst(&format!("mov   w8, {}", Self::PRIMARY_REGISTER));
         self.write_inst(&format!("str   w8, [{}]", Self::GLOBAL_VAR_REGISTER));
@@ -103,10 +111,10 @@ impl AsmGenerator for ArmGenerator {
                 self.write_inst(&format!("mov   {dst_reg}, w{reg_to_load_from}"))
             }
             VarLoc::Global(id, offset) => {
-                let page = self.curr_ctx().get_page_access();
+                let page = self.get_page_access();
                 self.write_inst(&format!(
                     "adrp  {}, _{id}@{page}",
-                    Self::GLOBAL_VAR_REGISTER
+                    Self::GLOBAL_VAR_REGISTER,
                 ));
                 self.write_inst(&format!(
                     "ldr   {}, [{}, _{id}@{page}OFF]",

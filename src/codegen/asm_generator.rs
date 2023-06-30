@@ -234,7 +234,7 @@ pub trait AsmGenerator {
         }
 
         for (id, val) in &defined_globals {
-            self.define_global(id, *val);
+            self.define_global(id, val);
         }
 
         for id in &declared_globals {
