@@ -301,30 +301,6 @@ pub trait AsmGenerator {
 
     fn gen_stmt_asm(&mut self, stmt: Statement) -> RustCcResult<()> {
         match stmt {
-            Statement::Return(exp_opt) => {
-                match exp_opt {
-                    Some(exp) => {
-                        let exp_ret_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
-                        let fun_ret_type =
-                            self.get_fn_map().ret_type(&self.curr_ctx().function_name);
-                        if exp_ret_type != fun_ret_type {
-                            return Err(CodegenError::ReturningIncorrectType(
-                                self.curr_ctx().function_name.to_owned(),
-                                fun_ret_type,
-                                exp_ret_type,
-                            )
-                            .into());
-                        }
-
-                        self.gen_l15_asm(exp)?;
-                    }
-                    /* C standard states that int fns without a return value return 0 by default */
-                    None => {
-                        self.mov_into_primary("0");
-                    }
-                }
-                self.write_to_buffer(Instruction::Ret);
-            }
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
                     self.gen_l15_asm(exp)?;
@@ -479,19 +455,51 @@ pub trait AsmGenerator {
                     }
                 }
             }
-            Statement::Break => {
+            Statement::Jmp(js) => self.gen_jmp_stmt_asm(js)?,
+        }
+
+        Ok(())
+    }
+
+    fn gen_jmp_stmt_asm(&mut self, js: JumpStatement) -> RustCcResult<()> {
+        match js {
+            JumpStatement::Break => {
                 if let Some(break_label) = self.get_break_stack().last() {
                     self.write_branch_inst(Cond::Always, *break_label);
                 } else {
                     return Err(CodegenError::UnenclosedBreak.into());
                 }
             }
-            Statement::Continue => {
+            JumpStatement::Continue => {
                 if let Some(continue_label) = self.get_continue_stack().last() {
                     self.write_branch_inst(Cond::Always, *continue_label);
                 } else {
                     return Err(CodegenError::UnenclosedContinue.into());
                 }
+            }
+            JumpStatement::Return(exp_opt) => {
+                match exp_opt {
+                    Some(exp) => {
+                        let exp_ret_type = exp.exp_type(self.get_fn_map(), self.get_scoped_map());
+                        let fun_ret_type =
+                            self.get_fn_map().ret_type(&self.curr_ctx().function_name);
+                        if exp_ret_type != fun_ret_type {
+                            return Err(CodegenError::ReturningIncorrectType(
+                                self.curr_ctx().function_name.to_owned(),
+                                fun_ret_type,
+                                exp_ret_type,
+                            )
+                            .into());
+                        }
+
+                        self.gen_l15_asm(exp)?;
+                    }
+                    /* C standard states that int fns without a return value return 0 by default */
+                    None => {
+                        self.mov_into_primary("0");
+                    }
+                }
+                self.write_to_buffer(Instruction::Ret);
             }
         }
 

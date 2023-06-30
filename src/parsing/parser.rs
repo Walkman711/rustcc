@@ -107,7 +107,7 @@ impl Parser {
         let mut params = vec![];
         self.lexer.expect_next(&Token::OpenParen)?;
 
-        // Parse params. We should either have nothing, void and nothing else, or a list of args.
+        /* Parse params. We should either have nothing, void and nothing else, or a list of args */
         if !self.lexer.advance_if_match(&Token::Keyword(Keywords::Void)) {
             while let Ok(var_type) = self.parse_variable_type() {
                 let Some(Token::Identifier(id)) = self.lexer.next_token() else {
@@ -127,7 +127,7 @@ impl Parser {
 
             let need_to_add_return = !block_items.iter().any(|bi| bi.has_return());
             if need_to_add_return {
-                block_items.push(BlockItem::Stmt(Statement::Return(None)))
+                block_items.push(BlockItem::Stmt(Statement::Jmp(JumpStatement::Return(None))))
             }
 
             Ok(Function::Definition(
@@ -147,7 +147,7 @@ impl Parser {
 
                 self.lexer.expect_next(&Token::Semicolon)?;
 
-                Ok(Statement::Return(Some(exp)))
+                Ok(Statement::Jmp(JumpStatement::Return(Some(exp))))
             }
             Some(Token::Keyword(Keywords::If)) => {
                 let exp = self.parse_l15_exp()?;
@@ -235,12 +235,12 @@ impl Parser {
             // BREAK ";"
             Some(Token::Keyword(Keywords::Break)) => {
                 self.lexer.expect_next(&Token::Semicolon)?;
-                Ok(Statement::Break)
+                Ok(Statement::Jmp(JumpStatement::Break))
             }
             // CONTINUE ";"
             Some(Token::Keyword(Keywords::Continue)) => {
                 self.lexer.expect_next(&Token::Semicolon)?;
-                Ok(Statement::Continue)
+                Ok(Statement::Jmp(JumpStatement::Continue))
             }
             // DO <statement> WHILE "(" <exp> ")" ";"
             Some(Token::Keyword(Keywords::Do)) => {

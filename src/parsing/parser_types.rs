@@ -155,8 +155,14 @@ impl std::fmt::Display for Function {
 pub type Declaration = (String, VariableType, Option<Level15Exp>);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+// labeled,
+// x compound,
+// x exp,
+// selection (IF & SWITCH),
+// x iteration,
+// jump (GOTO, CONTINUE, BREAK, RETURN)
 pub enum Statement {
-    Return(Option<Level15Exp>),
+    // Return(Option<Level15Exp>),
     Exp(Option<Level15Exp>),
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
     Compound(Vec<BlockItem>),
@@ -174,18 +180,14 @@ pub enum Statement {
     ),
     While(Level15Exp, Box<Statement>),
     DoWhile(Box<Statement>, Level15Exp),
-    Break,
-    Continue,
+    Jmp(JumpStatement), // Break,
+                        // Continue,
 }
 
 impl PrettyPrinter for Statement {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         match self {
-            Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => println!("{tabs}RETVRN {exp}"),
-                None => println!("{tabs}RETVRN 0 (omitted)"),
-            },
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
                     println!("{tabs}EXP: {exp}");
@@ -222,8 +224,6 @@ impl PrettyPrinter for Statement {
                 stmt.pretty_print(indentation_level + 1);
                 println!("{tabs}}} WHILE ({exp})");
             }
-            Statement::Break => println!("{tabs}BREAK"),
-            Statement::Continue => println!("{tabs}CONTINUE"),
             Statement::For(exp1, exp2, exp3, body) => {
                 print!("{tabs}FOR (");
                 if let Some(exp) = exp1 {
@@ -263,6 +263,7 @@ impl PrettyPrinter for Statement {
                 body.pretty_print(indentation_level + 1);
                 println!("{tabs}}}")
             }
+            Statement::Jmp(js) => js.pretty_print(indentation_level),
         }
     }
 }
@@ -270,10 +271,6 @@ impl PrettyPrinter for Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Return(exp_opt) => match exp_opt {
-                Some(exp) => writeln!(f, "RETVRN {exp}"),
-                None => writeln!(f, "RETVRN 0 (omitted)"),
-            },
             Statement::Exp(exp_opt) => match exp_opt {
                 Some(exp) => writeln!(f, "EXP: {exp}"),
                 None => writeln!(f, "NULL EXP"),
@@ -305,16 +302,14 @@ impl std::fmt::Display for Statement {
             Statement::DoWhile(exp, stmt) => {
                 writeln!(f, "DO {{\n\t{stmt}\n}} WHILE ({exp})")
             }
-            Statement::Break => writeln!(f, "BREAK"),
-            Statement::Continue => writeln!(f, "CONTINUE"),
+            Statement::Jmp(js) => writeln!(f, "{js}"),
         }
     }
 }
 
 impl Statement {
-    pub fn has_return(&self) -> bool {
+    fn has_return(&self) -> bool {
         match self {
-            Statement::Return(_) => true,
             Statement::If(_, pred, else_opt) => {
                 let pred_has_ret = pred.has_return();
                 if let Some(else_stmt) = else_opt {
@@ -330,9 +325,39 @@ impl Statement {
             Statement::While(_, stmt) => stmt.has_return(),
             Statement::DoWhile(stmt, _) => stmt.has_return(),
             Statement::Exp(_) => false,
-            Statement::Break => false,
-            Statement::Continue => false,
+            Statement::Jmp(js) => match js {
+                JumpStatement::Break => false,
+                JumpStatement::Continue => false,
+                JumpStatement::Return(_) => true,
+            },
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JumpStatement {
+    Break,
+    Continue,
+    Return(Option<Level15Exp>),
+}
+
+impl std::fmt::Display for JumpStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JumpStatement::Break => writeln!(f, "BREAK"),
+            JumpStatement::Continue => writeln!(f, "CONTINUE"),
+            JumpStatement::Return(exp_opt) => match exp_opt {
+                Some(exp) => writeln!(f, "RETVRN {exp}"),
+                None => writeln!(f, "RETVRN 0 (omitted)"),
+            },
+        }
+    }
+}
+
+impl PrettyPrinter for JumpStatement {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        println!("{tabs}{}", self)
     }
 }
 
