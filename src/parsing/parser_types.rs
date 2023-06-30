@@ -162,25 +162,52 @@ pub type Declaration = (String, VariableType, Option<Level15Exp>);
 // x iteration,
 // jump (GOTO, CONTINUE, BREAK, RETURN)
 pub enum Statement {
-    Exp(Option<Level15Exp>),
-    If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
     Compound(Vec<BlockItem>),
-    // For(
-    //     Option<Level15Exp>,
-    //     Option<Level15Exp>,
-    //     Option<Level15Exp>,
-    //     Box<Statement>,
-    // ),
-    // ForDecl(
-    //     Declaration,
-    //     Option<Level15Exp>,
-    //     Option<Level15Exp>,
-    //     Box<Statement>,
-    // ),
-    // While(Level15Exp, Box<Statement>),
-    // DoWhile(Box<Statement>, Level15Exp),
-    Jmp(JumpStatement),
+    Exp(Option<Level15Exp>),
+    Select(SelectionStatement),
     Iter(IterationStatement),
+    Jmp(JumpStatement),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SelectionStatement {
+    If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
+}
+
+impl PrettyPrinter for SelectionStatement {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        match self {
+            SelectionStatement::If(exp, pred, else_opt) => match else_opt {
+                Some(else_stmt) => {
+                    println!("{tabs}IF: ({exp}) {{");
+                    println!("{tabs}\t{pred}");
+                    println!("{tabs}}} else {{");
+                    println!("{tabs}\t{else_stmt}");
+                    println!("{tabs}}}");
+                }
+                None => {
+                    println!("{tabs}IF: ({exp}) {{");
+                    println!("{tabs}\t{pred}");
+                    println!("{tabs}}}");
+                }
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for SelectionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SelectionStatement::If(exp, pred, else_opt) => match else_opt {
+                Some(else_stmt) => writeln!(
+                    f,
+                    "IF: {exp} {{\n\t{pred}\n\t}} else {{\n\t{else_stmt}\n\t}}"
+                ),
+                None => writeln!(f, "IF: {exp} {{\n\t{pred}\n\t}}"),
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -286,20 +313,7 @@ impl PrettyPrinter for Statement {
                     println!("{tabs}EXP: {exp}");
                 }
             }
-            Statement::If(exp, pred, else_opt) => match else_opt {
-                Some(else_stmt) => {
-                    println!("{tabs}IF: ({exp}) {{");
-                    println!("{tabs}\t{pred}");
-                    println!("{tabs}}} else {{");
-                    println!("{tabs}\t{else_stmt}");
-                    println!("{tabs}}}");
-                }
-                None => {
-                    println!("{tabs}IF: ({exp}) {{");
-                    println!("{tabs}\t{pred}");
-                    println!("{tabs}}}");
-                }
-            },
+            Statement::Select(select_stmt) => select_stmt.pretty_print(indentation_level),
             Statement::Compound(block_items) => {
                 println!("{tabs}{{");
                 for block_item in block_items {
@@ -320,13 +334,7 @@ impl std::fmt::Display for Statement {
                 Some(exp) => writeln!(f, "EXP: {exp}"),
                 None => writeln!(f, "NULL EXP"),
             },
-            Statement::If(exp, pred, else_opt) => match else_opt {
-                Some(else_stmt) => writeln!(
-                    f,
-                    "IF: {exp} {{\n\t{pred}\n\t}} else {{\n\t{else_stmt}\n\t}}"
-                ),
-                None => writeln!(f, "IF: {exp} {{\n\t{pred}\n\t}}"),
-            },
+            Statement::Select(select_stmt) => writeln!(f, "{select_stmt}"),
             Statement::Compound(block_items) => {
                 writeln!(f, "{{")?;
                 for block_item in block_items {
@@ -344,15 +352,17 @@ impl std::fmt::Display for Statement {
 impl Statement {
     fn has_return(&self) -> bool {
         match self {
-            Statement::If(_, pred, else_opt) => {
-                let pred_has_ret = pred.has_return();
-                if let Some(else_stmt) = else_opt {
-                    let else_stmt_has_ret = else_stmt.has_return();
-                    pred_has_ret && else_stmt_has_ret
-                } else {
-                    pred_has_ret
+            Statement::Select(select_stmt) => match select_stmt {
+                SelectionStatement::If(_, pred, else_opt) => {
+                    let pred_has_ret = pred.has_return();
+                    if let Some(else_stmt) = else_opt {
+                        let else_stmt_has_ret = else_stmt.has_return();
+                        pred_has_ret && else_stmt_has_ret
+                    } else {
+                        pred_has_ret
+                    }
                 }
-            }
+            },
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
             Statement::Exp(_) => false,
             Statement::Iter(iter_stmt) => match iter_stmt {

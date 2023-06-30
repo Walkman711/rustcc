@@ -156,13 +156,17 @@ impl Parser {
 
                 if self.lexer.advance_if_match(&Token::Keyword(Keywords::Else)) {
                     let else_stmt = self.parse_statement()?;
-                    Ok(Statement::If(
+                    Ok(Statement::Select(SelectionStatement::If(
                         exp,
                         Box::new(pred_stmt),
                         Some(Box::new(else_stmt)),
-                    ))
+                    )))
                 } else {
-                    Ok(Statement::If(exp, Box::new(pred_stmt), None))
+                    Ok(Statement::Select(SelectionStatement::If(
+                        exp,
+                        Box::new(pred_stmt),
+                        None,
+                    )))
                 }
             }
             Some(Token::OpenBrace) => {

@@ -306,7 +306,18 @@ pub trait AsmGenerator {
                     self.gen_l15_asm(exp)?;
                 }
             }
-            Statement::If(exp, predicate, else_opt) => {
+            Statement::Select(select_stmt) => self.gen_select_stmt_asm(select_stmt)?,
+            Statement::Compound(block_items) => self.gen_block_asm(block_items)?,
+            Statement::Iter(iter_stmt) => self.gen_iter_stmt_asm(iter_stmt)?,
+            Statement::Jmp(jmp_stmt) => self.gen_jmp_stmt_asm(jmp_stmt)?,
+        }
+
+        Ok(())
+    }
+
+    fn gen_select_stmt_asm(&mut self, select_stmt: SelectionStatement) -> RustCcResult<()> {
+        match select_stmt {
+            SelectionStatement::If(exp, predicate, else_opt) => {
                 let else_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
@@ -332,11 +343,7 @@ pub trait AsmGenerator {
                 }
                 self.write_jmp_label(exit_label);
             }
-            Statement::Compound(block_items) => self.gen_block_asm(block_items)?,
-            Statement::Iter(iter_stmt) => self.gen_iter_stmt_asm(iter_stmt)?,
-            Statement::Jmp(jmp_stmt) => self.gen_jmp_stmt_asm(jmp_stmt)?,
         }
-
         Ok(())
     }
 
@@ -468,6 +475,7 @@ pub trait AsmGenerator {
 
         Ok(())
     }
+
     fn gen_jmp_stmt_asm(&mut self, js: JumpStatement) -> RustCcResult<()> {
         match js {
             JumpStatement::Break => {
