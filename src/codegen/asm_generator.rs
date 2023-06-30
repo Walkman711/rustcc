@@ -333,7 +333,16 @@ pub trait AsmGenerator {
                 self.write_jmp_label(exit_label);
             }
             Statement::Compound(block_items) => self.gen_block_asm(block_items)?,
-            Statement::While(exp, stmt) => {
+            Statement::Iter(iter_stmt) => self.gen_iter_stmt_asm(iter_stmt)?,
+            Statement::Jmp(jmp_stmt) => self.gen_jmp_stmt_asm(jmp_stmt)?,
+        }
+
+        Ok(())
+    }
+
+    fn gen_iter_stmt_asm(&mut self, iter_stmt: IterationStatement) -> RustCcResult<()> {
+        match iter_stmt {
+            IterationStatement::While(exp, stmt) => {
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
@@ -357,7 +366,7 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
             }
-            Statement::DoWhile(stmt, exp) => {
+            IterationStatement::DoWhile(stmt, exp) => {
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
@@ -375,7 +384,7 @@ pub trait AsmGenerator {
                 self.write_branch_inst(Cond::NotEquals, continue_label);
                 self.write_jmp_label(exit_label);
             }
-            Statement::For(initial_exp, controlling_exp, post_exp, body) => {
+            IterationStatement::For(initial_exp, controlling_exp, post_exp, body) => {
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
@@ -409,7 +418,7 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(exit_label);
             }
-            Statement::ForDecl(decl, controlling_exp, post_exp, body) => {
+            IterationStatement::ForDecl(decl, controlling_exp, post_exp, body) => {
                 let start_label = self.get_next_jmp_label();
                 let continue_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
@@ -455,12 +464,10 @@ pub trait AsmGenerator {
                     }
                 }
             }
-            Statement::Jmp(js) => self.gen_jmp_stmt_asm(js)?,
         }
 
         Ok(())
     }
-
     fn gen_jmp_stmt_asm(&mut self, js: JumpStatement) -> RustCcResult<()> {
         match js {
             JumpStatement::Break => {

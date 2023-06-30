@@ -210,18 +210,18 @@ impl Parser {
 
                 let body = self.parse_statement()?;
                 match decl {
-                    Some(d) => Ok(Statement::ForDecl(
+                    Some(d) => Ok(Statement::Iter(IterationStatement::ForDecl(
                         d,
                         controlling_exp,
                         post_exp,
                         Box::new(body),
-                    )),
-                    None => Ok(Statement::For(
+                    ))),
+                    None => Ok(Statement::Iter(IterationStatement::For(
                         init_exp,
                         controlling_exp,
                         post_exp,
                         Box::new(body),
-                    )),
+                    ))),
                 }
             }
             // WHILE "(" <exp> ")" <statement>
@@ -230,7 +230,10 @@ impl Parser {
                 let exp = self.parse_l15_exp()?;
                 self.lexer.expect_next(&Token::CloseParen)?;
                 let body = self.parse_statement()?;
-                Ok(Statement::While(exp, Box::new(body)))
+                Ok(Statement::Iter(IterationStatement::While(
+                    exp,
+                    Box::new(body),
+                )))
             }
             // BREAK ";"
             Some(Token::Keyword(Keywords::Break)) => {
@@ -250,7 +253,10 @@ impl Parser {
                 let exp = self.parse_l15_exp()?;
                 self.lexer.expect_next(&Token::CloseParen)?;
                 self.lexer.expect_next(&Token::Semicolon)?;
-                Ok(Statement::DoWhile(Box::new(body), exp))
+                Ok(Statement::Iter(IterationStatement::DoWhile(
+                    Box::new(body),
+                    exp,
+                )))
             }
             Some(Token::Semicolon) => Ok(Statement::Exp(None)),
             _ => {

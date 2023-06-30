@@ -162,10 +162,29 @@ pub type Declaration = (String, VariableType, Option<Level15Exp>);
 // x iteration,
 // jump (GOTO, CONTINUE, BREAK, RETURN)
 pub enum Statement {
-    // Return(Option<Level15Exp>),
     Exp(Option<Level15Exp>),
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
     Compound(Vec<BlockItem>),
+    // For(
+    //     Option<Level15Exp>,
+    //     Option<Level15Exp>,
+    //     Option<Level15Exp>,
+    //     Box<Statement>,
+    // ),
+    // ForDecl(
+    //     Declaration,
+    //     Option<Level15Exp>,
+    //     Option<Level15Exp>,
+    //     Box<Statement>,
+    // ),
+    // While(Level15Exp, Box<Statement>),
+    // DoWhile(Box<Statement>, Level15Exp),
+    Jmp(JumpStatement),
+    Iter(IterationStatement),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IterationStatement {
     For(
         Option<Level15Exp>,
         Option<Level15Exp>,
@@ -180,8 +199,82 @@ pub enum Statement {
     ),
     While(Level15Exp, Box<Statement>),
     DoWhile(Box<Statement>, Level15Exp),
-    Jmp(JumpStatement), // Break,
-                        // Continue,
+}
+
+impl std::fmt::Display for IterationStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IterationStatement::For(..) => {
+                writeln!(f, "FOR todo")
+            }
+            IterationStatement::ForDecl(..) => {
+                writeln!(f, "FORDecl todo")
+            }
+            IterationStatement::While(exp, stmt) => {
+                writeln!(f, "WHILE ({exp}) {{\n\t{stmt}\n}}")
+            }
+            IterationStatement::DoWhile(exp, stmt) => {
+                writeln!(f, "DO {{\n\t{stmt}\n}} WHILE ({exp})")
+            }
+        }
+    }
+}
+
+impl PrettyPrinter for IterationStatement {
+    fn pretty_print(&self, indentation_level: usize) {
+        let tabs = "\t".repeat(indentation_level);
+        match self {
+            IterationStatement::While(exp, stmt) => {
+                println!("{tabs}WHILE ({exp}) {{");
+                stmt.pretty_print(indentation_level + 1);
+                println!("{tabs}}}");
+            }
+            IterationStatement::DoWhile(stmt, exp) => {
+                println!("{tabs}DO {{");
+                stmt.pretty_print(indentation_level + 1);
+                println!("{tabs}}} WHILE ({exp})");
+            }
+            IterationStatement::For(exp1, exp2, exp3, body) => {
+                print!("{tabs}FOR (");
+                if let Some(exp) = exp1 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp2 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp3 {
+                    print!("{exp};");
+                }
+
+                println!(") {{");
+                body.pretty_print(indentation_level + 1);
+                println!("{tabs}}}")
+            }
+            IterationStatement::ForDecl(decl, exp2, exp3, body) => {
+                print!("{tabs}FOR ({} = ...; ", decl.0,);
+
+                if let Some(exp) = exp2 {
+                    print!("{exp}; ");
+                } else {
+                    print!("; ")
+                }
+
+                if let Some(exp) = exp3 {
+                    print!("{exp}");
+                }
+
+                println!(") {{");
+                body.pretty_print(indentation_level + 1);
+                println!("{tabs}}}")
+            }
+        }
+    }
 }
 
 impl PrettyPrinter for Statement {
@@ -214,56 +307,8 @@ impl PrettyPrinter for Statement {
                 }
                 println!("{tabs}}}");
             }
-            Statement::While(exp, stmt) => {
-                println!("{tabs}WHILE ({exp}) {{");
-                stmt.pretty_print(indentation_level + 1);
-                println!("{tabs}}}");
-            }
-            Statement::DoWhile(stmt, exp) => {
-                println!("{tabs}DO {{");
-                stmt.pretty_print(indentation_level + 1);
-                println!("{tabs}}} WHILE ({exp})");
-            }
-            Statement::For(exp1, exp2, exp3, body) => {
-                print!("{tabs}FOR (");
-                if let Some(exp) = exp1 {
-                    print!("{exp}; ");
-                } else {
-                    print!("; ")
-                }
-
-                if let Some(exp) = exp2 {
-                    print!("{exp}; ");
-                } else {
-                    print!("; ")
-                }
-
-                if let Some(exp) = exp3 {
-                    print!("{exp};");
-                }
-
-                println!(") {{");
-                body.pretty_print(indentation_level + 1);
-                println!("{tabs}}}")
-            }
-            Statement::ForDecl(decl, exp2, exp3, body) => {
-                print!("{tabs}FOR ({} = ...; ", decl.0,);
-
-                if let Some(exp) = exp2 {
-                    print!("{exp}; ");
-                } else {
-                    print!("; ")
-                }
-
-                if let Some(exp) = exp3 {
-                    print!("{exp}");
-                }
-
-                println!(") {{");
-                body.pretty_print(indentation_level + 1);
-                println!("{tabs}}}")
-            }
-            Statement::Jmp(js) => js.pretty_print(indentation_level),
+            Statement::Iter(iter_stmt) => iter_stmt.pretty_print(indentation_level),
+            Statement::Jmp(jmp_stmt) => jmp_stmt.pretty_print(indentation_level),
         }
     }
 }
@@ -290,19 +335,8 @@ impl std::fmt::Display for Statement {
                 writeln!(f, "}}")?;
                 Ok(())
             }
-            Statement::For(..) => {
-                writeln!(f, "FOR todo")
-            }
-            Statement::ForDecl(..) => {
-                writeln!(f, "FORDecl todo")
-            }
-            Statement::While(exp, stmt) => {
-                writeln!(f, "WHILE ({exp}) {{\n\t{stmt}\n}}")
-            }
-            Statement::DoWhile(exp, stmt) => {
-                writeln!(f, "DO {{\n\t{stmt}\n}} WHILE ({exp})")
-            }
-            Statement::Jmp(js) => writeln!(f, "{js}"),
+            Statement::Iter(iter_stmt) => writeln!(f, "{iter_stmt}"),
+            Statement::Jmp(jmp_stmt) => writeln!(f, "{jmp_stmt}"),
         }
     }
 }
@@ -320,12 +354,14 @@ impl Statement {
                 }
             }
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
-            Statement::For(_, _, _, stmt) => stmt.has_return(),
-            Statement::ForDecl(_, _, _, stmt) => stmt.has_return(),
-            Statement::While(_, stmt) => stmt.has_return(),
-            Statement::DoWhile(stmt, _) => stmt.has_return(),
             Statement::Exp(_) => false,
-            Statement::Jmp(js) => match js {
+            Statement::Iter(iter_stmt) => match iter_stmt {
+                IterationStatement::For(_, _, _, stmt) => stmt.has_return(),
+                IterationStatement::ForDecl(_, _, _, stmt) => stmt.has_return(),
+                IterationStatement::While(_, stmt) => stmt.has_return(),
+                IterationStatement::DoWhile(stmt, _) => stmt.has_return(),
+            },
+            Statement::Jmp(jmp_stmt) => match jmp_stmt {
                 JumpStatement::Break => false,
                 JumpStatement::Continue => false,
                 JumpStatement::Return(_) => true,
