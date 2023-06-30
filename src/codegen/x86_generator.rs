@@ -40,7 +40,6 @@ impl AsmGenerator for x86Generator {
     const PRIMARY_REGISTER: &'static str = "%eax";
     const BACKUP_REGISTER: &'static str = "%edx";
     const RETURN_REGISTER: &'static str = "%eax";
-    const GLOBAL_VAR_REGISTER: &'static str = "GLOBAL_VAR_TODO";
     const DEFAULT_ARGS: &'static str = "%eax, %edx";
     const UNARY_ARGS: &'static str = "%eax";
     const INT_SIZE: usize = 4;
@@ -151,7 +150,7 @@ impl AsmGenerator for x86Generator {
         Ok(())
     }
 
-    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
+    fn move_args_into_curr_frame(&mut self, params: &[Param]) -> RustCcResult<()> {
         let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
         for (i, param) in params.iter().enumerate() {
             // mov arg from register into primary
@@ -189,7 +188,8 @@ impl AsmGenerator for x86Generator {
     }
 
     fn mov_into_primary(&mut self, val: &str) {
-        let (mov_inst, dollar_sign) = if val.contains('%') {
+        let is_register = val.contains('%');
+        let (mov_inst, dollar_sign) = if is_register {
             ("movq", "")
         } else {
             ("movl", "$")
@@ -211,6 +211,17 @@ impl AsmGenerator for x86Generator {
         self.write_inst("movl %edx, %eax");
         self.write_inst("cdq");
         self.write_inst("idiv %ecx");
+    }
+
+    fn define_global(&mut self, id: &str, val: &i64) {
+        let gc = self.global_context_mut();
+        gc.write_defined_global_inst(format!("\t.global {id}"));
+        gc.write_defined_global_inst("\t.data".to_string());
+        gc.write_defined_global_inst("\t.align 4".to_string());
+        gc.write_defined_global_inst(format!("\t.type {id}, @object"));
+        gc.write_defined_global_inst(format!("\t.size {id}, 4"));
+        gc.write_defined_global_inst(format!("{id}:"));
+        gc.write_defined_global_inst(format!("\t.long {val}"));
     }
 
     fn declare_global(&mut self, id: &str) {

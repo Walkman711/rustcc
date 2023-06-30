@@ -19,6 +19,10 @@ pub struct ArmGenerator {
     global_context: GlobalContext,
 }
 
+impl ArmGenerator {
+    const GLOBAL_VAR_REGISTER: &'static str = "x9";
+}
+
 impl TryFrom<&Program> for ArmGenerator {
     type Error = RustCcError;
 
@@ -38,7 +42,6 @@ impl AsmGenerator for ArmGenerator {
     const PRIMARY_REGISTER: &'static str = "w0";
     const BACKUP_REGISTER: &'static str = "w1";
     const RETURN_REGISTER: &'static str = "w0";
-    const GLOBAL_VAR_REGISTER: &'static str = "x9";
     const DEFAULT_ARGS: &'static str = "w0, w1, w0";
     const UNARY_ARGS: &'static str = "w0, w0";
 
@@ -168,7 +171,7 @@ impl AsmGenerator for ArmGenerator {
         Ok(())
     }
 
-    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()> {
+    fn move_args_into_curr_frame(&mut self, params: &[Param]) -> RustCcResult<()> {
         let mut var_loc = self.stack_ptr() + Self::INT_SIZE;
 
         for (reg, param) in params.iter().enumerate() {
@@ -206,6 +209,15 @@ impl AsmGenerator for ArmGenerator {
         self.write_inst("sdiv  w2, w1, w0");
         self.write_inst("mul   w0, w2, w0");
         self.write_inst("sub   w0, w1, w0")
+    }
+
+    fn define_global(&mut self, id: &str, val: &i64) {
+        let gc = self.global_context_mut();
+        // set .p2align to 3 so that globals in the data section are 8-byte aligned
+        gc.write_defined_global_inst(".p2align 3".to_string());
+        gc.write_defined_global_inst(format!(".global _{id}"));
+        gc.write_defined_global_inst(format!("_{id}:"));
+        gc.write_defined_global_inst(format!("\t.long {val}"));
     }
 
     fn declare_global(&mut self, id: &str) {

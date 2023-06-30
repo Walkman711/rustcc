@@ -38,9 +38,6 @@ impl AsmGenerator for RiscVGenerator {
     const PRIMARY_REGISTER: &'static str = "a5";
     const BACKUP_REGISTER: &'static str = "a6";
     const RETURN_REGISTER: &'static str = "ra";
-
-    // XXX: incorrect
-    const GLOBAL_VAR_REGISTER: &'static str = "x30";
     const DEFAULT_ARGS: &'static str = "a5, a5, a6";
     const UNARY_ARGS: &'static str = "a5, a5";
     const INT_SIZE: usize = 8;
@@ -120,7 +117,7 @@ impl AsmGenerator for RiscVGenerator {
         todo!()
     }
 
-    fn move_args_onto_stack(&mut self, _params: &[Param]) -> RustCcResult<()> {
+    fn move_args_into_curr_frame(&mut self, _params: &[Param]) -> RustCcResult<()> {
         todo!()
     }
 
@@ -133,6 +130,10 @@ impl AsmGenerator for RiscVGenerator {
     }
 
     fn gen_remainder_inst(&mut self) {
+        todo!()
+    }
+
+    fn define_global(&mut self, _id: &str, _val: &i64) {
         todo!()
     }
 }

@@ -130,8 +130,6 @@ impl ScopedMap {
             panic!("tried to assign void to a variable: {rh_type:?}");
         };
 
-        // assert_eq!(rh, var_type);
-
         let new_state = if let VarLoc::Global(..) = loc {
             VarState::GlobalInitialized
         } else {

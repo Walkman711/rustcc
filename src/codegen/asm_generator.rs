@@ -24,7 +24,6 @@ pub trait AsmGenerator {
     const PRIMARY_REGISTER: &'static str;
     const BACKUP_REGISTER: &'static str;
     const RETURN_REGISTER: &'static str;
-    const GLOBAL_VAR_REGISTER: &'static str;
     const DEFAULT_ARGS: &'static str;
     const UNARY_ARGS: &'static str;
     const INT_SIZE: usize;
@@ -45,6 +44,9 @@ pub trait AsmGenerator {
 
     /// Write instruction to store `PRIMARY_REGISTER` on the stack.
     fn assign_to_global(&mut self, id: &str, offset: usize);
+
+    /// Write instruction to define global variables
+    fn define_global(&mut self, id: &str, val: &i64);
 
     /// Write instruction to declare uninitialized global variables
     fn declare_global(&mut self, id: &str);
@@ -69,7 +71,7 @@ pub trait AsmGenerator {
     fn write_fn_call(&mut self, fn_name: &str, args: Vec<Level15Exp>) -> RustCcResult<()>;
 
     /// When entering a function, move the arguments from registers onto the stack
-    fn move_args_onto_stack(&mut self, params: &[Param]) -> RustCcResult<()>;
+    fn move_args_into_curr_frame(&mut self, params: &[Param]) -> RustCcResult<()>;
 
     /// Compare `PRIMARY_REGISTER` with 0 and store result in `PRIMARY_REGISTER`.
     fn cmp_primary_with_zero(&mut self);
@@ -170,10 +172,6 @@ pub trait AsmGenerator {
 
     fn write_jmp_label(&mut self, lbl: usize) {
         self.write_inst(&format!(".L{lbl}_{}:", self.curr_ctx().function_name));
-        // self.write_to_buffer(Instruction::NoOffset(format!(
-        //     ".L{lbl}_{}:",
-        //     self.curr_ctx().function_name
-        // )));
     }
 
     fn gen_asm(&mut self, asm_filename: &str, prog: Program) -> RustCcResult<()> {
@@ -208,17 +206,20 @@ pub trait AsmGenerator {
                     self.increment_stack_ptr();
                 }
                 TopLevelItem::Fun(function) => match function {
-                    Function::Declaration(..) => {}
+                    Function::Declaration(..) => {
+                        /* We've already constructed the function map, so we don't need to worry
+                         * about function declarations preceding the function's first use */
+                    }
                     Function::Definition(_id, _ret, params, block_items) => {
-                        // Making a new function, so declare a new context,
+                        /* Making a new function, so declare a new context */
                         self.global_context_mut().new_function_context(function);
 
-                        // And then enter a new scope
+                        /* And then enter a new scope */
                         self.get_scoped_map_mut().new_scope()?;
 
-                        // Move arguments from registers and the previous stack frame into the
-                        // current stack frame
-                        self.move_args_onto_stack(params)?;
+                        /* Move arguments from registers and the previous stack frame into the
+                         * current stack frame */
+                        self.move_args_into_curr_frame(params)?;
 
                         // PERF: don't clone this
                         self.gen_block_asm(block_items.to_owned())?;
@@ -233,30 +234,7 @@ pub trait AsmGenerator {
         }
 
         for (id, val) in &defined_globals {
-            let arch = self.get_arch();
-            let gc = self.global_context_mut();
-            match arch {
-                Arch::ARM => {
-                    // TODO: pull this and .comm into fns
-                    // set .p2align to 3 so that globals in the data section are 8-byte aligned
-                    gc.write_defined_global_inst(".p2align 3".to_string());
-                    gc.write_defined_global_inst(format!(".global _{id}"));
-                    gc.write_defined_global_inst(format!("_{id}:"));
-                    gc.write_defined_global_inst(format!("\t.long {val}"));
-                }
-                Arch::x86 => {
-                    gc.write_defined_global_inst(format!("\t.global {id}"));
-                    gc.write_defined_global_inst("\t.data".to_string());
-                    gc.write_defined_global_inst("\t.align 4".to_string());
-                    gc.write_defined_global_inst(format!("\t.type {id}, @object"));
-                    gc.write_defined_global_inst(format!("\t.size {id}, 4"));
-                    gc.write_defined_global_inst(format!("{id}:"));
-                    gc.write_defined_global_inst(format!("\t.long {val}"));
-                }
-                Arch::RISCV => {
-                    todo!("pull global stuff into separate fns, or a trait.")
-                }
-            }
+            self.define_global(id, *val);
         }
 
         for id in &declared_globals {
@@ -338,10 +316,9 @@ pub trait AsmGenerator {
                             .into());
                         }
 
-                        // TODO: this is ugly, should be some way to stop generating ASM
                         self.gen_l15_asm(exp)?;
                     }
-                    // C standard states that int fns without a return value return 0 by default
+                    /* C standard states that int fns without a return value return 0 by default */
                     None => {
                         self.mov_into_primary("0");
                     }
@@ -357,21 +334,21 @@ pub trait AsmGenerator {
                 let else_label = self.get_next_jmp_label();
                 let exit_label = self.get_next_jmp_label();
 
-                // Evaluate exp and store in primary register
+                /* Evaluate exp and store in primary register */
                 self.gen_l15_asm(exp)?;
 
-                // If the exp == 0, trigger the else case to minimize the jump
-                // instructions we need
+                /* If the exp == 0, trigger the else case to minimize the jump
+                 * instructions we need */
                 self.cmp_primary_with_zero();
 
                 self.write_branch_inst(Cond::Equals, else_label);
 
-                // Execute if the if-exp is nonzero
+                /* Execute if the if-exp is nonzero */
                 self.gen_stmt_asm(*predicate)?;
                 self.write_branch_inst(Cond::Always, exit_label);
 
-                // If we don't have an else case, jumping to this label
-                // will just cause us to fall through to the exit label
+                /* If we don't have an else case, jumping to this label
+                 * will just cause us to fall through to the exit label */
                 self.write_jmp_label(else_label);
 
                 if let Some(else_stmt) = else_opt {
@@ -388,16 +365,17 @@ pub trait AsmGenerator {
                 self.get_break_stack_mut().push(exit_label);
 
                 self.write_jmp_label(continue_label);
-                // Evaluate exp and store in primary register
+
+                /* Evaluate exp and store in primary register */
                 self.gen_l15_asm(exp)?;
 
-                // If the exp == 0, trigger the else case to minimize the jump
-                // instructions we need
+                /* If the exp == 0, trigger the else case to minimize the jump
+                 * instructions we need */
                 self.cmp_primary_with_zero();
 
                 self.write_branch_inst(Cond::Equals, exit_label);
 
-                // Execute if the if-exp is nonzero
+                /* Execute if the if-exp is nonzero */
                 self.gen_stmt_asm(*stmt)?;
                 self.write_branch_inst(Cond::Always, continue_label);
 
@@ -410,11 +388,11 @@ pub trait AsmGenerator {
                 self.get_continue_stack_mut().push(continue_label);
                 self.get_break_stack_mut().push(exit_label);
 
-                // DO stmt
+                /* DO stmt */
                 self.write_jmp_label(continue_label);
                 self.gen_stmt_asm(*stmt)?;
 
-                // Evaluate exp and store in primary register
+                /* Evaluate exp and store in primary register */
                 self.gen_l15_asm(exp)?;
 
                 self.cmp_primary_with_zero();
@@ -439,14 +417,14 @@ pub trait AsmGenerator {
                     None => self.mov_into_primary("1"),
                 };
 
-                // Skip to end if primary reg == 0
+                /* Skip to end if primary reg == 0 */
                 self.cmp_primary_with_zero();
                 self.write_branch_inst(Cond::Equals, exit_label);
 
-                // Exec stmt
+                /* Exec stmt */
                 self.gen_stmt_asm(*body)?;
 
-                // Eval post exp
+                /* Eval post exp */
                 if let Some(exp) = post_exp {
                     self.gen_l15_asm(exp)?;
                 }
@@ -470,22 +448,22 @@ pub trait AsmGenerator {
 
                 self.write_jmp_label(start_label);
 
-                // Empty controlling exps evaluate to true
+                /* Empty controlling exps evaluate to true */
                 match controlling_exp {
                     Some(exp) => self.gen_l15_asm(exp)?,
                     None => self.mov_into_primary("1"),
                 };
 
-                // Skip to end if primary reg == 0
+                /* Skip to end if primary reg == 0 */
                 self.cmp_primary_with_zero();
                 self.write_branch_inst(Cond::Equals, exit_label);
 
-                // Exec stmt
+                /* Exec stmt */
                 self.gen_stmt_asm(*body)?;
 
                 self.write_jmp_label(continue_label);
 
-                // Eval post exp
+                /* Eval post exp */
                 if let Some(exp) = post_exp {
                     self.gen_l15_asm(exp)?;
                 }
@@ -572,13 +550,13 @@ pub trait AsmGenerator {
 
                 self.gen_l12_asm(exp)?;
 
-                // If the exp == 0, trigger the else case to minimize the jump
-                // instructions we need
+                /* If the exp == 0, trigger the else case
+                 * to minimize the jump instructions we need */
                 self.cmp_primary_with_zero();
 
                 self.write_branch_inst(Cond::Equals, else_label);
 
-                // Execute if the if-exp is nonzero
+                /* Execute if the if-exp is nonzero */
                 self.gen_l15_asm(*pred_exp)?;
                 self.write_branch_inst(Cond::Always, exit_label);
 
@@ -642,7 +620,7 @@ pub trait AsmGenerator {
         }
 
         if print_jmp_insts {
-            // Get the last term checked
+            /* Get the last term checked */
             self.cmp_primary_with_zero();
             self.write_branch_inst(Cond::Equals, short_circuit_label);
 
