@@ -4,6 +4,6 @@ enum HeadsOrTails {
 };
 
 int main() {
-    HeadsOrTails x = Heads;
+    enum HeadsOrTails x = Heads;
     return x;
 }

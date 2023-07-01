@@ -52,7 +52,7 @@ impl Parser {
                     todo!("Error: tried to declare a global var with type Void");
                 }
                 if let Some(Token::Integer(i)) = self.lexer.next_token() {
-                    self.lexer.expect_next(&Token::Semicolon)?;
+                    self.lexer.expect_next(&Token::Semicolon).unwrap();
                     Ok(TopLevelItem::Var(GlobalVar::Definition(
                         identifier, i as i64,
                     )))
@@ -145,7 +145,7 @@ impl Parser {
             Some(Token::Keyword(Keywords::Return)) => {
                 let exp = self.parse_l15_exp()?;
 
-                self.lexer.expect_next(&Token::Semicolon)?;
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
 
                 Ok(Statement::Jmp(JumpStatement::Return(Some(exp))))
             }
@@ -169,6 +169,11 @@ impl Parser {
                     )))
                 }
             }
+            Some(Token::Keyword(Keywords::Switch)) => {
+                let exp = self.parse_l15_exp()?;
+                // let stmt = self.parse_statement()?;
+                Ok(Statement::Select(SelectionStatement::Switch(exp, vec![])))
+            }
             Some(Token::OpenBrace) => {
                 // Move lexer back so that parse_block_items() is the only thing enforcing
                 // bracket rules. Otherwise the responsibility for bracket parsing is distributed
@@ -189,10 +194,10 @@ impl Parser {
                     // XXX: can we just declare and not init a var in the init exp?
                     // I think that the Expression type doesn't do empty exps for now.
                     decl = Some((id, var_type, Some(self.parse_l15_exp()?)));
-                    self.lexer.expect_next(&Token::Semicolon)?;
+                    self.lexer.expect_next(&Token::Semicolon).unwrap();
                 } else if !self.lexer.advance_if_match(&Token::Semicolon) {
                     let exp = self.parse_l15_exp()?;
-                    self.lexer.expect_next(&Token::Semicolon)?;
+                    self.lexer.expect_next(&Token::Semicolon).unwrap();
                     init_exp = Some(exp);
                 }
 
@@ -200,7 +205,7 @@ impl Parser {
                     None
                 } else {
                     let exp = self.parse_l15_exp()?;
-                    self.lexer.expect_next(&Token::Semicolon)?;
+                    self.lexer.expect_next(&Token::Semicolon).unwrap();
                     Some(exp)
                 };
 
@@ -241,12 +246,12 @@ impl Parser {
             }
             // BREAK ";"
             Some(Token::Keyword(Keywords::Break)) => {
-                self.lexer.expect_next(&Token::Semicolon)?;
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
                 Ok(Statement::Jmp(JumpStatement::Break))
             }
             // CONTINUE ";"
             Some(Token::Keyword(Keywords::Continue)) => {
-                self.lexer.expect_next(&Token::Semicolon)?;
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
                 Ok(Statement::Jmp(JumpStatement::Continue))
             }
             // DO <statement> WHILE "(" <exp> ")" ";"
@@ -256,19 +261,46 @@ impl Parser {
                 self.lexer.expect_next(&Token::OpenParen)?;
                 let exp = self.parse_l15_exp()?;
                 self.lexer.expect_next(&Token::CloseParen)?;
-                self.lexer.expect_next(&Token::Semicolon)?;
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
                 Ok(Statement::Iter(IterationStatement::DoWhile(
                     Box::new(body),
                     exp,
                 )))
             }
+            // Empty Exp
             Some(Token::Semicolon) => Ok(Statement::Exp(None)),
+            // GOTO <Identifier> ";"
+            Some(Token::Keyword(Keywords::Goto)) => {
+                let Token::Identifier(label) = self.lexer.next_token_fallible()? else {
+                    return Err(ParseError::MalformedDeclaration.into());
+                };
+
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
+                Ok(Statement::Jmp(JumpStatement::Goto(label)))
+            }
             _ => {
+                /* Move the lexer back so we don't lose the token */
                 self.lexer.back();
+
+                /* If we have an identifier followed by a colon, it's a labeled statement and we
+                 * can return. Otherwise, move the lexer back and then parse an expression */
+                if let Some(Token::Identifier(id)) = self.lexer.peek() {
+                    let _ = self.lexer.next_token();
+                    if let Some(Token::Colon) = self.lexer.peek() {
+                        let _ = self.lexer.next_token();
+                        let stmt = self.parse_statement()?;
+                        return Ok(Statement::Label(LabeledStatement::Label(
+                            id,
+                            Box::new(stmt),
+                        )));
+                    } else {
+                        self.lexer.back();
+                    }
+                }
 
                 let exp = Ok(Statement::Exp(Some(self.parse_l15_exp()?)));
 
-                self.lexer.expect_next(&Token::Semicolon)?;
+                self.lexer.expect_next(&Token::Semicolon).unwrap();
 
                 exp
             }
@@ -295,7 +327,7 @@ impl Parser {
                     // TODO: change for +=, -=, etc.
                     self.lexer.expect_next(&Token::SingleEquals)?;
                     let exp = self.parse_l15_exp()?;
-                    self.lexer.expect_next(&Token::Semicolon)?;
+                    self.lexer.expect_next(&Token::Semicolon).unwrap();
                     Some(exp)
                 };
 
@@ -421,7 +453,7 @@ impl Parser {
                 Level2Op::SizeOf,
                 Box::new(self.parse_l2_exp()?),
             )),
-            t => Err(ParseError::UnexpectedBottomLevelToken(t).into()),
+            t => panic!("{t:?}"), // Err(ParseError::UnexpectedBottomLevelToken(t).into()),
         }
     }
 }

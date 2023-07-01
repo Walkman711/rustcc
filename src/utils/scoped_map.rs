@@ -78,23 +78,52 @@ pub struct VarDetails {
     pub loc: VarLoc,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct Scope {
+    // var_name -> loc
+    var_map: HashMap<String, VarDetails>,
+    // Label in c -> our internal asm representation
+    labels: HashMap<String, String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct ScopedMap {
-    // var_name -> loc
-    var_maps: Vec<HashMap<String, VarDetails>>,
+    scopes: Vec<Scope>,
 }
 
 impl Default for ScopedMap {
     fn default() -> Self {
         Self {
-            var_maps: vec![HashMap::new()],
+            scopes: vec![Scope::default()],
         }
     }
 }
 
 impl ScopedMap {
+    pub fn new_label(&mut self, c_label: &str, asm_repr: &str) -> RustCcResult<()> {
+        let Some(last) = self.scopes.last_mut() else {
+            return Err(ScopeError::NoScope.into());
+        };
+
+        if let Some(prev_asm_repr) = last.labels.insert(c_label.to_owned(), asm_repr.to_owned()) {
+            todo!("make an error for labels that already existed in the scope. Can't define em twice! \n `{prev_asm_repr}`");
+        }
+
+        Ok(())
+    }
+
+    pub fn get_label(&mut self, c_label: &str) -> RustCcResult<String> {
+        let Some(last) = self.scopes.last_mut() else {
+            return Err(ScopeError::NoScope.into());
+        };
+
+        Ok(last.labels.get(c_label).unwrap().to_owned())
+    }
+}
+
+impl ScopedMap {
     pub fn new_param(&mut self, id: &str, var_type: VariableType, loc: VarLoc) -> RustCcResult<()> {
-        let Some(last) = self.var_maps.last_mut() else {
+        let Some(last) = self.scopes.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
@@ -107,7 +136,7 @@ impl ScopedMap {
         if let Some(VarDetails {
             state: VarState::Param,
             ..
-        }) = last.insert(id.to_owned(), details)
+        }) = last.var_map.insert(id.to_owned(), details)
         {
             return Err(ScopeError::ReusedParamNameInFunctionPrototype(id.to_owned()).into());
         }
@@ -122,7 +151,7 @@ impl ScopedMap {
         rh_type: ReturnType,
         loc: VarLoc,
     ) -> RustCcResult<()> {
-        let Some(last) = self.var_maps.last_mut() else {
+        let Some(last) = self.scopes.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
@@ -142,7 +171,7 @@ impl ScopedMap {
             loc,
         };
 
-        if let Some(VarDetails { state, .. }) = last.insert(var.to_owned(), details) {
+        if let Some(VarDetails { state, .. }) = last.var_map.insert(var.to_owned(), details) {
             state.validate_initialization(new_state, var)?;
         }
 
@@ -155,7 +184,7 @@ impl ScopedMap {
         var_type: VariableType,
         loc: VarLoc,
     ) -> RustCcResult<()> {
-        let Some(last) = self.var_maps.last_mut() else {
+        let Some(last) = self.scopes.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
@@ -174,7 +203,7 @@ impl ScopedMap {
         if let Some(VarDetails {
             state: VarState::DeclaredInThisScope,
             ..
-        }) = last.insert(var.to_owned(), details)
+        }) = last.var_map.insert(var.to_owned(), details)
         {
             return Err(ScopeError::DeclaredTwiceInSameScope(var.to_owned()).into());
         }
@@ -184,7 +213,7 @@ impl ScopedMap {
 
     // TODO: validate that the RH value == var_type of LH
     pub fn assign_var(&mut self, var: &str, rh_type: ReturnType) -> RustCcResult<VarLoc> {
-        let Some(last) = self.var_maps.last_mut() else {
+        let Some(last) = self.scopes.last_mut() else {
             return Err(ScopeError::NoScope.into());
         };
 
@@ -192,7 +221,7 @@ impl ScopedMap {
             panic!("tried to assign void to a variable");
         };
 
-        if let Some(var_details) = last.get_mut(var) {
+        if let Some(var_details) = last.var_map.get_mut(var) {
             assert_eq!(var_details.var_type, vt);
             match var_details.state {
                 VarState::DeclaredInThisScope => {
@@ -215,11 +244,11 @@ impl ScopedMap {
     }
 
     pub fn get_var(&self, var: &str) -> RustCcResult<VarDetails> {
-        let Some(last) = self.var_maps.last() else {
+        let Some(last) = self.scopes.last() else {
             return Err(ScopeError::NoScope.into());
         };
 
-        if let Some(details) = last.get(var) {
+        if let Some(details) = last.var_map.get(var) {
             if details.state.has_value() {
                 Ok(details.to_owned())
             } else {
@@ -231,23 +260,23 @@ impl ScopedMap {
     }
 
     pub fn new_scope(&mut self) -> RustCcResult<()> {
-        let Some(last) = self.var_maps.last() else {
+        let Some(last) = self.scopes.last() else {
             return Err(ScopeError::NoScope.into());
         };
 
-        let mut new_map = last.clone();
-        for details in new_map.values_mut() {
+        let mut new_scope = last.clone();
+        for details in new_scope.var_map.values_mut() {
             details.state = details.state.new_scope_state();
         }
-        self.var_maps.push(new_map);
+        self.scopes.push(new_scope);
         Ok(())
     }
 
     pub fn exit_scope(&mut self) -> RustCcResult<usize> {
         let mut num_initialized_in_scope = 0;
-        match self.var_maps.pop() {
-            Some(vm) => {
-                for (_var, details) in vm {
+        match self.scopes.pop() {
+            Some(scope) => {
+                for (_var, details) in scope.var_map {
                     if details.state == VarState::InitializedInThisScope {
                         num_initialized_in_scope += 1;
                     }

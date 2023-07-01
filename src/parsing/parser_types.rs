@@ -162,6 +162,7 @@ pub type Declaration = (String, VariableType, Option<Level15Exp>);
 // x iteration,
 // jump (GOTO, CONTINUE, BREAK, RETURN)
 pub enum Statement {
+    Label(LabeledStatement),
     Compound(Vec<BlockItem>),
     Exp(Option<Level15Exp>),
     Select(SelectionStatement),
@@ -170,8 +171,16 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LabeledStatement {
+    Label(String, Box<Statement>),
+    Case(Level15Exp, Box<Statement>),
+    Default(Box<Statement>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SelectionStatement {
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
+    Switch(Level15Exp, Vec<LabeledStatement>),
 }
 
 impl PrettyPrinter for SelectionStatement {
@@ -192,6 +201,7 @@ impl PrettyPrinter for SelectionStatement {
                     println!("{tabs}}}");
                 }
             },
+            SelectionStatement::Switch(..) => todo!("switch pretty print"),
         }
     }
 }
@@ -206,6 +216,7 @@ impl std::fmt::Display for SelectionStatement {
                 ),
                 None => writeln!(f, "IF: {exp} {{\n\t{pred}\n\t}}"),
             },
+            SelectionStatement::Switch(..) => todo!("switch disp"),
         }
     }
 }
@@ -308,6 +319,7 @@ impl PrettyPrinter for Statement {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         match self {
+            Statement::Label(lbl_stmt) => todo!("label stmt pretty print"),
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
                     println!("{tabs}EXP: {exp}");
@@ -330,6 +342,7 @@ impl PrettyPrinter for Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Statement::Label(lbl_stmt) => todo!("label stmt pretty print"),
             Statement::Exp(exp_opt) => match exp_opt {
                 Some(exp) => writeln!(f, "EXP: {exp}"),
                 None => writeln!(f, "NULL EXP"),
@@ -362,6 +375,7 @@ impl Statement {
                         pred_has_ret
                     }
                 }
+                SelectionStatement::Switch(_exp, stmt) => true, //stmt.has_return(),
             },
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
             Statement::Exp(_) => false,
@@ -375,7 +389,9 @@ impl Statement {
                 JumpStatement::Break => false,
                 JumpStatement::Continue => false,
                 JumpStatement::Return(_) => true,
+                JumpStatement::Goto(_) => false,
             },
+            Statement::Label(label) => todo!(),
         }
     }
 }
@@ -385,6 +401,7 @@ pub enum JumpStatement {
     Break,
     Continue,
     Return(Option<Level15Exp>),
+    Goto(String),
 }
 
 impl std::fmt::Display for JumpStatement {
@@ -396,6 +413,7 @@ impl std::fmt::Display for JumpStatement {
                 Some(exp) => writeln!(f, "RETVRN {exp}"),
                 None => writeln!(f, "RETVRN 0 (omitted)"),
             },
+            JumpStatement::Goto(label) => writeln!(f, "GOTO {label}"),
         }
     }
 }

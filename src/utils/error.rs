@@ -28,7 +28,7 @@ pub enum ParseError {
     UnexpectedTokenEnd,
     #[error("Next token didn't parse into op")]
     PeekFailed,
-    #[error("Int keyword not followed by an identifier")]
+    #[error("Keyword not followed by an identifier")]
     MalformedDeclaration,
     #[error("`{0:?}` is not a valid L2 token")]
     UnexpectedBottomLevelToken(Token),
