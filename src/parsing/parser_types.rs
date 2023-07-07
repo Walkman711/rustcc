@@ -180,7 +180,7 @@ pub enum LabeledStatement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SelectionStatement {
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
-    Switch(Level15Exp, Vec<Statement>),
+    Switch(Level15Exp, Box<Statement>),
 }
 
 impl PrettyPrinter for SelectionStatement {
@@ -319,7 +319,7 @@ impl PrettyPrinter for Statement {
     fn pretty_print(&self, indentation_level: usize) {
         let tabs = "\t".repeat(indentation_level);
         match self {
-            Statement::Label(lbl_stmt) => todo!("label stmt pretty print"),
+            Statement::Label(_lbl_stmt) => todo!("label stmt pretty print"),
             Statement::Exp(exp_opt) => {
                 if let Some(exp) = exp_opt {
                     println!("{tabs}EXP: {exp}");
@@ -342,7 +342,7 @@ impl PrettyPrinter for Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Label(lbl_stmt) => todo!("label stmt pretty print"),
+            Statement::Label(_lbl_stmt) => todo!("label stmt pretty print"),
             Statement::Exp(exp_opt) => match exp_opt {
                 Some(exp) => writeln!(f, "EXP: {exp}"),
                 None => writeln!(f, "NULL EXP"),
@@ -375,9 +375,7 @@ impl Statement {
                         pred_has_ret
                     }
                 }
-                SelectionStatement::Switch(_exp, stmts) => {
-                    stmts.iter().any(|stmt| stmt.has_return())
-                }
+                SelectionStatement::Switch(_exp, stmt) => stmt.has_return(),
             },
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
             Statement::Exp(_) => false,
@@ -393,7 +391,11 @@ impl Statement {
                 JumpStatement::Return(_) => true,
                 JumpStatement::Goto(_) => false,
             },
-            Statement::Label(label) => todo!(),
+            Statement::Label(label) => match label {
+                LabeledStatement::Label(_, stmt)
+                | LabeledStatement::Case(_, stmt)
+                | LabeledStatement::Default(stmt) => stmt.has_return(),
+            },
         }
     }
 }

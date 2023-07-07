@@ -143,9 +143,9 @@ impl Ctx for ArmContext {
         prologue_buf.push("\t.align 2".to_string());
         prologue_buf.push(format!("_{fn_name}:"));
         prologue_buf.push(format!("\tsub   sp, sp, {stack_frame_size}"));
-        prologue_buf.push("str   x29, [sp]".to_string());
-        prologue_buf.push("str   x30, [sp, 8]".to_string());
-        prologue_buf.push("mov   x29, sp".to_string());
+        prologue_buf.push("\tstr   x29, [sp]".to_string());
+        prologue_buf.push("\tstr   x30, [sp, 8]".to_string());
+        prologue_buf.push("\tmov   x29, sp".to_string());
 
         /* Deprecating this so it's easier to target 32-bit arm */
         // prologue_buf.push("\tstp   x29, x30, [sp, -16]!".to_string());

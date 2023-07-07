@@ -171,8 +171,26 @@ impl Parser {
             }
             Some(Token::Keyword(Keywords::Switch)) => {
                 let exp = self.parse_l15_exp()?;
-                // let stmt = self.parse_statement()?;
-                Ok(Statement::Select(SelectionStatement::Switch(exp, vec![])))
+                let stmt = self.parse_statement()?;
+                Ok(Statement::Select(SelectionStatement::Switch(
+                    exp,
+                    Box::new(stmt),
+                )))
+            }
+            // XXX: Hmm, how will this handle multiple cases in a single switch block??
+            Some(Token::Keyword(Keywords::Case)) => {
+                let exp = self.parse_l15_exp()?;
+                self.lexer.expect_next(&Token::Colon)?;
+                let stmt = self.parse_statement()?;
+                Ok(Statement::Label(LabeledStatement::Case(
+                    exp,
+                    Box::new(stmt),
+                )))
+            }
+            Some(Token::Keyword(Keywords::Default)) => {
+                self.lexer.expect_next(&Token::Colon)?;
+                let stmt = self.parse_statement()?;
+                Ok(Statement::Label(LabeledStatement::Default(Box::new(stmt))))
             }
             Some(Token::OpenBrace) => {
                 // Move lexer back so that parse_block_items() is the only thing enforcing

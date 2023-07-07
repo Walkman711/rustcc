@@ -318,35 +318,37 @@ pub trait AsmGenerator {
 
     fn gen_lbl_stmt_asm(&mut self, lbl_stmt: LabeledStatement) -> RustCcResult<()> {
         match lbl_stmt {
-            LabeledStatement::Label(label, stmt) => {
-                self.write_inst(&format!("{label}:"));
+            LabeledStatement::Label(_label, stmt) => {
+                todo!("label statements");
+                // self.write_inst(&format!("{label}:"));
                 // self.write_jmp_label(label);
                 self.gen_stmt_asm(*stmt)?;
             }
+            // TODO: Case and default have to be within a switch. Add something to context in order
+            // to express "in-switch"
             LabeledStatement::Case(exp, stmt) => {
                 let not_case_label = self.get_next_jmp_label();
+
                 /* Save value of primary register */
                 self.push_stack();
-                let prev_exp_loc = self.stack_ptr();
+                // TODO: add fn to move from PRIMARY to BACKUP
+                self.pop_stack_into_backup();
 
                 /* Get value of exp */
                 // TODO,CONSTANT_EXP,TYPE: this has to be a constant exp
                 self.gen_l15_asm(exp)?;
 
-                // FIX: consolidate with pop_stack_into_backup()
-                self.load_var(Self::BACKUP_REGISTER, VarLoc::CurrFrame(prev_exp_loc));
-                self.decrement_stack_ptr();
-
+                // TODO,OPTIMIZATION: could come up with a better way to move into backup
                 self.compare_primary_with_backup(Cond::Equals);
+                self.write_branch_inst(Cond::NotEquals, not_case_label);
                 self.gen_stmt_asm(*stmt)?;
 
                 self.write_jmp_label(not_case_label);
+
+                // Restore primary register contents
+                self.mov_into_primary(Self::BACKUP_REGISTER);
             }
-            LabeledStatement::Default(stmt) => {
-                let label = self.get_next_jmp_label();
-                // self.write_jmp_label();
-                self.gen_stmt_asm(*stmt)?;
-            }
+            LabeledStatement::Default(stmt) => self.gen_stmt_asm(*stmt)?,
         }
         Ok(())
     }
@@ -381,13 +383,16 @@ pub trait AsmGenerator {
             }
             SelectionStatement::Switch(exp, stmt) => {
                 let exit_label = self.get_next_jmp_label();
+                self.get_break_stack_mut().push(exit_label);
 
                 /* Get value of expression */
                 self.gen_l15_asm(exp)?;
 
                 // TODO,TYPING: this should be a constant integer type expression
+                self.gen_stmt_asm(*stmt)?;
+                // let cases = stmt.get_cases();
+                // panic!("{:?}", cases);
 
-                self.get_break_stack_mut().push(exit_label);
                 self.write_jmp_label(exit_label);
             }
         }

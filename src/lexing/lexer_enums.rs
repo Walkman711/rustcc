@@ -63,7 +63,7 @@ pub enum Keywords {
     Char,
     Const,
     Continue,
-    Defualt,
+    Default,
     Do,
     Double,
     Else,

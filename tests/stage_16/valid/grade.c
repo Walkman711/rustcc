@@ -1,24 +1,16 @@
 int main () {
-    int rank = 2;
-    int grade;
+  int rank = 2;
 
   switch(rank) {
     case 1 :
-      grade = 100;
-      break;
+      return 100;
     case 2 :
-      grade = 90;
-      break;
+      return 90;
     case 3 :
-      grade = 80;
-      break;
+      return 80;
     case 4 :
-      grade = 70;
-      break;
+      return 70;
     default :
-      grade = 0;
-      break;
+      return 0;
    }
-   
-   return grade;
 }
