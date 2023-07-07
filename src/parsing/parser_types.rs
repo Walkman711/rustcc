@@ -180,7 +180,7 @@ pub enum LabeledStatement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SelectionStatement {
     If(Level15Exp, Box<Statement>, Option<Box<Statement>>),
-    Switch(Level15Exp, Vec<LabeledStatement>),
+    Switch(Level15Exp, Vec<Statement>),
 }
 
 impl PrettyPrinter for SelectionStatement {
@@ -375,7 +375,9 @@ impl Statement {
                         pred_has_ret
                     }
                 }
-                SelectionStatement::Switch(_exp, stmt) => true, //stmt.has_return(),
+                SelectionStatement::Switch(_exp, stmts) => {
+                    stmts.iter().any(|stmt| stmt.has_return())
+                }
             },
             Statement::Compound(bis) => bis.iter().any(|bi| bi.has_return()),
             Statement::Exp(_) => false,
